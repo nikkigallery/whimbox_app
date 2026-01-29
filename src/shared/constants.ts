@@ -7,3 +7,10 @@ export const PLATFORM = {
   IS_WINDOWS: process.platform === 'win32',
   IS_LINUX: process.platform === 'linux',
 }
+
+export const RPC_SERVER = {
+  host: '127.0.0.1',
+  port: 8350,
+}
+
+export const RPC_URL = `ws://${RPC_SERVER.host}:${RPC_SERVER.port}`
