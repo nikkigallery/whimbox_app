@@ -4,8 +4,10 @@ import { makeAppWithSingleInstanceLock } from 'lib/electron-app/factories/app/in
 import { makeAppSetup } from 'lib/electron-app/factories/app/setup'
 import { loadReactDevtools } from 'lib/electron-app/utils'
 import { ENVIRONMENT } from 'shared/constants'
-import { MainWindow } from './windows/main'
 import { waitFor } from 'shared/utils'
+import { startAuthServer, stopAuthServer } from './services/auth-server'
+import { registerLauncherIpc } from './services/launcher-ipc'
+import { MainWindow } from './windows/main'
 
 makeAppWithSingleInstanceLock(async () => {
   ipcMain.handle('window:minimize', () => {
@@ -31,6 +33,12 @@ makeAppWithSingleInstanceLock(async () => {
 
   await app.whenReady()
   const window = await makeAppSetup(MainWindow)
+  registerLauncherIpc(window)
+  try {
+    await startAuthServer(window)
+  } catch (error) {
+    console.error('启动认证服务器失败:', error)
+  }
 
   if (ENVIRONMENT.IS_DEV) {
     await loadReactDevtools()
@@ -43,4 +51,8 @@ makeAppWithSingleInstanceLock(async () => {
       window.webContents.reload()
     })
   }
+})
+
+app.on('before-quit', () => {
+  stopAuthServer()
 })
