@@ -42,6 +42,9 @@ export class RpcClient {
     }
   >()
   private requestId = 1
+  private reconnectTimer: ReturnType<typeof setTimeout> | null = null
+  private reconnectAttempts = 0
+  private shouldReconnect = true
 
   constructor(url: string = RPC_URL) {
     this.url = url
@@ -53,19 +56,35 @@ export class RpcClient {
 
   connect() {
     if (this.state === 'open' || this.state === 'connecting') return
+    console.info('[rpc] connect: start', { url: this.url })
+    this.shouldReconnect = true
+    if (this.reconnectTimer) {
+      clearTimeout(this.reconnectTimer)
+      this.reconnectTimer = null
+    }
     this.setState('connecting')
     const ws = new WebSocket(this.url)
     this.ws = ws
     ws.onopen = () => {
+      console.info('[rpc] connect: open')
       this.setState('open')
+      this.reconnectAttempts = 0
     }
-    ws.onclose = () => {
+    ws.onclose = (event) => {
+      console.warn('[rpc] connect: close', {
+        code: event.code,
+        reason: event.reason,
+        wasClean: event.wasClean,
+      })
       this.setState('closed')
       this.cleanupPending(new Error('RPC connection closed'))
+      this.scheduleReconnect()
     }
-    ws.onerror = () => {
+    ws.onerror = (event) => {
+      console.warn('[rpc] connect: error', event)
       this.setState('error')
       this.emit('error', { message: 'RPC connection error' })
+      this.scheduleReconnect()
     }
     ws.onmessage = (event) => {
       this.handleMessage(event.data)
@@ -74,10 +93,16 @@ export class RpcClient {
 
   disconnect() {
     if (!this.ws) return
+    console.info('[rpc] disconnect: manual')
+    this.shouldReconnect = false
     this.ws.close()
     this.ws = null
     this.setState('closed')
     this.cleanupPending(new Error('RPC connection closed'))
+    if (this.reconnectTimer) {
+      clearTimeout(this.reconnectTimer)
+      this.reconnectTimer = null
+    }
   }
 
   on<K extends ListenerKey>(
@@ -158,6 +183,7 @@ export class RpcClient {
   private setState(state: RpcState) {
     if (this.state === state) return
     this.state = state
+    console.info('[rpc] state:', state)
     this.emit('state', { state })
   }
 
@@ -167,6 +193,27 @@ export class RpcClient {
       pending.reject(error)
     }
     this.pending.clear()
+  }
+
+  private scheduleReconnect() {
+    if (!this.shouldReconnect) return
+    if (this.reconnectTimer) return
+    const baseDelay = 500
+    const maxDelay = 10_000
+    const attempt = Math.min(this.reconnectAttempts, 6)
+    const delay = Math.min(baseDelay * 2 ** attempt, maxDelay)
+    const jitter = Math.random() * 200
+    this.reconnectAttempts += 1
+    console.info('[rpc] reconnect: schedule', {
+      attempt: this.reconnectAttempts,
+      delay: Math.round(delay + jitter),
+    })
+    this.reconnectTimer = setTimeout(() => {
+      this.reconnectTimer = null
+      if (this.state === 'open' || this.state === 'connecting') return
+      console.info('[rpc] reconnect: attempt', { attempt: this.reconnectAttempts })
+      this.connect()
+    }, delay + jitter)
   }
 
   private emit<K extends ListenerKey>(event: K, payload: RpcListenerMap[K]) {

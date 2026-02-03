@@ -21,16 +21,22 @@ import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { NotificationDrawer, type NotificationItem } from 'renderer/components/notification-drawer'
 import { SettingsDialog } from 'renderer/components/settings-dialog'
 import { SidebarNavItem } from 'renderer/components/sidebar-nav-item'
+import { AutoTriggerPage } from '../pages/auto-trigger-page'
+import { HomePage } from '../pages/home-page'
+import { AutoNavigatePage } from '../pages/auto-navigate-page'
+import { OneDragonPage } from '../pages/one-dragon-page'
+import { AutoMacroPage } from '../pages/auto-macro-page'
+import { AutoMusicPage } from '../pages/auto-music-page'
 import { RpcClient } from 'renderer/lib/rpc'
 import { apiClient } from 'renderer/lib/api-client'
 
 const navItems = [
-  { label: '首页', icon: Home, active: true },
-  { label: '一条龙', icon: Layers },
-  { label: '自动触发', icon: Sparkles },
-  { label: '跑图路线', icon: Map },
-  { label: '键鼠宏', icon: Keyboard },
-  { label: '自动演奏', icon: Piano },
+  { id: 'home', label: '首页', icon: Home },
+  { id: 'one-dragon', label: '一条龙', icon: Layers },
+  { id: 'auto-trigger', label: '自动触发', icon: Sparkles },
+  { id: 'auto-navigate', label: '自动跑图', icon: Map },
+  { id: 'auto-macro', label: '键鼠宏', icon: Keyboard },
+  { id: 'auto-music', label: '自动演奏', icon: Piano },
 ]
 
 const quickActions = [
@@ -117,6 +123,7 @@ export function MainScreen() {
   const rpcClient = rpcRef.current
 
   const [rpcState, setRpcState] = useState(rpcClient.getState())
+  const [activePage, setActivePage] = useState('home')
   const [sessionId, setSessionId] = useState<string | null>(null)
   const [input, setInput] = useState('')
   const [messages, setMessages] = useState<UiMessage[]>([])
@@ -527,6 +534,29 @@ export function MainScreen() {
   const handleToggleMaximize = () => window.App.windowControls.toggleMaximize()
   const handleClose = () => window.App.windowControls.close()
 
+  const renderPage = () => {
+    switch (activePage) {
+      case 'one-dragon':
+        return <OneDragonPage />
+      case 'auto-trigger':
+        return <AutoTriggerPage />
+      case 'auto-navigate':
+        return <AutoNavigatePage />
+      case 'auto-macro':
+        return <AutoMacroPage />
+      case 'auto-music':
+        return <AutoMusicPage />
+      case 'home':
+      default:
+        return (
+          <HomePage
+            quickActions={quickActions}
+            messages={messages}
+          />
+        )
+    }
+  }
+
   return (
     <main className="flex h-screen flex-col bg-background text-foreground">
       <header className="app-drag flex items-center justify-between border-b border-slate-100 bg-white/80 px-6 py-3 dark:border-slate-800 dark:bg-slate-900/80">
@@ -598,10 +628,11 @@ export function MainScreen() {
             <div className="space-y-2 bg-white px-2 py-3 dark:bg-slate-900/60">
               {navItems.map((item) => (
                 <SidebarNavItem
-                  key={item.label}
+                  key={item.id}
                   label={item.label}
                   icon={item.icon}
-                  active={item.active}
+                  active={activePage === item.id}
+                  onClick={() => setActivePage(item.id)}
                 />
               ))}
             </div>
@@ -655,102 +686,7 @@ export function MainScreen() {
         </aside>
 
         <section className="flex flex-1 flex-col">
-          <div className="flex flex-1 flex-col items-center justify-center gap-6 px-10">
-            <div className="flex flex-col items-center gap-4">
-              <div className="flex size-20 items-center justify-center rounded-3xl bg-pink-100 text-pink-400 dark:bg-pink-500/20 dark:text-pink-300">
-                <Gift className="size-10" />
-              </div>
-              <p className="text-sm text-slate-400 dark:text-slate-400">
-                你好，我是奇想盒
-              </p>
-              <h1 className="text-xl font-semibold text-slate-700 dark:text-slate-100">
-                今天需要我帮你做点什么吗？
-              </h1>
-            </div>
-
-            <div className="grid w-full max-w-2xl grid-cols-1 gap-4 md:grid-cols-3">
-              {quickActions.map((action) => (
-                <div
-                  key={action.title}
-                  className="flex items-center gap-3 rounded-2xl border border-slate-100 bg-white px-4 py-4 shadow-sm dark:border-slate-800 dark:bg-slate-900"
-                >
-                  <div className="flex size-10 items-center justify-center rounded-xl bg-pink-50 text-pink-400 dark:bg-pink-500/15 dark:text-pink-300">
-                    <action.icon className="size-5" />
-                  </div>
-                  <span className="text-sm text-slate-500 dark:text-slate-300">
-                    {action.title}
-                  </span>
-                </div>
-              ))}
-            </div>
-
-            <div className="grid w-full max-w-4xl grid-cols-1 gap-4">
-              <div className="rounded-2xl border border-slate-100 bg-white p-4 shadow-sm dark:border-slate-800 dark:bg-slate-900">
-                <div className="flex flex-wrap items-center justify-between gap-2 text-xs text-slate-400">
-                  <div className="flex items-center gap-2">
-                    <span
-                      className={`size-2 rounded-full ${
-                        rpcState === 'open'
-                          ? 'bg-emerald-400'
-                          : rpcState === 'connecting'
-                            ? 'bg-amber-400'
-                            : 'bg-slate-400'
-                      }`}
-                    />
-                    <span>RPC {formatRpcState(rpcState)}</span>
-                  </div>
-                  <span>Session: {sessionId ?? '未建立'}</span>
-                </div>
-
-                <div className="mt-3 max-h-40 space-y-2 overflow-auto">
-                  {messages.length === 0 ? (
-                    <p className="text-xs text-slate-400">暂无对话内容</p>
-                  ) : (
-                    messages.map((message) => (
-                      <div
-                        key={message.id}
-                        className={`rounded-xl px-3 py-2 text-xs ${
-                          message.role === 'user'
-                            ? 'bg-pink-50 text-pink-600 dark:bg-pink-500/10 dark:text-pink-300'
-                            : 'bg-slate-50 text-slate-600 dark:bg-slate-800/60 dark:text-slate-200'
-                        }`}
-                      >
-                        <span className="mr-2 font-semibold">
-                          {message.role === 'user' ? '你' : 'Agent'}
-                        </span>
-                        <span>
-                          {message.content || (message.pending ? '处理中...' : '')}
-                        </span>
-                      </div>
-                    ))
-                  )}
-                </div>
-
-                <div className="mt-3 border-t border-slate-100 pt-3 text-xs dark:border-slate-800">
-                  <p className="text-slate-400">最近事件</p>
-                  <div className="mt-2 space-y-1">
-                    {eventLogs.length === 0 ? (
-                      <p className="text-slate-400">暂无事件</p>
-                    ) : (
-                      eventLogs.map((event) => (
-                        <div key={event.id} className="text-slate-500 dark:text-slate-300">
-                          <span className="font-semibold">{event.method}</span>
-                          {event.detail ? `：${event.detail}` : ''}
-                        </div>
-                      ))
-                    )}
-                  </div>
-                </div>
-              </div>
-
-            </div>
-
-            <div className="w-full max-w-5xl rounded-2xl border border-slate-100 bg-white p-4 text-xs text-slate-500 shadow-sm dark:border-slate-800 dark:bg-slate-900 dark:text-slate-300">
-              <p className="font-semibold text-slate-600 dark:text-slate-200">当前操作</p>
-              <p className="mt-2">{progressText || '暂无进行中的操作'}</p>
-              <p className="mt-1 text-slate-400">进度：{progressPercent}%</p>
-            </div>
-          </div>
+          {renderPage()}
 
           <div className="border-t border-slate-100 bg-white px-3 pt-3 pb-6 dark:border-slate-800 dark:bg-slate-900">
             <div className="flex items-end gap-4 rounded-2xl border border-slate-100 bg-white px-4 py-3 shadow-sm dark:border-slate-800 dark:bg-slate-900">
