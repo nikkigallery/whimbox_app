@@ -10,6 +10,7 @@ type UiMessage = {
   role: "user" | "assistant" | "system"
   content: string
   pending?: boolean
+  title?: string
 }
 
 type RpcEventLog = {
@@ -73,7 +74,7 @@ export function HomePage({
       ) : null}
 
       {hasConversation ? (
-        <div className="flex w-full max-w-4xl flex-1 min-h-0">
+        <div className="flex w-full max-w-4xl flex-1 min-h-0 mx-auto">
           <ConversationPanel messages={messages} />
         </div>
       ) : null}

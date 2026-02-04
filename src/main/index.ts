@@ -7,6 +7,7 @@ import { ENVIRONMENT } from 'shared/constants'
 import { waitFor } from 'shared/utils'
 import { startAuthServer, stopAuthServer } from './services/auth-server'
 import { registerLauncherIpc } from './services/launcher-ipc'
+import { registerRpcBridge, stopRpcBridge } from './services/rpc-bridge'
 import { MainWindow } from './windows/main'
 
 makeAppWithSingleInstanceLock(async () => {
@@ -34,6 +35,7 @@ makeAppWithSingleInstanceLock(async () => {
   await app.whenReady()
   const window = await makeAppSetup(MainWindow)
   registerLauncherIpc(window)
+  registerRpcBridge()
   try {
     await startAuthServer(window)
   } catch (error) {
@@ -55,4 +57,5 @@ makeAppWithSingleInstanceLock(async () => {
 
 app.on('before-quit', () => {
   stopAuthServer()
+  stopRpcBridge()
 })

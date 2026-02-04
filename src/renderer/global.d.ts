@@ -1,3 +1,5 @@
+import type { RpcError, RpcNotification, RpcState } from 'shared/rpc-types'
+
 declare global {
   interface Window {
     App: {
@@ -57,6 +59,20 @@ declare global {
         onLaunchAppStatus: (callback: (data: { message: string }) => void) => void
         onLaunchAppEnd: (callback: (data: { message: string }) => void) => void
         onAuthCallback: (callback: (data: { refreshToken?: string }) => void) => void
+      }
+      rpc: {
+        getState: () => Promise<RpcState>
+        request: <T = unknown>(
+          method: string,
+          params?: Record<string, unknown>,
+        ) => Promise<T>
+        notify: (method: string, params?: Record<string, unknown>) => void
+        onState: (callback: (data: { state: RpcState }) => void) => () => void
+        onNotification: (callback: (data: RpcNotification) => void) => () => void
+        onResponse: (
+          callback: (data: { id: number; result?: unknown; error?: RpcError }) => void,
+        ) => () => void
+        onError: (callback: (data: { message: string; error?: unknown }) => void) => () => void
       }
     }
   }

@@ -27,7 +27,7 @@ import { AutoNavigatePage } from '../pages/auto-navigate-page'
 import { OneDragonPage } from '../pages/one-dragon-page'
 import { AutoMacroPage } from '../pages/auto-macro-page'
 import { AutoMusicPage } from '../pages/auto-music-page'
-import { RpcClient } from 'renderer/lib/rpc'
+import { IpcRpcClient } from 'renderer/lib/ipc-rpc'
 import { apiClient } from 'renderer/lib/api-client'
 
 const navItems = [
@@ -59,6 +59,7 @@ type UiMessage = {
   role: 'user' | 'assistant' | 'system'
   content: string
   pending?: boolean
+  title?: string
 }
 
 type RpcEventLog = {
@@ -116,9 +117,9 @@ export function MainScreen() {
     localStorage.setItem('theme', isDark ? 'dark' : 'light')
   }, [isDark])
 
-  const rpcRef = useRef<RpcClient | null>(null)
+  const rpcRef = useRef<IpcRpcClient | null>(null)
   if (!rpcRef.current) {
-    rpcRef.current = new RpcClient()
+    rpcRef.current = new IpcRpcClient()
   }
   const rpcClient = rpcRef.current
 
@@ -129,6 +130,8 @@ export function MainScreen() {
   const [messages, setMessages] = useState<UiMessage[]>([])
   const [eventLogs, setEventLogs] = useState<RpcEventLog[]>([])
   const pendingAssistantIdRef = useRef<string | null>(null)
+  const activeLogGroupIdRef = useRef<string | null>(null)
+  const activeLogTitleRef = useRef<string | null>(null)
   const [announcements, setAnnouncements] = useState<NotificationItem[]>([])
   const [announcementsHash, setAnnouncementsHash] = useState<string>('')
   const [hasUnreadNotifications, setHasUnreadNotifications] = useState(false)
@@ -363,15 +366,71 @@ export function MainScreen() {
 
       addEventLog(notification.method, detail)
 
+      if (notification.method === 'event.agent.status') {
+        const status = typeof params?.status === 'string' ? params.status : ''
+        const detailText =
+          typeof params?.detail === 'string' && params.detail
+            ? params.detail
+            : ''
+        if (status === 'on_tool_start') {
+          if (pendingAssistantIdRef.current) {
+            setMessages((prev) =>
+              prev.map((message) =>
+                message.id === pendingAssistantIdRef.current
+                  ? { ...message, pending: false }
+                  : message,
+              ),
+            )
+            pendingAssistantIdRef.current = null
+          }
+          activeLogGroupIdRef.current = createId()
+          activeLogTitleRef.current = detailText
+        }
+        if (status === 'on_tool_end' || status === 'on_tool_error') {
+          if (pendingAssistantIdRef.current) {
+            setMessages((prev) =>
+              prev.map((message) =>
+                message.id === pendingAssistantIdRef.current
+                  ? { ...message, pending: false }
+                  : message,
+              ),
+            )
+            pendingAssistantIdRef.current = null
+          }
+          activeLogGroupIdRef.current = null
+          activeLogTitleRef.current = null
+        }
+      }
+
+      if (notification.method === 'event.task.progress') {
+        const detailText =
+          typeof params?.detail === 'string' ? params.detail : ''
+        const toolId = typeof params?.tool_id === 'string' ? params.tool_id : ''
+        if (detailText === 'started') {
+          if (!activeLogGroupIdRef.current) {
+            activeLogGroupIdRef.current = createId()
+            activeLogTitleRef.current = toolId || null
+          }
+        } else if (
+          detailText === 'completed' ||
+          detailText === 'cancelled'
+        ) {
+          activeLogGroupIdRef.current = null
+          activeLogTitleRef.current = null
+        }
+      }
+
       if (notification.method === 'event.agent.message') {
         const chunk = typeof detailValue === 'string' ? detailValue : ''
         if (!chunk) return
         setMessages((prev) => {
           const targetId = pendingAssistantIdRef.current
           if (!targetId) {
+            const newId = createId()
+            pendingAssistantIdRef.current = newId
             return [
               ...prev,
-              { id: createId(), role: 'assistant', content: chunk, pending: true },
+              { id: newId, role: 'assistant', content: chunk, pending: true },
             ]
           }
           const index = prev.findIndex((message) => message.id === targetId)
@@ -391,20 +450,66 @@ export function MainScreen() {
           return next
         })
       }
+
+      if (notification.method === 'event.task.log') {
+        const targetSessionId =
+          typeof params?.session_id === 'string' ? params.session_id : null
+        if (targetSessionId && sessionId && targetSessionId !== sessionId) {
+          return
+        }
+        const message =
+          typeof params?.message === 'string'
+            ? params.message
+            : typeof params?.raw_message === 'string'
+              ? params.raw_message
+              : ''
+        if (!message) return
+        setMessages((prev) => {
+          const activeId = activeLogGroupIdRef.current
+          if (!activeId) {
+            return [
+              ...prev,
+              { id: createId(), role: 'system', content: message },
+            ]
+          }
+          const index = prev.findIndex((item) => item.id === activeId)
+          const title = activeLogTitleRef.current
+            ? `工具运行日志 · ${activeLogTitleRef.current}`
+            : '工具运行日志'
+          if (index < 0) {
+            return [
+              ...prev,
+              {
+                id: activeId,
+                role: 'system',
+                title,
+                content: message,
+              },
+            ]
+          }
+          const next = [...prev]
+          const current = next[index]
+          next[index] = {
+            ...current,
+            title: current.title ?? title,
+            content: current.content
+              ? `${current.content}\n${message}`
+              : message,
+          }
+          return next
+        })
+      }
     })
     const offError = rpcClient.on('error', (payload) => {
       addEventLog('rpc.error', payload.message)
     })
 
-    rpcClient.connect()
-
     return () => {
       offState()
       offNotification()
       offError()
-      rpcClient.disconnect()
     }
-  }, [rpcClient, addEventLog])
+  }, [rpcClient, addEventLog, sessionId])
 
   useEffect(() => {
     if (rpcState !== 'open') return

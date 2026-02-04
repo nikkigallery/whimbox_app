@@ -1,4 +1,5 @@
 import { contextBridge, ipcRenderer } from 'electron'
+import type { RpcError, RpcNotification, RpcState } from 'shared/rpc-types'
 
 declare global {
   interface Window {
@@ -51,6 +52,42 @@ const API = {
     },
     onAuthCallback: (callback: (data: { refreshToken?: string }) => void) => {
       ipcRenderer.on('launcher:auth-callback', (_, data) => callback(data))
+    },
+  },
+  rpc: {
+    getState: () => ipcRenderer.invoke('rpc:get-state'),
+    request: (method: string, params?: Record<string, unknown>) =>
+      ipcRenderer.invoke('rpc:request', method, params),
+    notify: (method: string, params?: Record<string, unknown>) =>
+      ipcRenderer.send('rpc:notify', method, params),
+    onState: (callback: (data: { state: RpcState }) => void) => {
+      const listener = (_: Electron.IpcRendererEvent, data: { state: RpcState }) => callback(data)
+      ipcRenderer.on('rpc:state', listener)
+      return () => ipcRenderer.removeListener('rpc:state', listener)
+    },
+    onNotification: (callback: (data: RpcNotification) => void) => {
+      const listener = (
+        _: Electron.IpcRendererEvent,
+        data: RpcNotification,
+      ) => callback(data)
+      ipcRenderer.on('rpc:notification', listener)
+      return () => ipcRenderer.removeListener('rpc:notification', listener)
+    },
+    onResponse: (callback: (data: { id: number; result?: unknown; error?: RpcError }) => void) => {
+      const listener = (
+        _: Electron.IpcRendererEvent,
+        data: { id: number; result?: unknown; error?: RpcError },
+      ) => callback(data)
+      ipcRenderer.on('rpc:response', listener)
+      return () => ipcRenderer.removeListener('rpc:response', listener)
+    },
+    onError: (callback: (data: { message: string; error?: unknown }) => void) => {
+      const listener = (
+        _: Electron.IpcRendererEvent,
+        data: { message: string; error?: unknown },
+      ) => callback(data)
+      ipcRenderer.on('rpc:error', listener)
+      return () => ipcRenderer.removeListener('rpc:error', listener)
     },
   },
 }
