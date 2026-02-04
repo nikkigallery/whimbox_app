@@ -1,4 +1,5 @@
 import { useEffect, useMemo, useRef, useState } from "react"
+import { toast } from "sonner"
 
 import {
   Combobox,
@@ -10,6 +11,8 @@ import {
 } from "renderer/components/ui/combobox"
 import { ScrollCenterLayout } from "renderer/components/scroll-center-layout"
 import { IpcRpcClient } from "renderer/lib/ipc-rpc"
+import { Button } from "renderer/components/ui/button"
+import { Spinner } from "renderer/components/ui/spinner"
 
 type ConfigItem = {
   value: string | number | boolean
@@ -51,6 +54,7 @@ export function OneDragonPage({ sessionId, rpcState }: OneDragonPageProps) {
   const [gameConfig, setGameConfig] = useState<ConfigSection | null>(null)
   const [draftConfig, setDraftConfig] = useState<ConfigSection | null>(null)
   const [configMeta, setConfigMeta] = useState<ConfigMeta | null>(null)
+  const [isRunning, setIsRunning] = useState(false)
   const originalConfigRef = useRef<ConfigSection | null>(null)
   const [loading, setLoading] = useState(true)
   const [saving, setSaving] = useState(false)
@@ -86,6 +90,27 @@ export function OneDragonPage({ sessionId, rpcState }: OneDragonPageProps) {
       .catch(() => {})
     return () => {
       active = false
+    }
+  }, [rpcClient])
+
+  useEffect(() => {
+    const offNotification = rpcClient.on("notification", (notification) => {
+      if (notification.method !== "event.task.progress") return
+      const params =
+        notification.params && typeof notification.params === "object"
+          ? (notification.params as Record<string, unknown>)
+          : undefined
+      const toolId = typeof params?.tool_id === "string" ? params.tool_id : ""
+      if (toolId !== "nikki.all_in_one") return
+      const detail = typeof params?.detail === "string" ? params.detail : ""
+      if (detail === "started") {
+        setIsRunning(true)
+      } else if (detail === "completed" || detail === "cancelled") {
+        setIsRunning(false)
+      }
+    })
+    return () => {
+      offNotification()
     }
   }, [rpcClient])
 
@@ -127,7 +152,7 @@ export function OneDragonPage({ sessionId, rpcState }: OneDragonPageProps) {
         value: item.value,
       }))
     if (updates.length === 0) {
-      setStatus("暂无需要保存的修改。")
+      toast.info("暂无需要保存的修改。")
       return
     }
     setSaving(true)
@@ -136,9 +161,9 @@ export function OneDragonPage({ sessionId, rpcState }: OneDragonPageProps) {
       await rpcClient.sendRequest("config.update", { updates })
       originalConfigRef.current = draftConfig
       setGameConfig(draftConfig)
-      setStatus("已保存配置。")
+      toast.success("配置保存成功")
     } catch {
-      setStatus("保存失败，请稍后重试。")
+      toast.error("配置保存失败")
     } finally {
       setSaving(false)
     }
@@ -156,7 +181,7 @@ export function OneDragonPage({ sessionId, rpcState }: OneDragonPageProps) {
         tool_id: "nikki.all_in_one",
         input: {},
       })
-      setStatus("已启动一条龙任务。")
+      setIsRunning(true)
     } catch {
       setStatus("启动失败，请稍后重试。")
     }
@@ -171,33 +196,37 @@ export function OneDragonPage({ sessionId, rpcState }: OneDragonPageProps) {
           </h1>
         </div>
         <div className="flex items-center gap-3">
-          <button
-            type="button"
+          <Button
             onClick={handleSave}
             disabled={loading || saving}
-            className="rounded-xl border border-slate-200 bg-white px-4 py-2 text-sm text-slate-600 shadow-sm transition hover:bg-slate-50 disabled:cursor-not-allowed disabled:opacity-60 dark:border-slate-700 dark:bg-slate-900 dark:text-slate-200"
+            variant="outline"
+            className="rounded-xl"
           >
-            {saving ? "保存中..." : "保存设置"}
-          </button>
-          <button
-            type="button"
+            {saving ? (
+              <>
+                <Spinner className="size-4" />
+                保存中...
+              </>
+            ) : (
+              "保存设置"
+            )}
+          </Button>
+          <Button
             onClick={handleRun}
-            disabled={rpcState !== "open" || !sessionId}
-            className="rounded-xl bg-pink-500 px-4 py-2 text-sm font-semibold text-white shadow-sm transition hover:bg-pink-400 disabled:cursor-not-allowed disabled:opacity-60"
+            disabled={rpcState !== "open" || !sessionId || isRunning}
+            className="rounded-xl bg-pink-500 text-white shadow-sm transition hover:bg-pink-400"
           >
-            开始一条龙
-          </button>
+            {isRunning ? "一条龙运行中" : "开始一条龙"}
+          </Button>
         </div>
       </div>
 
-      {status ? (
-        <div className="rounded-xl border border-slate-200 bg-white px-4 py-3 text-sm text-slate-500 shadow-sm dark:border-slate-700 dark:bg-slate-900 dark:text-slate-300">
-          {status}
-        </div>
-      ) : null}
       <div className="mt-4 space-y-4">
         {loading ? (
-          <div className="text-sm text-slate-400">正在读取配置...</div>
+          <div className="flex items-center gap-2 text-sm text-slate-400">
+            <Spinner className="size-4" />
+            正在读取配置...
+          </div>
         ) : items.length === 0 ? (
           <div className="text-sm text-slate-400">暂无可用配置</div>
         ) : (

@@ -29,6 +29,7 @@ import { AutoMacroPage } from '../pages/auto-macro-page'
 import { AutoMusicPage } from '../pages/auto-music-page'
 import { IpcRpcClient } from 'renderer/lib/ipc-rpc'
 import { apiClient } from 'renderer/lib/api-client'
+import { Toaster } from 'renderer/components/ui/sonner'
 
 const navItems = [
   { id: 'home', label: '首页', icon: Home },
@@ -668,7 +669,9 @@ export function MainScreen() {
   }
 
   return (
-    <main className="flex h-screen flex-col bg-background text-foreground">
+    <>
+      <Toaster />
+      <main className="flex h-screen flex-col bg-background text-foreground">
       <header className="app-drag flex items-center justify-between border-b border-slate-100 bg-white/80 px-6 py-3 dark:border-slate-800 dark:bg-slate-900/80">
         <div className="flex items-center gap-2 text-pink-500">
           <Gift className="size-6" />
@@ -800,6 +803,7 @@ export function MainScreen() {
 
         </section>
       </div>
-    </main>
+      </main>
+    </>
   )
 }
