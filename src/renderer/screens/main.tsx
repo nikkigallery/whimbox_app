@@ -642,7 +642,7 @@ export function MainScreen() {
   const renderPage = () => {
     switch (activePage) {
       case 'one-dragon':
-        return <OneDragonPage />
+        return <OneDragonPage sessionId={sessionId} rpcState={rpcState} />
       case 'auto-trigger':
         return <AutoTriggerPage />
       case 'auto-navigate':
@@ -657,6 +657,11 @@ export function MainScreen() {
           <HomePage
             quickActions={quickActions}
             messages={messages}
+            input={input}
+            rpcState={rpcState}
+            sessionId={sessionId}
+            onInputChange={setInput}
+            onSend={handleSend}
           />
         )
     }
@@ -728,7 +733,7 @@ export function MainScreen() {
       </header>
 
       <div className="flex min-h-0 flex-1">
-        <aside className="flex w-68 flex-col border-r border-slate-100 bg-white dark:border-slate-800 dark:bg-slate-900">
+        <aside className="flex w-60 flex-col border-r border-slate-100 bg-white dark:border-slate-800 dark:bg-slate-900">
           <nav className="px-4">
             <div className="space-y-2 bg-white px-2 py-3 dark:bg-slate-900/60">
               {navItems.map((item) => (
@@ -793,44 +798,6 @@ export function MainScreen() {
         <section className="flex flex-1 flex-col">
           {renderPage()}
 
-          <div className="border-t border-slate-100 bg-white px-3 pt-3 pb-6 dark:border-slate-800 dark:bg-slate-900">
-            <div className="flex items-end gap-4 rounded-2xl border border-slate-100 bg-white px-4 py-3 shadow-sm dark:border-slate-800 dark:bg-slate-900">
-              <div className="flex-1">
-                <textarea
-                  rows={1}
-                  value={input}
-                  placeholder={
-                    rpcState === 'open'
-                      ? '请输入内容...'
-                      : 'RPC 未连接，暂无法发送'
-                  }
-                  onChange={(event) => {
-                    const target = event.currentTarget
-                    setInput(target.value)
-                    target.style.height = 'auto'
-                    target.style.height = `${target.scrollHeight}px`
-                  }}
-                  onKeyDown={(event) => {
-                    if (event.key === 'Enter' && !event.shiftKey) {
-                      event.preventDefault()
-                      handleSend()
-                    }
-                  }}
-                  className="max-h-40 w-full resize-none bg-transparent text-sm text-slate-600 placeholder:text-slate-400 focus:outline-none dark:text-slate-200"
-                />
-              </div>
-              <div className="flex items-center gap-3">
-                <button
-                  type="button"
-                  onClick={handleSend}
-                  disabled={!input.trim() || rpcState !== 'open' || !sessionId}
-                  className="flex size-9 items-center justify-center rounded-xl bg-pink-400 text-white shadow transition disabled:cursor-not-allowed disabled:opacity-50"
-                >
-                  <Send className="size-4" />
-                </button>
-              </div>
-            </div>
-          </div>
         </section>
       </div>
     </main>
