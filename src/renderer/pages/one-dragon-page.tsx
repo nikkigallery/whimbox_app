@@ -214,14 +214,14 @@ export function OneDragonPage({ sessionId, rpcState }: OneDragonPageProps) {
           <Button
             onClick={handleRun}
             disabled={rpcState !== "open" || !sessionId || isRunning}
-            className="rounded-xl bg-pink-500 text-white shadow-sm transition hover:bg-pink-400"
+            className="rounded-xl bg-pink-400 text-white shadow-sm transition hover:bg-pink-500"
           >
             {isRunning ? "一条龙运行中" : "开始一条龙"}
           </Button>
         </div>
       </div>
 
-      <div className="mt-4 space-y-4">
+      <div className="space-y-4">
         {loading ? (
           <div className="flex items-center gap-2 text-sm text-slate-400">
             <Spinner className="size-4" />
