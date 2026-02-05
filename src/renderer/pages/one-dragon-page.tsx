@@ -13,6 +13,8 @@ import { ScrollCenterLayout } from "renderer/components/scroll-center-layout"
 import { IpcRpcClient } from "renderer/lib/ipc-rpc"
 import { Button } from "renderer/components/ui/button"
 import { Spinner } from "renderer/components/ui/spinner"
+import { Checkbox } from "renderer/components/ui/checkbox"
+import { Input } from "renderer/components/ui/input"
 
 type ConfigItem = {
   value: string | number | boolean
@@ -250,16 +252,12 @@ export function OneDragonPage({ sessionId, rpcState }: OneDragonPageProps) {
                   </div>
                   {booleanLike ? (
                     <label className="inline-flex items-center gap-2 text-sm text-slate-600 dark:text-slate-300">
-                      <input
-                        type="checkbox"
+                      <Checkbox
                         checked={String(value) === "true"}
-                        onChange={(event) =>
-                          handleValueChange(
-                            key,
-                            event.target.checked ? "true" : "false",
-                          )
+                        onCheckedChange={(checked) =>
+                          handleValueChange(key, checked ? "true" : "false")
                         }
-                        className="size-4 rounded border-slate-300 text-pink-500 focus:ring-pink-500"
+                        className="data-[state=checked]:bg-pink-400 data-[state=checked]:border-pink-400 data-[state=checked]:text-white"
                       />
                       {String(value) === "true" ? "开启" : "关闭"}
                     </label>
@@ -299,12 +297,12 @@ export function OneDragonPage({ sessionId, rpcState }: OneDragonPageProps) {
                       </ComboboxContent>
                     </Combobox>
                   ) : (
-                    <input
+                    <Input
                       value={String(value)}
                       onChange={(event) =>
                         handleValueChange(key, event.target.value)
                       }
-                      className="w-full rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm text-slate-700 shadow-sm focus:border-pink-400 focus:outline-none focus:ring-1 focus:ring-pink-200 dark:border-slate-700 dark:bg-slate-900 dark:text-slate-100"
+                      className="w-full"
                     />
                   )}
                 </div>

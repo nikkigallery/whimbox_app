@@ -15,7 +15,7 @@ export function ScrollCenterLayout({
   return (
     <div
       className={cn(
-        "flex flex-1 overflow-y-auto [scrollbar-gutter:stable]",
+        "flex min-h-0 flex-1 flex-col overflow-y-auto [scrollbar-gutter:stable]",
         className,
       )}
     >

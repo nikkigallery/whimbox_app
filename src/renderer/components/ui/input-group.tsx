@@ -6,10 +6,15 @@ import { Button } from "renderer/components/ui/button"
 import { Input } from "renderer/components/ui/input"
 import { Textarea } from "renderer/components/ui/textarea"
 
-function InputGroup({ className, ...props }: React.ComponentProps<"div">) {
+type InputGroupProps = React.ComponentProps<"div"> & {
+  tone?: "default" | "pink"
+}
+
+function InputGroup({ className, tone = "pink", ...props }: InputGroupProps) {
   return (
     <div
       data-slot="input-group"
+      data-tone={tone}
       role="group"
       className={cn(
         "group/input-group border-input dark:bg-input/30 relative flex w-full items-center rounded-md border shadow-xs transition-[color,box-shadow] outline-none",
@@ -22,7 +27,9 @@ function InputGroup({ className, ...props }: React.ComponentProps<"div">) {
         "has-[>[data-align=block-end]]:h-auto has-[>[data-align=block-end]]:flex-col has-[>[data-align=block-end]]:[&>input]:pt-3",
 
         // Focus state.
-        "has-[[data-slot=input-group-control]:focus-visible]:border-ring has-[[data-slot=input-group-control]:focus-visible]:ring-ring/50 has-[[data-slot=input-group-control]:focus-visible]:ring-[3px]",
+        tone === "pink"
+          ? "has-[[data-slot=input-group-control]:focus-visible]:border-pink-400 has-[[data-slot=input-group-control]:focus-visible]:ring-pink-200/70 has-[[data-slot=input-group-control]:focus-visible]:ring-[3px]"
+          : "has-[[data-slot=input-group-control]:focus-visible]:border-ring has-[[data-slot=input-group-control]:focus-visible]:ring-ring/50 has-[[data-slot=input-group-control]:focus-visible]:ring-[3px]",
 
         // Error state.
         "has-[[data-slot][aria-invalid=true]]:ring-destructive/20 has-[[data-slot][aria-invalid=true]]:border-destructive dark:has-[[data-slot][aria-invalid=true]]:ring-destructive/40",
@@ -126,13 +133,19 @@ function InputGroupText({ className, ...props }: React.ComponentProps<"span">) {
   )
 }
 
+type InputGroupInputProps = React.ComponentProps<"input"> & {
+  tone?: "default" | "pink"
+}
+
 function InputGroupInput({
   className,
+  tone = "pink",
   ...props
-}: React.ComponentProps<"input">) {
+}: InputGroupInputProps) {
   return (
     <Input
       data-slot="input-group-control"
+      tone={tone}
       className={cn(
         "flex-1 rounded-none border-0 bg-transparent shadow-none focus-visible:ring-0 dark:bg-transparent",
         className

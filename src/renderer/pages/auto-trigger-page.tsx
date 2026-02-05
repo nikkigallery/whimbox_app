@@ -98,7 +98,7 @@ export function AutoTriggerPage() {
         </div>
       </div>
 
-      <div className="bg-white dark:bg-slate-900">
+      <div>
         {loading ? (
           <div className="flex items-center gap-2 text-sm text-slate-400">
             <Spinner className="size-4" />

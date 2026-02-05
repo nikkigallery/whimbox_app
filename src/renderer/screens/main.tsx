@@ -647,11 +647,11 @@ export function MainScreen() {
       case 'auto-trigger':
         return <AutoTriggerPage />
       case 'auto-navigate':
-        return <AutoNavigatePage />
+        return <AutoNavigatePage sessionId={sessionId} rpcState={rpcState} />
       case 'auto-macro':
-        return <AutoMacroPage />
+        return <AutoMacroPage sessionId={sessionId} rpcState={rpcState} />
       case 'auto-music':
-        return <AutoMusicPage />
+        return <AutoMusicPage sessionId={sessionId} rpcState={rpcState} />
       case 'home':
       default:
         return (
@@ -798,7 +798,7 @@ export function MainScreen() {
           </div>
         </aside>
 
-        <section className="flex flex-1 flex-col">
+        <section className="flex min-h-0 flex-1 flex-col">
           {renderPage()}
 
         </section>
