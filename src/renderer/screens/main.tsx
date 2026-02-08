@@ -9,6 +9,7 @@ import {
   Moon,
   Keyboard,
   Piano,
+  Rss,
   Send,
   Sparkles,
   Sun,
@@ -27,6 +28,7 @@ import { AutoNavigatePage } from '../pages/auto-navigate-page'
 import { OneDragonPage } from '../pages/one-dragon-page'
 import { AutoMacroPage } from '../pages/auto-macro-page'
 import { AutoMusicPage } from '../pages/auto-music-page'
+import { ScriptSubscribePage } from '../pages/script-subscribe-page'
 import { IpcRpcClient } from 'renderer/lib/ipc-rpc'
 import { apiClient } from 'renderer/lib/api-client'
 import { Toaster } from 'renderer/components/ui/sonner'
@@ -38,6 +40,7 @@ const navItems = [
   { id: 'auto-navigate', label: '自动跑图', icon: Map },
   { id: 'auto-macro', label: '键鼠宏', icon: Keyboard },
   { id: 'auto-music', label: '自动演奏', icon: Piano },
+  { id: 'script-subscribe', label: '脚本订阅', icon: Rss },
 ]
 
 const quickActions = [
@@ -187,9 +190,9 @@ export function MainScreen() {
       setUserAvatarUrl(userManager.getAvatarUrl())
       setUserName(user?.username ?? '已登录')
       if (user?.is_vip) {
-        setUserVip(`自动更新有效期：${user.vip_expiry_data ?? '未知'}`)
+        setUserVip(`自动更新：${user.vip_expiry_data ?? '未知'}`)
       } else if (user?.vip_expiry_data) {
-        setUserVip(`自动更新已过期：\n${user.vip_expiry_data}`)
+        setUserVip('自动更新已过期')
       } else {
         setUserVip('未开通自动更新')
       }
@@ -652,6 +655,8 @@ export function MainScreen() {
         return <AutoMacroPage sessionId={sessionId} rpcState={rpcState} />
       case 'auto-music':
         return <AutoMusicPage sessionId={sessionId} rpcState={rpcState} />
+      case 'script-subscribe':
+        return <ScriptSubscribePage onOpenExternal={launcherApi.openExternal} />
       case 'home':
       default:
         return (
@@ -736,7 +741,7 @@ export function MainScreen() {
       </header>
 
       <div className="flex min-h-0 flex-1">
-        <aside className="flex w-60 flex-col border-r border-slate-100 bg-white dark:border-slate-800 dark:bg-slate-900">
+        <aside className="shrink-0 flex w-60 flex-col border-r border-slate-100 bg-white dark:border-slate-800 dark:bg-slate-900">
           <nav className="px-4">
             <div className="space-y-2 bg-white px-2 py-3 dark:bg-slate-900/60">
               {navItems.map((item) => (
@@ -798,9 +803,8 @@ export function MainScreen() {
           </div>
         </aside>
 
-        <section className="flex min-h-0 flex-1 flex-col">
+        <section className="flex min-h-0 flex-1 flex-col overflow-hidden">
           {renderPage()}
-
         </section>
       </div>
       </main>

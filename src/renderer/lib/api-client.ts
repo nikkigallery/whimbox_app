@@ -11,6 +11,20 @@ export type UserProfile = {
   vip_expiry_data?: string
 }
 
+export type ScriptListItem = {
+  id: number
+  name: string
+  type?: string
+  target?: string
+  count?: number
+  uploader_name?: string
+  uploader_id?: number
+  subscribe_count: number | string
+  description?: string
+  update_time?: string
+  is_subscribed: boolean
+}
+
 type StoredUser = {
   user: UserProfile
   accessToken: string
@@ -211,6 +225,36 @@ class APIClient {
     return this.request('/whimbox/launcher/announcements', { method: 'GET' }) as Promise<{
       announcements: Array<{ title: string; url?: string; created_at: string }>
     }>
+  }
+
+  /** 搜索脚本（需登录以获取 is_subscribed） */
+  async searchScripts(params: {
+    page?: number
+    page_size?: number
+    subscribed?: boolean
+    type?: string
+    target?: string
+    min_count?: number
+    uploader_name?: string
+    order_by?: string
+  }) {
+    return this.request('/whimbox/scripts/search', {
+      method: 'POST',
+      data: params as Record<string, unknown>,
+      requireAuth: true,
+    }) as Promise<{
+      scripts: ScriptListItem[]
+      pagination: { total_count: number }
+    }>
+  }
+
+  /** 订阅/取消订阅脚本 */
+  async subscribeScript(params: { script_id: number; subscribe: boolean }) {
+    return this.request('/whimbox/scripts/subscribe', {
+      method: 'POST',
+      data: params as Record<string, unknown>,
+      requireAuth: true,
+    }) as Promise<{ is_subscribed: boolean; message?: string }>
   }
 }
 
