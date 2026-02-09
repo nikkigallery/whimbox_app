@@ -3,6 +3,7 @@ import { Bell } from "lucide-react"
 import {
   Sheet,
   SheetContent,
+  SheetDescription,
   SheetHeader,
   SheetTitle,
   SheetTrigger,
@@ -48,7 +49,7 @@ export function NotificationDrawer({
           ) : null}
         </button>
       </SheetTrigger>
-      <SheetContent side="right" className="w-[360px] sm:w-[420px]">
+      <SheetContent side="right" className="w-[360px] sm:w-[420px]" aria-describedby={undefined}>
         <SheetHeader>
           <SheetTitle>通知 / 公告</SheetTitle>
         </SheetHeader>

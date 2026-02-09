@@ -5,6 +5,7 @@ import { downloader } from './downloader'
 import { getAuthPort } from './auth-server'
 import { apiRequest, getAnnouncements } from './launcher-api'
 import { pythonManager } from './python-manager'
+import { scriptManager } from './script-manager'
 
 let initialized = false
 
@@ -55,9 +56,37 @@ export function registerLauncherIpc(window: BrowserWindow) {
   ipcMain.handle('launcher:get-announcements', () => getAnnouncements())
   ipcMain.handle(
     'launcher:api-request',
-    (_, endpoint: string, options: { method?: string; data?: Record<string, unknown>; accessToken?: string }) =>
+    (_, endpoint: string, options: { method?: 'GET' | 'POST' | 'PUT' | 'DELETE'; data?: Record<string, unknown>; accessToken?: string }) =>
       apiRequest(endpoint, options),
   )
+
+  scriptManager.on('progress', (payload: { status: string; title?: string; message?: string; progress?: number; error?: string }) => {
+    window.webContents.send('launcher:task-progress', payload)
+  })
+
+  ipcMain.handle('launcher:sync-subscribed-scripts', async (_, scriptsData: { scripts: Array<{ name: string; md5: string }> }) => {
+    try {
+      return await scriptManager.updateSubscribedScripts(scriptsData)
+    } catch (err) {
+      const message = err instanceof Error ? err.message : String(err)
+      window.webContents.send('launcher:task-progress', { status: 'error', title: '同步订阅脚本', error: message })
+      throw err
+    }
+  })
+
+  ipcMain.handle('launcher:download-script', async (_, item: { name: string; md5: string }) => {
+    try {
+      await scriptManager.downloadScript(item)
+    } catch (err) {
+      const message = err instanceof Error ? err.message : String(err)
+      window.webContents.send('launcher:task-progress', { status: 'error', title: '下载脚本', error: message })
+      throw err
+    }
+  })
+
+  ipcMain.handle('launcher:delete-script', (_, md5: string) => {
+    scriptManager.deleteScript(md5)
+  })
 
   downloader.on('progress', (progress) => {
     window.webContents.send('launcher:download-progress', progress)

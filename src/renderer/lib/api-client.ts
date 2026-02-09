@@ -254,7 +254,15 @@ class APIClient {
       method: 'POST',
       data: params as Record<string, unknown>,
       requireAuth: true,
-    }) as Promise<{ is_subscribed: boolean; message?: string }>
+    }) as Promise<{ is_subscribed: boolean; md5: string; message?: string }>
+  }
+
+  /** 获取所有订阅的脚本（用于全量同步） */
+  async getAllSubscribedScripts() {
+    return this.request('/whimbox/scripts/all_subscribed', {
+      method: 'GET',
+      requireAuth: true,
+    }) as Promise<{ scripts: Array<{ name: string; md5: string }> }>
   }
 }
 

@@ -275,14 +275,6 @@ export function ScriptSelectPage({
         <div className="flex flex-wrap items-center gap-2">
           <Button
             variant="outline"
-            className="rounded-xl"
-            onClick={() => void loadScripts()}
-            disabled={loading}
-          >
-            刷新列表
-          </Button>
-          <Button
-            variant="outline"
             className="rounded-xl text-red-500 hover:text-red-600"
             onClick={handleDelete}
             disabled={!selectedName}

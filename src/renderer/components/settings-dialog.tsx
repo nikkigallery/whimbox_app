@@ -56,6 +56,7 @@ type SettingsDialogProps = {
   onCheckUpdate: () => void
   onInstallUpdate: () => void
   onManualUpdate: () => void
+  onSyncScripts: () => void
 }
 
 const settingSections: SettingSection[] = [
@@ -86,8 +87,25 @@ const settingsContent: Record<
       onCheckUpdate,
       onInstallUpdate,
       onManualUpdate,
+      onSyncScripts,
     }) => (
       <div className="space-y-3">
+        <div className="rounded-xl border border-slate-100 bg-white px-4 py-3 text-sm dark:border-slate-800 dark:bg-slate-900">
+          <div className="flex flex-wrap items-center justify-between gap-3">
+            <div>
+              <p className="font-semibold text-slate-700 dark:text-slate-100">订阅脚本</p>
+              <p className="text-xs text-slate-400">同步已订阅的脚本到本地</p>
+            </div>
+            <Button
+              variant="outline"
+              size="sm"
+              disabled={isProcessing}
+              onClick={onSyncScripts}
+            >
+              同步订阅脚本
+            </Button>
+          </div>
+        </div>
         <div className="rounded-xl border border-slate-100 bg-white px-4 py-3 text-sm dark:border-slate-800 dark:bg-slate-900">
           <div className="flex flex-wrap items-center justify-between gap-3">
             <div>
@@ -198,6 +216,7 @@ export function SettingsDialog({
   onCheckUpdate,
   onInstallUpdate,
   onManualUpdate,
+  onSyncScripts,
 }: SettingsDialogProps) {
   const [activeSection, setActiveSection] = useState(settingSections[0]?.id ?? "general")
   const content = useMemo(
@@ -253,6 +272,7 @@ export function SettingsDialog({
                   onCheckUpdate,
                   onInstallUpdate,
                   onManualUpdate,
+                  onSyncScripts,
                 })
               : (
                   <div className="space-y-3">

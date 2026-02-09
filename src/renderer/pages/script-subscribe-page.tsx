@@ -111,9 +111,14 @@ function SubscribeCountBadge({ value }: { value: number | string }) {
 
 type ScriptSubscribePageProps = {
   onOpenExternal?: (url: string) => void
+  /** 订阅/取消订阅/同步脚本后刷新后端脚本列表（调用 script.refresh） */
+  onRefreshBackendScripts?: () => void | Promise<void>
 }
 
-export function ScriptSubscribePage({ onOpenExternal }: ScriptSubscribePageProps) {
+export function ScriptSubscribePage({
+  onOpenExternal,
+  onRefreshBackendScripts,
+}: ScriptSubscribePageProps) {
   const [searchParams, setSearchParams] = useState<SearchParams>(defaultSearchParams)
   const [tableData, setTableData] = useState<ScriptListItem[]>([])
   const [total, setTotal] = useState(0)
@@ -179,6 +184,21 @@ export function ScriptSubscribePage({ onOpenExternal }: ScriptSubscribePageProps
         setDetailScript({ ...detailScript, is_subscribed: res.is_subscribed })
       }
       toast.success(res.message ?? (res.is_subscribed ? "订阅成功" : "取消订阅成功"))
+      if (res.is_subscribed && res.md5) {
+        try {
+          await window.App.launcher.downloadScript({ name: row.name, md5: res.md5 })
+          onRefreshBackendScripts?.()
+        } catch {
+          toast.error("脚本下载失败，可在设置中重新同步")
+        }
+      } else if (!res.is_subscribed && res.md5) {
+        try {
+          await window.App.launcher.deleteScript(res.md5)
+          onRefreshBackendScripts?.()
+        } catch {
+          toast.error("删除本地脚本失败")
+        }
+      }
     } catch (err) {
       const msg = err instanceof Error ? err.message : ""
       if (msg.includes("403") || msg.includes("自动更新")) {

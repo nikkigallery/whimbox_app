@@ -22,6 +22,10 @@ import {
 } from 'lucide-react'
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { cn } from 'renderer/lib/utils'
+import {
+  GlobalProgressModal,
+  type TaskProgressState,
+} from 'renderer/components/global-progress-modal'
 import { NotificationDrawer, type NotificationItem } from 'renderer/components/notification-drawer'
 import { SettingsDialog } from 'renderer/components/settings-dialog'
 import {
@@ -78,6 +82,17 @@ const navItems: NavItem[] = [
     ],
   },
   { id: 'script-subscribe', label: '脚本订阅', icon: Rss },
+]
+
+/** 所有可作为 activePage 的页面 id（与侧边栏可切换到的页面一致） */
+const PAGE_IDS = [
+  'home',
+  'one-dragon',
+  'auto-trigger',
+  'auto-navigate',
+  'auto-macro',
+  'auto-music',
+  'script-subscribe',
 ]
 
 const quickActions = [
@@ -166,6 +181,8 @@ export function MainScreen() {
 
   const [rpcState, setRpcState] = useState(rpcClient.getState())
   const [activePage, setActivePage] = useState('home')
+  /** 已访问过的页面 id，仅这些页面会保持挂载，切换时用 CSS 显隐避免重新加载 */
+  const [visitedPages, setVisitedPages] = useState<Set<string>>(() => new Set(['home']))
   const [sessionId, setSessionId] = useState<string | null>(null)
   const [input, setInput] = useState('')
   const [messages, setMessages] = useState<UiMessage[]>([])
@@ -191,6 +208,7 @@ export function MainScreen() {
   const [progressText, setProgressText] = useState<string>('')
   const [progressPercent, setProgressPercent] = useState<number>(0)
   const [isProcessing, setIsProcessing] = useState(false)
+  const [taskProgressState, setTaskProgressState] = useState<TaskProgressState>({ status: 'idle' })
 
   const launcherApi = useMemo(() => window.App.launcher, [])
 
@@ -381,6 +399,56 @@ export function MainScreen() {
       setIsProcessing(false)
     }
   }, [launcherApi, checkAppStatus, formatError])
+
+  const refreshBackendScripts = useCallback(() => {
+    rpcClient.sendRequest('script.refresh', {}).catch(() => {})
+  }, [rpcClient])
+
+  const syncSubscribedScripts = useCallback(async () => {
+    const userManager = apiClient.getUserManager()
+    if (!userManager.isLoggedIn()) return
+    setTaskProgressState({
+      status: 'running',
+      title: '同步订阅脚本',
+      message: '正在获取订阅列表…',
+    })
+    try {
+      const data = await apiClient.getAllSubscribedScripts()
+      if (data.scripts?.length) {
+        await launcherApi.syncSubscribedScripts(data)
+      } else {
+        setTaskProgressState({
+          status: 'success',
+          title: '同步订阅脚本',
+          message: '暂无订阅脚本',
+        })
+      }
+      refreshBackendScripts()
+    } catch (err) {
+      setTaskProgressState({
+        status: 'error',
+        title: '同步订阅脚本',
+        error: err instanceof Error ? err.message : '获取订阅列表失败',
+      })
+    }
+  }, [launcherApi, refreshBackendScripts])
+
+  useEffect(() => {
+    const off = launcherApi.onTaskProgress(
+      (data: { status: string; title?: string; message?: string; progress?: number; error?: string }) => {
+        setTaskProgressState({
+          status: data.status as 'running' | 'success' | 'error',
+          title: data.title,
+          message: data.message,
+          progress: data.progress,
+          error: data.error,
+        })
+      },
+    )
+    return () => {
+      off()
+    }
+  }, [launcherApi])
 
   useEffect(() => {
     const offState = rpcClient.on('state', ({ state }) => {
@@ -608,6 +676,10 @@ export function MainScreen() {
       }
       setProgressText(data.message)
     })
+
+    if (apiClient.getUserManager().isLoggedIn()) {
+      syncSubscribedScripts()
+    }
   }, [
     launcherApi,
     refreshUserState,
@@ -617,6 +689,7 @@ export function MainScreen() {
     checkUpdate,
     addEventLog,
     formatError,
+    syncSubscribedScripts,
   ])
 
   useEffect(() => {
@@ -681,8 +754,12 @@ export function MainScreen() {
   const handleToggleMaximize = () => window.App.windowControls.toggleMaximize()
   const handleClose = () => window.App.windowControls.close()
 
-  const renderPage = () => {
-    switch (activePage) {
+  useEffect(() => {
+    setVisitedPages((prev) => new Set(prev).add(activePage))
+  }, [activePage])
+
+  const getPageContent = (pageId: string) => {
+    switch (pageId) {
       case 'one-dragon':
         return <OneDragonPage sessionId={sessionId} rpcState={rpcState} />
       case 'auto-trigger':
@@ -694,7 +771,12 @@ export function MainScreen() {
       case 'auto-music':
         return <AutoMusicPage sessionId={sessionId} rpcState={rpcState} />
       case 'script-subscribe':
-        return <ScriptSubscribePage onOpenExternal={launcherApi.openExternal} />
+        return (
+          <ScriptSubscribePage
+            onOpenExternal={launcherApi.openExternal}
+            onRefreshBackendScripts={refreshBackendScripts}
+          />
+        )
       case 'home':
       default:
         return (
@@ -714,6 +796,10 @@ export function MainScreen() {
   return (
     <>
       <Toaster />
+      <GlobalProgressModal
+        state={taskProgressState}
+        onClose={() => setTaskProgressState({ status: 'idle' })}
+      />
       <main className="flex h-screen flex-col bg-background text-foreground">
       <header className="app-drag flex items-center justify-between border-b border-slate-100 bg-white/80 px-6 py-3 dark:border-slate-800 dark:bg-slate-900/80">
         <div className="flex items-center gap-2 text-pink-500">
@@ -733,6 +819,7 @@ export function MainScreen() {
             onCheckUpdate={checkUpdate}
             onInstallUpdate={handleInstallUpdate}
             onManualUpdate={handleManualUpdate}
+            onSyncScripts={syncSubscribedScripts}
           />
           <button
             type="button"
@@ -918,7 +1005,17 @@ export function MainScreen() {
             </SidebarFooter>
           </Sidebar>
           <section className="flex min-h-0 flex-1 flex-col overflow-hidden">
-            {renderPage()}
+            {PAGE_IDS.filter((id) => visitedPages.has(id)).map((pageId) => (
+              <div
+                key={pageId}
+                className={cn(
+                  'flex min-h-0 flex-1 flex-col overflow-hidden',
+                  activePage !== pageId && 'hidden',
+                )}
+              >
+                {getPageContent(pageId)}
+              </div>
+            ))}
           </section>
         </div>
       </SidebarProvider>

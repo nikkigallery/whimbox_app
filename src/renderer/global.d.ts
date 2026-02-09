@@ -60,6 +60,18 @@ declare global {
         onLaunchAppStatus: (callback: (data: { message: string }) => void) => void
         onLaunchAppEnd: (callback: (data: { message: string }) => void) => void
         onAuthCallback: (callback: (data: { refreshToken?: string }) => void) => void
+        syncSubscribedScripts: (scriptsData: { scripts: Array<{ name: string; md5: string }> }) => Promise<unknown>
+        downloadScript: (item: { name: string; md5: string }) => Promise<void>
+        deleteScript: (md5: string) => Promise<void>
+        onTaskProgress: (
+          callback: (data: {
+            status: string
+            title?: string
+            message?: string
+            progress?: number
+            error?: string
+          }) => void,
+        ) => () => void
       }
       rpc: {
         getState: () => Promise<RpcState>

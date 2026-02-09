@@ -54,6 +54,21 @@ const API = {
     onAuthCallback: (callback: (data: { refreshToken?: string }) => void) => {
       ipcRenderer.on('launcher:auth-callback', (_, data) => callback(data))
     },
+    syncSubscribedScripts: (scriptsData: { scripts: Array<{ name: string; md5: string }> }) =>
+      ipcRenderer.invoke('launcher:sync-subscribed-scripts', scriptsData),
+    downloadScript: (item: { name: string; md5: string }) =>
+      ipcRenderer.invoke('launcher:download-script', item),
+    deleteScript: (md5: string) => ipcRenderer.invoke('launcher:delete-script', md5),
+    onTaskProgress: (
+      callback: (data: { status: string; title?: string; message?: string; progress?: number; error?: string }) => void,
+    ) => {
+      const listener = (
+        _: Electron.IpcRendererEvent,
+        data: { status: string; title?: string; message?: string; progress?: number; error?: string },
+      ) => callback(data)
+      ipcRenderer.on('launcher:task-progress', listener)
+      return () => ipcRenderer.removeListener('launcher:task-progress', listener)
+    },
   },
   rpc: {
     getState: () => ipcRenderer.invoke('rpc:get-state'),
