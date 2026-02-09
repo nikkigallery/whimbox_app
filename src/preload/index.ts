@@ -34,8 +34,10 @@ const API = {
     getAnnouncements: () => ipcRenderer.invoke('launcher:get-announcements'),
     apiRequest: (
       endpoint: string,
-      options?: { method?: string; data?: Record<string, unknown>; accessToken?: string },
+      options?: { method?: string; data?: Record<string, unknown>; requireAuth?: boolean },
     ) => ipcRenderer.invoke('launcher:api-request', endpoint, options),
+    getAuthState: () => ipcRenderer.invoke('launcher:get-auth-state'),
+    logout: () => ipcRenderer.invoke('launcher:logout'),
     onDownloadProgress: (callback: (data: { progress: number }) => void) => {
       ipcRenderer.on('launcher:download-progress', (_, data) => callback(data))
     },
@@ -51,8 +53,10 @@ const API = {
     onLaunchAppEnd: (callback: (data: { message: string }) => void) => {
       ipcRenderer.on('launcher:launch-app-end', (_, data) => callback(data))
     },
-    onAuthCallback: (callback: (data: { refreshToken?: string }) => void) => {
-      ipcRenderer.on('launcher:auth-callback', (_, data) => callback(data))
+    onAuthState: (
+      callback: (data: { user: { id: number; username: string; avatar?: string; is_vip: boolean; vip_expiry_data?: string } } | null) => void,
+    ) => {
+      ipcRenderer.on('launcher:auth-state', (_, data) => callback(data))
     },
     syncSubscribedScripts: (scriptsData: { scripts: Array<{ name: string; md5: string }> }) =>
       ipcRenderer.invoke('launcher:sync-subscribed-scripts', scriptsData),
@@ -72,6 +76,13 @@ const API = {
   },
   rpc: {
     getState: () => ipcRenderer.invoke('rpc:get-state'),
+    getSessionId: () => ipcRenderer.invoke('rpc:get-session-id') as Promise<string | null>,
+    setSessionId: (id: string | null) => ipcRenderer.invoke('rpc:set-session-id', id),
+    onSessionId: (callback: (id: string | null) => void) => {
+      const listener = (_: Electron.IpcRendererEvent, id: string | null) => callback(id)
+      ipcRenderer.on('rpc:session-id', listener)
+      return () => ipcRenderer.removeListener('rpc:session-id', listener)
+    },
     request: (method: string, params?: Record<string, unknown>) =>
       ipcRenderer.invoke('rpc:request', method, params),
     notify: (method: string, params?: Record<string, unknown>) =>

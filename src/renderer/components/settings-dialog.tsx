@@ -235,7 +235,7 @@ export function SettingsDialog({
           设置
         </button>
       </DialogTrigger>
-      <DialogContent className="sm:max-w-4xl h-[80vh] content-start items-start">
+      <DialogContent className="sm:max-w-4xl h-[80vh] content-start items-start" aria-describedby={undefined}>
         <DialogHeader>
           <DialogTitle>设置</DialogTitle>
         </DialogHeader>

@@ -140,3 +140,10 @@
 .app-no-drag {
   -webkit-app-region: no-drag;
 }
+
+/* 悬浮窗：透明背景，仅内容区半透明 */
+.overlay-window,
+.overlay-window html,
+.overlay-window body {
+  background: transparent !important;
+}

@@ -3,6 +3,7 @@ import { app, dialog, ipcMain, shell, type BrowserWindow } from 'electron'
 import { appManager } from './app-manager'
 import { downloader } from './downloader'
 import { getAuthPort } from './auth-server'
+import { clearAuth, getAuthState as getStoredAuthState } from './auth-store'
 import { apiRequest, getAnnouncements } from './launcher-api'
 import { pythonManager } from './python-manager'
 import { scriptManager } from './script-manager'
@@ -20,6 +21,16 @@ export function registerLauncherIpc(window: BrowserWindow) {
   })
 
   ipcMain.handle('launcher:get-auth-port', () => getAuthPort())
+
+  ipcMain.handle('launcher:get-auth-state', () => {
+    const state = getStoredAuthState()
+    return state ? { user: state.user } : null
+  })
+
+  ipcMain.handle('launcher:logout', () => {
+    clearAuth()
+    window.webContents.send('launcher:auth-state', null)
+  })
 
   ipcMain.handle('launcher:detect-python', () => pythonManager.detectPythonEnvironment())
   ipcMain.handle('launcher:setup-python', () => pythonManager.setupEmbeddedPython())
@@ -56,8 +67,15 @@ export function registerLauncherIpc(window: BrowserWindow) {
   ipcMain.handle('launcher:get-announcements', () => getAnnouncements())
   ipcMain.handle(
     'launcher:api-request',
-    (_, endpoint: string, options: { method?: 'GET' | 'POST' | 'PUT' | 'DELETE'; data?: Record<string, unknown>; accessToken?: string }) =>
-      apiRequest(endpoint, options),
+    (
+      _,
+      endpoint: string,
+      options: {
+        method?: 'GET' | 'POST' | 'PUT' | 'DELETE'
+        data?: Record<string, unknown>
+        requireAuth?: boolean
+      },
+    ) => apiRequest(endpoint, options),
   )
 
   scriptManager.on('progress', (payload: { status: string; title?: string; message?: string; progress?: number; error?: string }) => {

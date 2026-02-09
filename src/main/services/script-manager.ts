@@ -2,6 +2,7 @@ import * as fs from 'node:fs'
 import * as path from 'node:path'
 import { app, shell } from 'electron'
 import { EventEmitter } from 'node:events'
+import { getScriptsIndex, setScriptsIndex } from './scripts-store'
 
 const SCRIPTS_BASE_URL = 'https://nikkigallery.vip/static/whimbox/scripts'
 
@@ -19,8 +20,6 @@ type ProgressPayload = {
 
 export class ScriptManager extends EventEmitter {
   readonly scriptsDir: string
-  readonly appDataDir: string
-  readonly scriptsIndexJsonPath: string
 
   constructor() {
     super()
@@ -28,15 +27,16 @@ export class ScriptManager extends EventEmitter {
       ? path.dirname(process.execPath)
       : app.getAppPath()
     this.scriptsDir = path.join(appDir, 'scripts')
-    this.appDataDir = path.join(appDir, 'app-data')
-    this.scriptsIndexJsonPath = path.join(this.appDataDir, 'scripts-index.json')
 
     if (!fs.existsSync(this.scriptsDir)) {
       fs.mkdirSync(this.scriptsDir, { recursive: true })
     }
-    if (!fs.existsSync(this.appDataDir)) {
-      fs.mkdirSync(this.appDataDir, { recursive: true })
-    }
+  }
+
+  private getExistingIndex(): Record<string, string> {
+    const stored = getScriptsIndex()
+    if (Object.keys(stored).length > 0) return stored
+    return this.generateIndexFromScriptsDir()
   }
 
   private isValidMD5(str: string): boolean {
@@ -82,18 +82,7 @@ export class ScriptManager extends EventEmitter {
     }
     const scripts = scriptsData.scripts
 
-    let existingIndex: Record<string, string> = {}
-    if (fs.existsSync(this.scriptsIndexJsonPath)) {
-      try {
-        const content = fs.readFileSync(this.scriptsIndexJsonPath, 'utf8')
-        existingIndex = JSON.parse(content) as Record<string, string>
-      } catch {
-        existingIndex = this.generateIndexFromScriptsDir()
-      }
-    } else {
-      existingIndex = this.generateIndexFromScriptsDir()
-    }
-
+    const existingIndex = this.getExistingIndex()
     const currentMd5Set = new Set(scripts.map((s) => s.md5))
     const existingMd5Set = new Set(Object.values(existingIndex))
     const unsubscribedMd5s = [...existingMd5Set].filter((md5) => !currentMd5Set.has(md5))
@@ -164,7 +153,7 @@ export class ScriptManager extends EventEmitter {
       }
     }
 
-    fs.writeFileSync(this.scriptsIndexJsonPath, JSON.stringify(newIndex, null, 2), 'utf8')
+    setScriptsIndex(newIndex)
 
     this.emit('progress', {
       status: 'success',
@@ -214,24 +203,14 @@ export class ScriptManager extends EventEmitter {
       // keep name from param
     }
 
-    let existingIndex: Record<string, string> = {}
-    if (fs.existsSync(this.scriptsIndexJsonPath)) {
-      try {
-        const content = fs.readFileSync(this.scriptsIndexJsonPath, 'utf8')
-        existingIndex = JSON.parse(content) as Record<string, string>
-      } catch {
-        existingIndex = this.generateIndexFromScriptsDir()
-      }
-    } else {
-      existingIndex = this.generateIndexFromScriptsDir()
-    }
-
-    if (existingIndex[scriptName] && existingIndex[scriptName] !== item.md5) {
-      const oldPath = path.join(this.scriptsDir, `${existingIndex[scriptName]}.json`)
+    const existingIndex = this.getExistingIndex()
+    const nextIndex = { ...existingIndex }
+    if (nextIndex[scriptName] && nextIndex[scriptName] !== item.md5) {
+      const oldPath = path.join(this.scriptsDir, `${nextIndex[scriptName]}.json`)
       if (fs.existsSync(oldPath)) fs.unlinkSync(oldPath)
     }
-    existingIndex[scriptName] = item.md5
-    fs.writeFileSync(this.scriptsIndexJsonPath, JSON.stringify(existingIndex, null, 2), 'utf8')
+    nextIndex[scriptName] = item.md5
+    setScriptsIndex(nextIndex)
 
     this.emit('progress', {
       status: 'success',
@@ -248,33 +227,15 @@ export class ScriptManager extends EventEmitter {
 
     fs.unlinkSync(filePath)
 
-    let index: Record<string, string> = {}
-    if (fs.existsSync(this.scriptsIndexJsonPath)) {
-      try {
-        const content = fs.readFileSync(this.scriptsIndexJsonPath, 'utf8')
-        index = JSON.parse(content) as Record<string, string>
-      } catch {
-        index = this.generateIndexFromScriptsDir()
-      }
-    } else {
-      index = this.generateIndexFromScriptsDir()
-    }
-
+    const index = this.getExistingIndex()
     const entries = Object.entries(index).filter(([, v]) => v !== md5)
-    const newIndex = Object.fromEntries(entries)
-    fs.writeFileSync(this.scriptsIndexJsonPath, JSON.stringify(newIndex, null, 2), 'utf8')
+    setScriptsIndex(Object.fromEntries(entries))
   }
 
   getScriptsMetadata(): Record<string, string> | null {
-    try {
-      if (fs.existsSync(this.scriptsIndexJsonPath)) {
-        const content = fs.readFileSync(this.scriptsIndexJsonPath, 'utf8')
-        return JSON.parse(content) as Record<string, string>
-      }
-    } catch (err) {
-      console.error('读取脚本元数据失败:', err)
-    }
-    return null
+    const index = getScriptsIndex()
+    if (Object.keys(index).length === 0) return null
+    return index
   }
 
   async openScriptsFolder(): Promise<void> {

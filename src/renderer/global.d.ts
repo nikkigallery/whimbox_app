@@ -50,8 +50,12 @@ declare global {
         }>
         apiRequest: (
           endpoint: string,
-          options?: { method?: string; data?: Record<string, unknown>; accessToken?: string },
+          options?: { method?: string; data?: Record<string, unknown>; requireAuth?: boolean },
         ) => Promise<unknown>
+        getAuthState: () => Promise<{
+          user: { id: number; username: string; avatar?: string; is_vip: boolean; vip_expiry_data?: string }
+        } | null>
+        logout: () => Promise<void>
         onDownloadProgress: (callback: (data: { progress: number }) => void) => void
         onInstallProgress: (
           callback: (data: { output: string; isError?: boolean }) => void,
@@ -59,7 +63,11 @@ declare global {
         onPythonSetup: (callback: (data: { stage: string; message: string }) => void) => void
         onLaunchAppStatus: (callback: (data: { message: string }) => void) => void
         onLaunchAppEnd: (callback: (data: { message: string }) => void) => void
-        onAuthCallback: (callback: (data: { refreshToken?: string }) => void) => void
+        onAuthState: (
+          callback: (data: {
+            user: { id: number; username: string; avatar?: string; is_vip: boolean; vip_expiry_data?: string }
+          } | null) => void,
+        ) => void
         syncSubscribedScripts: (scriptsData: { scripts: Array<{ name: string; md5: string }> }) => Promise<unknown>
         downloadScript: (item: { name: string; md5: string }) => Promise<void>
         deleteScript: (md5: string) => Promise<void>
@@ -75,6 +83,9 @@ declare global {
       }
       rpc: {
         getState: () => Promise<RpcState>
+        getSessionId: () => Promise<string | null>
+        setSessionId: (id: string | null) => Promise<void>
+        onSessionId: (callback: (id: string | null) => void) => () => void
         request: <T = unknown>(
           method: string,
           params?: Record<string, unknown>,

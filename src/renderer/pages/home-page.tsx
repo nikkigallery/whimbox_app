@@ -3,22 +3,9 @@ import type { ComponentType } from "react"
 import { Gift, Send } from "lucide-react"
 
 import { ConversationPanel } from "renderer/components/conversation-panel"
-
+import { useHomeConversation } from "renderer/hooks/use-home-conversation"
 import { cn } from "renderer/lib/utils"
-
-type UiMessage = {
-  id: string
-  role: "user" | "assistant" | "system"
-  content: string
-  pending?: boolean
-  title?: string
-}
-
-type RpcEventLog = {
-  id: string
-  method: string
-  detail: string
-}
+import type { IpcRpcClient } from "renderer/lib/ipc-rpc"
 
 type QuickAction = {
   icon: ComponentType<{ className?: string }>
@@ -27,25 +14,32 @@ type QuickAction = {
 
 type HomePageProps = {
   quickActions: QuickAction[]
-  messages: UiMessage[]
-  input: string
-  rpcState: "idle" | "connecting" | "open" | "closed" | "error"
+  rpcClient: IpcRpcClient
   sessionId: string | null
-  onInputChange: (value: string) => void
-  onSend: () => void
+  rpcState: string
+  addEventLog: (method: string, detail?: string) => void
+  formatError: (error: unknown) => string
 }
 
 export function HomePage({
   quickActions,
-  messages,
-  input,
-  rpcState,
+  rpcClient,
   sessionId,
-  onInputChange,
-  onSend,
+  rpcState,
+  addEventLog,
+  formatError,
 }: HomePageProps) {
+  const { messages, input, setInput, handleSend } = useHomeConversation({
+    rpcClient,
+    sessionId,
+    rpcState,
+    addEventLog,
+    formatError,
+  })
+
   const hasConversation = messages.length > 0
   const isSendDisabled = !input.trim() || rpcState !== "open" || !sessionId
+
   return (
     <div className="flex flex-1 flex-col min-h-0">
       <div
@@ -106,14 +100,14 @@ export function HomePage({
               }
               onChange={(event) => {
                 const target = event.currentTarget
-                onInputChange(target.value)
+                setInput(target.value)
                 target.style.height = "auto"
                 target.style.height = `${target.scrollHeight}px`
               }}
               onKeyDown={(event) => {
                 if (event.key === "Enter" && !event.shiftKey) {
                   event.preventDefault()
-                  onSend()
+                  handleSend()
                 }
               }}
               className="max-h-40 w-full resize-none bg-transparent text-sm text-slate-600 placeholder:text-slate-400 focus:outline-none dark:text-slate-200"
@@ -122,7 +116,7 @@ export function HomePage({
           <div className="flex items-center gap-3">
             <button
               type="button"
-              onClick={onSend}
+              onClick={handleSend}
               disabled={isSendDisabled}
               className="flex size-9 items-center justify-center rounded-xl bg-pink-400 text-white shadow transition disabled:cursor-not-allowed disabled:opacity-50"
             >

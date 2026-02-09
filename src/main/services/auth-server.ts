@@ -1,6 +1,7 @@
 import { createServer, type Server } from 'node:http'
 import { URL } from 'node:url'
 import type { BrowserWindow } from 'electron'
+import { completeLogin } from './launcher-api'
 
 let authServer: Server | null = null
 let authPort = 0
@@ -21,9 +22,13 @@ function handleAuthRequest(window: BrowserWindow) {
       return
     }
 
-    window.webContents.send('launcher:auth-callback', { refreshToken })
     res.writeHead(200, { 'Content-Type': 'text/plain; charset=utf-8' })
     res.end('奇想盒已登录成功，你可以关闭该页面')
+
+    completeLogin(refreshToken, window).catch((err) => {
+      console.error('登录完成失败:', err)
+      window.webContents.send('launcher:auth-state', null)
+    })
   }
 }
 

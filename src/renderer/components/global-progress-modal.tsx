@@ -21,12 +21,12 @@ export function GlobalProgressModal({ state, onClose }: GlobalProgressModalProps
   const visible = status !== 'idle'
   const canClose = status === 'success' || status === 'error'
 
-  useEffect(() => {
-    if (status === 'success' && onClose) {
-      const t = setTimeout(onClose, 2500)
-      return () => clearTimeout(t)
-    }
-  }, [status, onClose])
+  // useEffect(() => {
+  //   if (status === 'success' && onClose) {
+  //     const t = setTimeout(onClose, 2500)
+  //     return () => clearTimeout(t)
+  //   }
+  // }, [status, onClose])
 
   if (!visible) return null
 

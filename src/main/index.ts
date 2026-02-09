@@ -10,6 +10,7 @@ import { registerLauncherIpc } from './services/launcher-ipc'
 import { registerRpcBridge, stopRpcBridge } from './services/rpc-bridge'
 import { createTray, destroyTray } from './services/tray'
 import { MainWindow } from './windows/main'
+import { OverlayWindow } from './windows/overlay'
 
 makeAppWithSingleInstanceLock(async () => {
   ipcMain.handle('window:minimize', () => {
@@ -35,6 +36,7 @@ makeAppWithSingleInstanceLock(async () => {
 
   await app.whenReady()
   const window = await makeAppSetup(MainWindow)
+  await OverlayWindow()
 
   createTray(window)
   ipcMain.handle('window:minimize-to-tray', () => {
