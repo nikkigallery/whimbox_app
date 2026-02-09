@@ -7,6 +7,7 @@ declare global {
       username?: string
       windowControls: {
         minimize: () => Promise<void>
+        minimizeToTray: () => Promise<void>
         toggleMaximize: () => Promise<boolean>
         close: () => Promise<void>
       }

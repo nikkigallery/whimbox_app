@@ -8,6 +8,7 @@ import { waitFor } from 'shared/utils'
 import { startAuthServer, stopAuthServer } from './services/auth-server'
 import { registerLauncherIpc } from './services/launcher-ipc'
 import { registerRpcBridge, stopRpcBridge } from './services/rpc-bridge'
+import { createTray, destroyTray } from './services/tray'
 import { MainWindow } from './windows/main'
 
 makeAppWithSingleInstanceLock(async () => {
@@ -34,6 +35,14 @@ makeAppWithSingleInstanceLock(async () => {
 
   await app.whenReady()
   const window = await makeAppSetup(MainWindow)
+
+  createTray(window)
+  ipcMain.handle('window:minimize-to-tray', () => {
+    if (window && !window.isDestroyed()) {
+      window.hide()
+    }
+  })
+
   registerLauncherIpc(window)
   registerRpcBridge()
   try {
@@ -56,6 +65,7 @@ makeAppWithSingleInstanceLock(async () => {
 })
 
 app.on('before-quit', () => {
+  destroyTray()
   stopAuthServer()
   stopRpcBridge()
 })

@@ -9,6 +9,7 @@ import {
   Minus,
   Moon,
   Keyboard,
+  PanelBottomClose,
   Piano,
   PlayCircle,
   Rss,
@@ -676,6 +677,7 @@ export function MainScreen() {
   }, [input, rpcState, sessionId, rpcClient, addEventLog, formatError])
 
   const handleMinimize = () => window.App.windowControls.minimize()
+  const handleMinimizeToTray = () => window.App.windowControls.minimizeToTray()
   const handleToggleMaximize = () => window.App.windowControls.toggleMaximize()
   const handleClose = () => window.App.windowControls.close()
 
@@ -753,8 +755,17 @@ export function MainScreen() {
           <div className="flex items-center gap-2 text-pink-400">
             <button
               type="button"
+              onClick={handleMinimizeToTray}
+              className="flex size-7 items-center justify-center rounded-lg transition hover:bg-pink-50 dark:hover:bg-pink-500/10"
+              title="缩小到托盘"
+            >
+              <PanelBottomClose className="size-4" />
+            </button>
+            <button
+              type="button"
               onClick={handleMinimize}
               className="flex size-7 items-center justify-center rounded-lg transition hover:bg-pink-50 dark:hover:bg-pink-500/10"
+              title="最小化"
             >
               <Minus className="size-4" />
             </button>
@@ -770,7 +781,7 @@ export function MainScreen() {
               onClick={handleClose}
               className="flex size-7 items-center justify-center rounded-lg transition hover:bg-pink-50 dark:hover:bg-pink-500/10"
             >
-              <X className="size-4" />
+              <X className="size-5" />
             </button>
           </div>
         </div>
@@ -862,7 +873,7 @@ export function MainScreen() {
               </SidebarGroup>
             </SidebarContent>
             <SidebarFooter>
-              <div className="rounded-xl border border-slate-200 bg-white px-3 py-3 shadow-sm dark:border-slate-700 dark:bg-slate-900">
+              <div className="rounded-xl border border-slate-200 bg-white px-3 py-3 my-3 shadow-sm dark:border-slate-700 dark:bg-slate-900">
                 <div className="flex items-center gap-3">
                   <div className="size-9 shrink-0 overflow-hidden rounded-full bg-slate-200 dark:bg-slate-700">
                     {userAvatarUrl ? (

@@ -12,6 +12,7 @@ const API = {
   username: process.env.USER,
   windowControls: {
     minimize: () => ipcRenderer.invoke('window:minimize'),
+    minimizeToTray: () => ipcRenderer.invoke('window:minimize-to-tray'),
     toggleMaximize: () => ipcRenderer.invoke('window:toggle-maximize'),
     close: () => ipcRenderer.invoke('window:close'),
   },
