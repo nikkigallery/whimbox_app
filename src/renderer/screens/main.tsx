@@ -1,5 +1,6 @@
 import {
   Bot,
+  ChevronDown,
   FileText,
   Gift,
   Home,
@@ -9,6 +10,7 @@ import {
   Moon,
   Keyboard,
   Piano,
+  PlayCircle,
   Rss,
   Send,
   Sparkles,
@@ -18,10 +20,23 @@ import {
   X,
 } from 'lucide-react'
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
-
+import { cn } from 'renderer/lib/utils'
 import { NotificationDrawer, type NotificationItem } from 'renderer/components/notification-drawer'
 import { SettingsDialog } from 'renderer/components/settings-dialog'
-import { SidebarNavItem } from 'renderer/components/sidebar-nav-item'
+import {
+  Sidebar,
+  SidebarContent,
+  SidebarFooter,
+  SidebarGroup,
+  SidebarGroupContent,
+  SidebarMenu,
+  SidebarMenuButton,
+  SidebarMenuItem,
+  SidebarMenuSub,
+  SidebarMenuSubButton,
+  SidebarMenuSubItem,
+  SidebarProvider,
+} from 'renderer/components/ui/sidebar'
 import { AutoTriggerPage } from '../pages/auto-trigger-page'
 import { HomePage } from '../pages/home-page'
 import { AutoNavigatePage } from '../pages/auto-navigate-page'
@@ -32,14 +47,35 @@ import { ScriptSubscribePage } from '../pages/script-subscribe-page'
 import { IpcRpcClient } from 'renderer/lib/ipc-rpc'
 import { apiClient } from 'renderer/lib/api-client'
 import { Toaster } from 'renderer/components/ui/sonner'
+import {
+  Collapsible,
+  CollapsibleContent,
+  CollapsibleTrigger,
+} from 'renderer/components/ui/collapsible'
 
-const navItems = [
+type NavItem =
+  | { id: string; label: string; icon: typeof Home }
+  | {
+      id: string
+      label: string
+      icon: typeof PlayCircle
+      children: { id: string; label: string; icon: typeof Map }[]
+    }
+
+const navItems: NavItem[] = [
   { id: 'home', label: '首页', icon: Home },
   { id: 'one-dragon', label: '一条龙', icon: Layers },
   { id: 'auto-trigger', label: '自动触发', icon: Sparkles },
-  { id: 'auto-navigate', label: '自动跑图', icon: Map },
-  { id: 'auto-macro', label: '键鼠宏', icon: Keyboard },
-  { id: 'auto-music', label: '自动演奏', icon: Piano },
+  {
+    id: 'script-run',
+    label: '运行脚本',
+    icon: PlayCircle,
+    children: [
+      { id: 'auto-navigate', label: '跑图脚本', icon: Map },
+      { id: 'auto-macro', label: '宏脚本', icon: Keyboard },
+      { id: 'auto-music', label: '演奏脚本', icon: Piano },
+    ],
+  },
   { id: 'script-subscribe', label: '脚本订阅', icon: Rss },
 ]
 
@@ -740,73 +776,141 @@ export function MainScreen() {
         </div>
       </header>
 
-      <div className="flex min-h-0 flex-1">
-        <aside className="shrink-0 flex w-60 flex-col border-r border-slate-100 bg-white dark:border-slate-800 dark:bg-slate-900">
-          <nav className="px-4">
-            <div className="space-y-2 bg-white px-2 py-3 dark:bg-slate-900/60">
-              {navItems.map((item) => (
-                <SidebarNavItem
-                  key={item.id}
-                  label={item.label}
-                  icon={item.icon}
-                  active={activePage === item.id}
-                  onClick={() => setActivePage(item.id)}
-                />
-              ))}
-            </div>
-          </nav>
-
-          <div className="mt-auto space-y-4 px-4 pb-6">
-
-            <div className="rounded-2xl bg-white px-3 py-3 shadow-sm dark:bg-slate-900">
-              <div className="flex items-center gap-3">
-                <div className="size-9 overflow-hidden rounded-full bg-slate-200 dark:bg-slate-700">
-                  {userAvatarUrl ? (
-                    <img
-                      src={userAvatarUrl}
-                      alt={userName ?? '用户头像'}
-                      className="size-full object-cover"
-                    />
-                  ) : (
-                    <div className="size-full bg-gradient-to-br from-slate-200 to-slate-400 dark:from-slate-700 dark:to-slate-500" />
-                  )}
-                </div>
-                <div className="flex-1">
-                  <div className="flex items-center justify-between gap-2">
-                    <p className="text-base font-semibold text-slate-700 dark:text-slate-100">
-                      {userName ?? '未登录'}
-                    </p>
-                    {userName ? (
-                      <button
-                        type="button"
-                        onClick={handleLogout}
-                        className="rounded-full border border-slate-200 px-3 py-1 text-xs text-slate-500 hover:bg-slate-50 dark:border-slate-700 dark:text-slate-300 dark:hover:bg-slate-800"
-                      >
-                        退出
-                      </button>
+      <SidebarProvider className="flex min-h-0 flex-1">
+        <div className="flex min-h-0 flex-1">
+          <Sidebar collapsible="none" className="shrink-0 w-55">
+            <SidebarContent>
+              <SidebarGroup>
+                <SidebarGroupContent>
+                  <SidebarMenu>
+                    {navItems.map((item) =>
+                      'children' in item ? (
+                        <SidebarMenuItem key={item.id}>
+                          <Collapsible defaultOpen className="group">
+                            <CollapsibleTrigger asChild>
+                              <SidebarMenuButton
+                                asChild
+                                isActive={item.children.some((c) => c.id === activePage)}
+                                tooltip={item.label}
+                              >
+                                <button
+                                  type="button"
+                                  className={cn(
+                                    'flex w-full items-center gap-3 rounded-xl px-4 py-3 text-sm transition [&_svg.chevron]:shrink-0 [&_svg.chevron]:transition-transform group-data-[state=open]:[&_svg.chevron]:rotate-180',
+                                    item.children.some((c) => c.id === activePage)
+                                      ? 'bg-pink-50 text-pink-500 dark:bg-pink-500/15 dark:text-pink-300'
+                                      : 'text-slate-500 hover:bg-slate-50 dark:text-slate-300 dark:hover:bg-slate-800/60',
+                                  )}
+                                >
+                                  <item.icon className="size-4 shrink-0" />
+                                  <span className="flex-1 text-left">{item.label}</span>
+                                  <ChevronDown className="chevron size-4" />
+                                </button>
+                              </SidebarMenuButton>
+                            </CollapsibleTrigger>
+                            <CollapsibleContent>
+                              <SidebarMenuSub>
+                                {item.children.map((sub) => (
+                                  <SidebarMenuSubItem key={sub.id}>
+                                    <SidebarMenuSubButton asChild isActive={activePage === sub.id}>
+                                      <button
+                                        type="button"
+                                        onClick={() => setActivePage(sub.id)}
+                                        className={cn(
+                                          'flex w-full items-center gap-3 rounded-xl px-4 py-3 text-sm transition',
+                                          activePage === sub.id
+                                            ? 'bg-pink-50 text-pink-500 dark:bg-pink-500/15 dark:text-pink-300'
+                                            : 'text-slate-500 hover:bg-slate-50 dark:text-slate-300 dark:hover:bg-slate-800/60',
+                                        )}
+                                      >
+                                        <sub.icon className="size-4 shrink-0" />
+                                        <span>{sub.label}</span>
+                                      </button>
+                                    </SidebarMenuSubButton>
+                                  </SidebarMenuSubItem>
+                                ))}
+                              </SidebarMenuSub>
+                            </CollapsibleContent>
+                          </Collapsible>
+                        </SidebarMenuItem>
+                      ) : (
+                        <SidebarMenuItem key={item.id}>
+                          <SidebarMenuButton
+                            asChild
+                            isActive={activePage === item.id}
+                            tooltip={item.label}
+                          >
+                            <button
+                              type="button"
+                              onClick={() => setActivePage(item.id)}
+                              className={cn(
+                                'flex w-full items-center gap-3 rounded-xl px-4 py-3 text-sm transition',
+                                activePage === item.id
+                                ? "bg-pink-50 text-pink-500 dark:bg-pink-500/15 dark:text-pink-300"
+                                : "text-slate-500 hover:bg-slate-50 dark:text-slate-300 dark:hover:bg-slate-800/60",
+                              )}
+                            >
+                              <item.icon className="size-4 shrink-0" />
+                              <span>{item.label}</span>
+                            </button>
+                          </SidebarMenuButton>
+                        </SidebarMenuItem>
+                      )
+                    )}
+                  </SidebarMenu>
+                </SidebarGroupContent>
+              </SidebarGroup>
+            </SidebarContent>
+            <SidebarFooter>
+              <div className="rounded-xl border border-slate-200 bg-white px-3 py-3 shadow-sm dark:border-slate-700 dark:bg-slate-900">
+                <div className="flex items-center gap-3">
+                  <div className="size-9 shrink-0 overflow-hidden rounded-full bg-slate-200 dark:bg-slate-700">
+                    {userAvatarUrl ? (
+                      <img
+                        src={userAvatarUrl}
+                        alt={userName ?? '用户头像'}
+                        className="size-full object-cover"
+                      />
                     ) : (
-                      <button
-                        type="button"
-                        onClick={handleLogin}
-                        className="rounded-full bg-pink-400 px-3 py-1 text-xs text-white shadow"
-                      >
-                        登录
-                      </button>
+                      <div className="size-full bg-gradient-to-br from-slate-200 to-slate-400 dark:from-slate-700 dark:to-slate-500" />
                     )}
                   </div>
-                  <p className="mt-1 text-xs text-slate-400 dark:text-slate-400">
-                    {userVip}
-                  </p>
+                  <div className="min-w-0 flex-1">
+                    <div className="flex items-center justify-between gap-2">
+                      <p className="truncate text-base font-semibold text-slate-700 dark:text-slate-100">
+                        {userName ?? '未登录'}
+                      </p>
+                      {userName ? (
+                        <button
+                          type="button"
+                          onClick={handleLogout}
+                          className="shrink-0 rounded-full border border-slate-200 px-3 py-1 text-xs text-slate-500 hover:bg-slate-50 dark:border-slate-700 dark:text-slate-300 dark:hover:bg-slate-800"
+                        >
+                          退出
+                        </button>
+                      ) : (
+                        <button
+                          type="button"
+                          onClick={handleLogin}
+                          className="shrink-0 rounded-full bg-pink-400 px-3 py-1 text-xs text-white shadow"
+                        >
+                          登录
+                        </button>
+                      )}
+                    </div>
+                    <p className="mt-1 truncate text-xs text-slate-400 dark:text-slate-400">
+                      {userVip}
+                    </p>
+                  </div>
                 </div>
               </div>
-            </div>
-          </div>
-        </aside>
-
-        <section className="flex min-h-0 flex-1 flex-col overflow-hidden">
-          {renderPage()}
-        </section>
-      </div>
+            </SidebarFooter>
+          </Sidebar>
+          <section className="flex min-h-0 flex-1 flex-col overflow-hidden">
+            {renderPage()}
+          </section>
+        </div>
+      </SidebarProvider>
       </main>
     </>
   )
