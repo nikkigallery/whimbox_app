@@ -1,4 +1,3 @@
-import { useEffect } from 'react'
 import { CheckCircle2, Loader2, XCircle } from 'lucide-react'
 import { cn } from 'renderer/lib/utils'
 import { Button } from 'renderer/components/ui/button'
@@ -20,13 +19,6 @@ export function GlobalProgressModal({ state, onClose }: GlobalProgressModalProps
   const { status, title, message, progress, error } = state
   const visible = status !== 'idle'
   const canClose = status === 'success' || status === 'error'
-
-  // useEffect(() => {
-  //   if (status === 'success' && onClose) {
-  //     const t = setTimeout(onClose, 2500)
-  //     return () => clearTimeout(t)
-  //   }
-  // }, [status, onClose])
 
   if (!visible) return null
 

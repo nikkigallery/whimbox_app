@@ -69,7 +69,7 @@ export class ScriptManager extends EventEmitter {
     return index
   }
 
-  /** 全量同步订阅脚本；会通过 emit 发出进度，由 IPC 转发给渲染进程 */
+  /** 全量同步订阅脚本；仅当本地脚本有变动时才 emit 进度，由 IPC 转发给渲染进程 */
   async updateSubscribedScripts(scriptsData: ScriptsData): Promise<{
     success: boolean
     totalCount: number
@@ -87,12 +87,23 @@ export class ScriptManager extends EventEmitter {
     const existingMd5Set = new Set(Object.values(existingIndex))
     const unsubscribedMd5s = [...existingMd5Set].filter((md5) => !currentMd5Set.has(md5))
 
+    const hasUnsubscribedToDelete = unsubscribedMd5s.some((md5) =>
+      fs.existsSync(path.join(this.scriptsDir, `${md5}.json`)),
+    )
+    const hasScriptsToDownload = scripts.some((script) => {
+      const filePath = path.join(this.scriptsDir, `${script.md5}.json`)
+      if (!fs.existsSync(filePath)) return true
+      if (existingIndex[script.name] && existingIndex[script.name] !== script.md5) return true
+      return false
+    })
+    const hasLocalChange = hasUnsubscribedToDelete || hasScriptsToDownload
+
     for (const md5 of unsubscribedMd5s) {
       try {
         const filePath = path.join(this.scriptsDir, `${md5}.json`)
         if (fs.existsSync(filePath)) {
           fs.unlinkSync(filePath)
-          this.emit('scriptUnsubscribed', { md5, fileName: `${md5}.json` })
+          if (hasLocalChange) this.emit('scriptUnsubscribed', { md5, fileName: `${md5}.json` })
         }
       } catch (err) {
         console.error(`删除退订脚本 ${md5}.json 失败:`, err)
@@ -105,13 +116,15 @@ export class ScriptManager extends EventEmitter {
 
     for (let i = 0; i < scripts.length; i++) {
       const script = scripts[i]
-      const progress = scripts.length > 0 ? Math.round(((i + 1) / scripts.length) * 100) : 100
-      this.emit('progress', {
-        status: 'running',
-        title: '同步订阅脚本',
-        message: `正在处理 ${i + 1}/${scripts.length}: ${script.name}`,
-        progress,
-      } as ProgressPayload)
+      if (hasLocalChange) {
+        const progress = scripts.length > 0 ? Math.round(((i + 1) / scripts.length) * 100) : 100
+        this.emit('progress', {
+          status: 'running',
+          title: '同步订阅脚本',
+          message: `正在处理 ${i + 1}/${scripts.length}: ${script.name}`,
+          progress,
+        } as ProgressPayload)
+      }
 
       try {
         const url = `${SCRIPTS_BASE_URL}/${script.md5}.json`
@@ -145,29 +158,33 @@ export class ScriptManager extends EventEmitter {
 
         newIndex[scriptName] = script.md5
         successCount++
-        this.emit('scriptDownloaded', { name: scriptName, md5: script.md5, current: i + 1, total: scripts.length })
+        if (hasLocalChange) {
+          this.emit('scriptDownloaded', { name: scriptName, md5: script.md5, current: i + 1, total: scripts.length })
+        }
       } catch (err) {
         failedCount++
         const msg = err instanceof Error ? err.message : String(err)
-        this.emit('scriptDownloadError', { name: script.name, md5: script.md5, error: msg })
+        if (hasLocalChange) this.emit('scriptDownloadError', { name: script.name, md5: script.md5, error: msg })
       }
     }
 
     setScriptsIndex(newIndex)
 
-    this.emit('progress', {
-      status: 'success',
-      title: '同步订阅脚本',
-      message: `已完成，成功 ${successCount}/${scripts.length} 个，删除 ${unsubscribedMd5s.length} 个退订`,
-      progress: 100,
-    } as ProgressPayload)
+    if (hasLocalChange) {
+      this.emit('progress', {
+        status: 'success',
+        title: '同步订阅脚本',
+        message: `已完成，成功 ${successCount}/${scripts.length} 个，删除 ${unsubscribedMd5s.length} 个退订`,
+        progress: 100,
+      } as ProgressPayload)
 
-    this.emit('updateComplete', {
-      totalCount: scripts.length,
-      successCount,
-      failedCount,
-      unsubscribedCount: unsubscribedMd5s.length,
-    })
+      this.emit('updateComplete', {
+        totalCount: scripts.length,
+        successCount,
+        failedCount,
+        unsubscribedCount: unsubscribedMd5s.length,
+      })
+    }
 
     return {
       success: true,
@@ -178,17 +195,23 @@ export class ScriptManager extends EventEmitter {
     }
   }
 
-  /** 下载单个脚本（订阅后调用） */
+  /** 下载单个脚本（订阅后调用）；仅当本地有变动时才 emit */
   async downloadScript(item: { name: string; md5: string }): Promise<void> {
-    this.emit('progress', {
-      status: 'running',
-      title: '下载脚本',
-      message: `正在下载 ${item.name}`,
-      progress: 0,
-    } as ProgressPayload)
+    const filePath = path.join(this.scriptsDir, `${item.md5}.json`)
+    const existingIndex = this.getExistingIndex()
+    const alreadyHasFile = fs.existsSync(filePath)
+    const hasLocalChange = !alreadyHasFile || existingIndex[item.name] !== item.md5
+
+    if (hasLocalChange) {
+      this.emit('progress', {
+        status: 'running',
+        title: '下载脚本',
+        message: `正在下载 ${item.name}`,
+        progress: 0,
+      } as ProgressPayload)
+    }
 
     const url = `${SCRIPTS_BASE_URL}/${item.md5}.json`
-    const filePath = path.join(this.scriptsDir, `${item.md5}.json`)
     const res = await fetch(url, { signal: AbortSignal.timeout(30_000) })
     if (!res.ok) throw new Error(`HTTP ${res.status}`)
     const buf = await res.arrayBuffer()
@@ -203,7 +226,6 @@ export class ScriptManager extends EventEmitter {
       // keep name from param
     }
 
-    const existingIndex = this.getExistingIndex()
     const nextIndex = { ...existingIndex }
     if (nextIndex[scriptName] && nextIndex[scriptName] !== item.md5) {
       const oldPath = path.join(this.scriptsDir, `${nextIndex[scriptName]}.json`)
@@ -212,15 +234,17 @@ export class ScriptManager extends EventEmitter {
     nextIndex[scriptName] = item.md5
     setScriptsIndex(nextIndex)
 
-    this.emit('progress', {
-      status: 'success',
-      title: '下载脚本',
-      message: `${scriptName} 已下载`,
-      progress: 100,
-    } as ProgressPayload)
+    if (hasLocalChange) {
+      this.emit('progress', {
+        status: 'success',
+        title: '下载脚本',
+        message: `${scriptName} 已下载`,
+        progress: 100,
+      } as ProgressPayload)
+    }
   }
 
-  /** 删除单个脚本（取消订阅后调用） */
+  /** 删除单个脚本（取消订阅后调用）；仅当本地有变动（文件被删除）时才 emit */
   deleteScript(md5: string): void {
     const filePath = path.join(this.scriptsDir, `${md5}.json`)
     if (!fs.existsSync(filePath)) return
@@ -230,6 +254,7 @@ export class ScriptManager extends EventEmitter {
     const index = this.getExistingIndex()
     const entries = Object.entries(index).filter(([, v]) => v !== md5)
     setScriptsIndex(Object.fromEntries(entries))
+    this.emit('scriptUnsubscribed', { md5, fileName: `${md5}.json` })
   }
 
   getScriptsMetadata(): Record<string, string> | null {

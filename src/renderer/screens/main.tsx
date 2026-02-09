@@ -264,11 +264,6 @@ export function MainScreen() {
   const syncSubscribedScripts = useCallback(async () => {
     const authState = await launcherApi.getAuthState()
     if (!authState?.user) return
-    setTaskProgressState({
-      status: 'running',
-      title: '同步订阅脚本',
-      message: '正在获取订阅列表…',
-    })
     try {
       const data = await apiClient.getAllSubscribedScripts()
       if (data.scripts?.length) {
