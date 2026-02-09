@@ -1,13 +1,15 @@
+import { useCallback, useEffect, useMemo, useState } from "react"
 import { Bell } from "lucide-react"
 
 import {
   Sheet,
   SheetContent,
-  SheetDescription,
   SheetHeader,
   SheetTitle,
   SheetTrigger,
 } from "renderer/components/ui/sheet"
+
+const ANNOUNCEMENTS_SEEN_KEY = "whimbox_announcements_hash_seen"
 
 export type NotificationItem = {
   title: string
@@ -15,12 +17,7 @@ export type NotificationItem = {
   created_at: string
 }
 
-type NotificationDrawerProps = {
-  items: NotificationItem[]
-  onOpenExternal: (url: string) => void
-  hasUnread?: boolean
-  onOpenChange?: (open: boolean) => void
-}
+type NotificationDrawerProps = {}
 
 const formatDate = (value: string) => {
   if (!value) return ""
@@ -29,14 +26,55 @@ const formatDate = (value: string) => {
   return date.toLocaleDateString("zh-CN")
 }
 
-export function NotificationDrawer({
-  items,
-  onOpenExternal,
-  hasUnread = false,
-  onOpenChange,
-}: NotificationDrawerProps) {
+export function NotificationDrawer({}: NotificationDrawerProps) {
+  const launcherApi = useMemo(() => window.App.launcher, [])
+  const [items, setItems] = useState<NotificationItem[]>([])
+  const [announcementsHash, setAnnouncementsHash] = useState<string>("")
+  const [hasUnread, setHasUnread] = useState(false)
+
+  const loadAnnouncements = useCallback(async () => {
+    try {
+      const result = await launcherApi.getAnnouncements()
+      const list = (result.announcements ?? []) as NotificationItem[]
+      list.sort(
+        (a, b) =>
+          new Date(b.created_at).getTime() - new Date(a.created_at).getTime(),
+      )
+      setItems(list.slice(0, 5))
+      if (result.hash) {
+        setAnnouncementsHash(result.hash)
+        const seenHash = localStorage.getItem(ANNOUNCEMENTS_SEEN_KEY)
+        setHasUnread(result.hash !== seenHash)
+      } else {
+        setAnnouncementsHash("")
+        setHasUnread(false)
+      }
+    } catch {
+      setItems([])
+      setAnnouncementsHash("")
+      setHasUnread(false)
+    }
+  }, [launcherApi])
+
+  const markAnnouncementsSeen = useCallback(() => {
+    if (!announcementsHash) return
+    localStorage.setItem(ANNOUNCEMENTS_SEEN_KEY, announcementsHash)
+    setHasUnread(false)
+  }, [announcementsHash])
+
+  useEffect(() => {
+    loadAnnouncements()
+  }, [loadAnnouncements])
+
+  const handleOpenChange = useCallback(
+    (open: boolean) => {
+      if (open) markAnnouncementsSeen()
+    },
+    [markAnnouncementsSeen],
+  )
+
   return (
-    <Sheet onOpenChange={onOpenChange}>
+    <Sheet onOpenChange={handleOpenChange}>
       <SheetTrigger asChild>
         <button
           type="button"
@@ -57,11 +95,11 @@ export function NotificationDrawer({
           {items.length === 0 ? (
             <p className="text-sm text-slate-400">暂无公告</p>
           ) : (
-            items.map((item) => (
+            items.map((item: NotificationItem) => (
               <button
                 key={`${item.title}-${item.created_at}`}
                 type="button"
-                onClick={() => item.url && onOpenExternal(item.url)}
+                onClick={() => item.url && launcherApi.openExternal(item.url)}
                 className="cursor-pointer flex w-full flex-col gap-1 rounded-xl border border-slate-100 px-3 py-2 text-left hover:bg-slate-50 dark:border-slate-800 dark:hover:bg-slate-800/70"
               >
                 <span className="text-sm text-slate-700 dark:text-slate-200">

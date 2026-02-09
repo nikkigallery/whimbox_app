@@ -26,7 +26,7 @@ import {
   GlobalProgressModal,
   type TaskProgressState,
 } from 'renderer/components/global-progress-modal'
-import { NotificationDrawer, type NotificationItem } from 'renderer/components/notification-drawer'
+import { NotificationDrawer } from 'renderer/components/notification-drawer'
 import { SettingsDialog } from 'renderer/components/settings-dialog'
 import {
   Sidebar,
@@ -177,9 +177,6 @@ export function MainScreen() {
   const [visitedPages, setVisitedPages] = useState<Set<string>>(() => new Set(['home']))
   const [sessionId, setSessionId] = useState<string | null>(null)
   const [eventLogs, setEventLogs] = useState<RpcEventLog[]>([])
-  const [announcements, setAnnouncements] = useState<NotificationItem[]>([])
-  const [announcementsHash, setAnnouncementsHash] = useState<string>('')
-  const [hasUnreadNotifications, setHasUnreadNotifications] = useState(false)
   const [userName, setUserName] = useState<string | null>(null)
   const [userVip, setUserVip] = useState<string>('未登录')
   const [userAvatarUrl, setUserAvatarUrl] = useState<string | null>(null)
@@ -203,12 +200,6 @@ export function MainScreen() {
       return next.slice(0, 6)
     })
   }, [])
-
-  const markAnnouncementsSeen = useCallback(() => {
-    if (!announcementsHash) return
-    localStorage.setItem('whimbox_announcements_hash_seen', announcementsHash)
-    setHasUnreadNotifications(false)
-  }, [announcementsHash])
 
   const formatError = useCallback((error: unknown) => {
     if (!error) return ''
@@ -250,28 +241,6 @@ export function MainScreen() {
   const refreshUserState = useCallback(() => {
     launcherApi.getAuthState().then(applyAuthState)
   }, [launcherApi, applyAuthState])
-
-  const loadAnnouncements = useCallback(async () => {
-    try {
-      const result = await launcherApi.getAnnouncements()
-      const list = result.announcements ?? []
-      list.sort(
-        (a: NotificationItem, b: NotificationItem) =>
-          new Date(b.created_at).getTime() - new Date(a.created_at).getTime(),
-      )
-      setAnnouncements(list.slice(0, 5))
-      if (result.hash) {
-        setAnnouncementsHash(result.hash)
-        const seenHash = localStorage.getItem('whimbox_announcements_hash_seen')
-        setHasUnreadNotifications(result.hash !== seenHash)
-      } else {
-        setAnnouncementsHash('')
-        setHasUnreadNotifications(false)
-      }
-    } catch (error) {
-      addEventLog('announcement.error', formatError(error))
-    }
-  }, [launcherApi, addEventLog, formatError])
 
   const handleLogin = useCallback(async () => {
     try {
@@ -381,7 +350,6 @@ export function MainScreen() {
 
   useEffect(() => {
     refreshUserState()
-    loadAnnouncements()
 
     launcherApi.onAuthState((data) => {
       applyAuthState(data)
@@ -397,7 +365,6 @@ export function MainScreen() {
     launcherApi,
     applyAuthState,
     refreshUserState,
-    loadAnnouncements,
     syncSubscribedScripts,
   ])
 
@@ -480,16 +447,7 @@ export function MainScreen() {
             {isDark ? <Sun className="size-3" /> : <Moon className="size-3" />}
             {isDark ? '白天' : '夜间'}
           </button>
-          <NotificationDrawer
-            items={announcements}
-            onOpenExternal={(url) => launcherApi.openExternal(url)}
-            hasUnread={hasUnreadNotifications}
-            onOpenChange={(open) => {
-              if (open) {
-                markAnnouncementsSeen()
-              }
-            }}
-          />
+          <NotificationDrawer/>
           <div className="flex items-center gap-2 text-pink-400">
             <button
               type="button"
