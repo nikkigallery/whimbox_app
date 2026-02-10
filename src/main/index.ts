@@ -7,6 +7,7 @@ import { ENVIRONMENT } from 'shared/constants'
 import { waitFor } from 'shared/utils'
 import { startAuthServer, stopAuthServer } from './services/auth-server'
 import { ensurePythonEnvironment, registerLauncherIpc } from './services/launcher-ipc'
+import { registerAppUpdater, unregisterAppUpdater } from './services/updater'
 import { pythonManager } from './services/python-manager'
 import { registerRpcBridge, stopRpcBridge } from './services/rpc-bridge'
 import { createTray, destroyTray } from './services/tray'
@@ -110,6 +111,7 @@ makeAppWithSingleInstanceLock(async () => {
   })
 
   registerLauncherIpc(window)
+  registerAppUpdater(window)
   registerRpcBridge()
   try {
     await startAuthServer(window)
@@ -134,4 +136,5 @@ app.on('before-quit', () => {
   destroyTray()
   stopAuthServer()
   stopRpcBridge()
+  unregisterAppUpdater()
 })

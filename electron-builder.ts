@@ -3,50 +3,71 @@ import type { Configuration } from 'electron-builder'
 
 import {
   main,
-  name,
   version,
   resources,
-  description,
   displayName,
-  author as _author,
 } from './package.json'
 
 import { getDevFolder } from './src/lib/electron-app/release/utils/path'
 
-const author = _author?.name ?? _author
 const currentYear = new Date().getFullYear()
-const authorInKebabCase = author.replace(/\s+/g, '-')
-const appId = `com.${authorInKebabCase}.${name}`.toLowerCase()
 
-const artifactName = [`${name}-v${version}`, '-${os}.${ext}'].join('')
+// 与 whimbox_launcher 风格一致：appId / 产物名 / 中文快捷方式等
+const appId = 'com.nikkigallery.whimbox_app'
+const artifactName = `${displayName}-setup-${version}.${'${ext}'}`
 
 export default {
   appId,
   productName: displayName,
-  copyright: `Copyright © ${currentYear} — ${author}`,
+  copyright: `Copyright © ${currentYear} nikkigallery`,
 
   directories: {
     app: getDevFolder(main),
     output: `dist/v${version}`,
   },
 
-  mac: {
-    artifactName,
-    icon: `${resources}/build/icons/icon.icns`,
-    category: 'public.app-category.utilities',
-    target: ['zip', 'dmg', 'dir'],
-  },
+  // 将 assets 目录打包到安装包的「资源」目录，运行时通过 process.resourcesPath 访问
+  extraResources: [
+    {
+      from: 'assets',
+      to: 'assets',
+      filter: ['**/*'],
+    },
+  ],
 
-  linux: {
-    artifactName,
-    category: 'Utilities',
-    synopsis: description,
-    target: ['AppImage', 'deb', 'pacman', 'freebsd', 'rpm'],
-  },
+  // // 控制 asar 解包，避免整颗 node_modules 进 unpacked 导致包体过大
+  // asar: {
+  //   smartUnpack: false,
+  // },
+  // asarUnpack: ['**/*.node'],
+  // // 仅解压 .node 原生模块；若依赖里没有 .node，可改为 [] 进一步减小体积
 
   win: {
     artifactName,
     icon: `${resources}/build/icons/icon.ico`,
-    target: ['zip', 'portable'],
+    target: [{ target: 'nsis', arch: ['x64'] }],
+    requestedExecutionLevel: 'requireAdministrator', // 始终以管理员身份运行
+  },
+
+  nsis: {
+    oneClick: false,
+    allowToChangeInstallationDirectory: true,
+    allowElevation: true,
+    installerIcon: `${resources}/build/icons/icon.ico`,
+    uninstallerIcon: `${resources}/build/icons/icon.ico`,
+    createDesktopShortcut: 'always',
+    createStartMenuShortcut: true,
+    shortcutName: '奇想盒',
+    language: '2052',
+    runAfterFinish: true,
+    deleteAppDataOnUninstall: false,
+    displayLanguageSelector: false,
+    uninstallDisplayName: '奇想盒',
+    include: 'installer.nsh', // 自定义安装脚本，用于保护用户数据文件夹
+    differentialPackage: true,
+  },
+  publish: {
+    provider: 'generic',
+    url: 'https://nikkigallery.vip/static/whimbox/electron/',
   },
 } satisfies Configuration

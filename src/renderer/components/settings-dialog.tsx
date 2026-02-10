@@ -40,6 +40,15 @@ type UpdateState = {
     | "up-to-date"
     | "error"
   message: string
+  transferred?: number
+  total?: number
+}
+
+function formatBytes(bytes: number): string {
+  if (bytes >= 1024 ** 3) return `${(bytes / 1024 ** 3).toFixed(1)} GB`
+  if (bytes >= 1024 ** 2) return `${(bytes / 1024 ** 2).toFixed(1)} MB`
+  if (bytes >= 1024) return `${(bytes / 1024).toFixed(1)} KB`
+  return `${bytes} B`
 }
 
 type SettingsDialogProps = {
@@ -104,7 +113,17 @@ const settingsContent: Record<
               <p className="font-semibold text-slate-700 dark:text-slate-100">
                 当前版本：{appStatus?.version ?? "未安装"}
               </p>
-              <p className="text-xs text-slate-400">{updateState.message}</p>
+              <p className="text-xs text-slate-400">
+                {updateState.message}
+                {updateState.status === "downloading" &&
+                  updateState.transferred != null &&
+                  updateState.total != null &&
+                  updateState.total > 0 && (
+                    <span className="ml-1">
+                      （{formatBytes(updateState.transferred)} / {formatBytes(updateState.total)}）
+                    </span>
+                  )}
+              </p>
             </div>
             <div className="flex flex-wrap gap-2">
               <Button
@@ -118,9 +137,12 @@ const settingsContent: Record<
               <Button
                 size="sm"
                 onClick={onInstallUpdate}
-                disabled={isProcessing || updateState.status !== "available"}
+                disabled={
+                  isProcessing ||
+                  (updateState.status !== "available" && updateState.status !== "installing")
+                }
               >
-                立即更新
+                {updateState.status === "installing" ? "重启并安装" : "立即更新"}
               </Button>
               <Button
                 variant="ghost"

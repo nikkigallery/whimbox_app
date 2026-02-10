@@ -21,6 +21,7 @@ import {
   X,
 } from 'lucide-react'
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
+import { APP_RELEASE_PAGE_URL } from 'shared/constants'
 import { cn } from 'renderer/lib/utils'
 import {
   GlobalProgressModal,
@@ -123,6 +124,8 @@ type UpdateState = {
   message: string
   url?: string
   md5?: string
+  transferred?: number
+  total?: number
 }
 
 const createId = () => `${Date.now()}-${Math.random().toString(16).slice(2, 10)}`
@@ -175,6 +178,22 @@ export function MainScreen() {
   const [taskProgressState, setTaskProgressState] = useState<TaskProgressState>({ status: 'idle' })
 
   const launcherApi = useMemo(() => window.App.launcher, [])
+  const appUpdater = useMemo(() => window.App.appUpdater, [])
+
+  useEffect(() => {
+    const unsubscribe = appUpdater.onUpdateState((state) => {
+      setUpdateState({
+        status: state.status as UpdateState['status'],
+        message: state.message,
+        url: state.url,
+        transferred: state.transferred,
+        total: state.total,
+      })
+    })
+    return () => {
+      unsubscribe()
+    }
+  }, [appUpdater])
 
   const addEventLog = useCallback((method: string, detail = '') => {
     setEventLogs((prev) => {
@@ -242,6 +261,27 @@ export function MainScreen() {
   const refreshBackendScripts = useCallback(() => {
     rpcClient.sendRequest('script.refresh', {}).catch(() => {})
   }, [rpcClient])
+
+  const handleCheckAppUpdate = useCallback(async () => {
+    setUpdateState((s) => ({ ...s, status: 'checking', message: '正在检查更新…' }))
+    await appUpdater.checkForUpdates()
+  }, [appUpdater])
+
+  const handleInstallAppUpdate = useCallback(async () => {
+    const status = updateState.status
+    if (status === 'installing') {
+      appUpdater.quitAndInstall()
+      return
+    }
+    if (status === 'available') {
+      await appUpdater.downloadAndInstallUpdate()
+    }
+  }, [appUpdater, updateState.status])
+
+  const handleManualAppUpdate = useCallback(async () => {
+    const url = await appUpdater.getManualUpdateUrl()
+    launcherApi.openExternal(url ?? APP_RELEASE_PAGE_URL)
+  }, [appUpdater, launcherApi])
 
   const syncSubscribedScripts = useCallback(async () => {
     const authState = await launcherApi.getAuthState()
@@ -397,7 +437,7 @@ export function MainScreen() {
         <div className="flex items-center gap-2 text-pink-500">
           <Gift className="size-6" />
           <div className="flex items-center gap-2 text-sm font-semibold">
-            <span>奇想盒</span>
+            <span>奇想盒ahahah</span>
             <span className="text-xs text-pink-300">V1.5.3</span>
           </div>
         </div>
@@ -406,9 +446,9 @@ export function MainScreen() {
             appStatus={appStatus}
             updateState={updateState}
             isProcessing={isProcessing}
-            onCheckUpdate={()=>{}}
-            onInstallUpdate={()=>{}}
-            onManualUpdate={()=>{}}
+            onCheckUpdate={handleCheckAppUpdate}
+            onInstallUpdate={handleInstallAppUpdate}
+            onManualUpdate={handleManualAppUpdate}
             onSyncScripts={syncSubscribedScripts}
           />
           <button

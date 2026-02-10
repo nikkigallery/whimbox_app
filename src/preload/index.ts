@@ -7,9 +7,30 @@ declare global {
   }
 }
 
+/** 与 main 进程 AppUpdateState 一致，供渲染进程使用 */
+type AppUpdateState = {
+  status: string
+  message: string
+  version?: string
+  url?: string
+  transferred?: number
+  total?: number
+}
+
 const API = {
   sayHelloFromBridge: () => console.log('\nHello from bridgeAPI! 👋\n\n'),
   username: process.env.USER,
+  appUpdater: {
+    checkForUpdates: () => ipcRenderer.invoke('app:check-for-updates'),
+    downloadAndInstallUpdate: () => ipcRenderer.invoke('app:download-and-install-update'),
+    quitAndInstall: () => ipcRenderer.invoke('app:quit-and-install'),
+    getManualUpdateUrl: () => ipcRenderer.invoke('app:get-manual-update-url') as Promise<string | null>,
+    onUpdateState: (callback: (state: AppUpdateState) => void) => {
+      const listener = (_: Electron.IpcRendererEvent, state: AppUpdateState) => callback(state)
+      ipcRenderer.on('app:update-state', listener)
+      return () => ipcRenderer.removeListener('app:update-state', listener)
+    },
+  },
   onSplashProgress: (callback: (data: { stage: string; message: string }) => void) => {
     const listener = (_: Electron.IpcRendererEvent, data: { stage: string; message: string }) =>
       callback(data)
