@@ -10,6 +10,7 @@ import {
 } from "renderer/components/ui/dialog"
 import { Button } from "renderer/components/ui/button"
 import { SidebarNavItem } from "renderer/components/sidebar-nav-item"
+import { RuntimeEnvironmentSection } from "renderer/components/runtime-environment-section"
 import { cn } from "renderer/lib/utils"
 
 type SettingSection = {
@@ -23,12 +24,6 @@ type SettingItem = {
   label: string
   description: string
   value: string
-}
-
-type PythonEnvStatus = {
-  installed: boolean
-  version?: string
-  message?: string
 }
 
 type LauncherAppStatus = {
@@ -48,11 +43,9 @@ type UpdateState = {
 }
 
 type SettingsDialogProps = {
-  pythonStatus: PythonEnvStatus
   appStatus: LauncherAppStatus | null
   updateState: UpdateState
   isProcessing: boolean
-  onSetupPython: () => void
   onCheckUpdate: () => void
   onInstallUpdate: () => void
   onManualUpdate: () => void
@@ -79,11 +72,9 @@ const settingsContent: Record<
     title: "通用设置",
     description: "应用启动与更新维护。",
     render: ({
-      pythonStatus,
       appStatus,
       updateState,
       isProcessing,
-      onSetupPython,
       onCheckUpdate,
       onInstallUpdate,
       onManualUpdate,
@@ -106,19 +97,7 @@ const settingsContent: Record<
             </Button>
           </div>
         </div>
-        <div className="rounded-xl border border-slate-100 bg-white px-4 py-3 text-sm dark:border-slate-800 dark:bg-slate-900">
-          <div className="flex flex-wrap items-center justify-between gap-3">
-            <div>
-              <p className="font-semibold text-slate-700 dark:text-slate-100">Python 环境</p>
-              <p className="text-xs text-slate-400">
-                {pythonStatus.installed ? "已就绪" : "未安装"}
-              </p>
-            </div>
-            <Button variant="outline" size="sm" disabled={isProcessing} onClick={onSetupPython}>
-              {pythonStatus.installed ? "重新检测" : "安装环境"}
-            </Button>
-          </div>
-        </div>
+        <RuntimeEnvironmentSection />
         <div className="rounded-xl border border-slate-100 bg-white px-4 py-3 text-sm dark:border-slate-800 dark:bg-slate-900">
           <div className="flex flex-wrap items-center justify-between gap-3">
             <div>
@@ -208,11 +187,9 @@ const settingsContent: Record<
 }
 
 export function SettingsDialog({
-  pythonStatus,
   appStatus,
   updateState,
   isProcessing,
-  onSetupPython,
   onCheckUpdate,
   onInstallUpdate,
   onManualUpdate,
@@ -264,11 +241,9 @@ export function SettingsDialog({
             </div>
             {content.render
               ? content.render({
-                  pythonStatus,
                   appStatus,
                   updateState,
                   isProcessing,
-                  onSetupPython,
                   onCheckUpdate,
                   onInstallUpdate,
                   onManualUpdate,

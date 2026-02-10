@@ -5,6 +5,7 @@ declare global {
     App: {
       sayHelloFromBridge: () => void
       username?: string
+      onSplashProgress: (callback: (data: { stage: string; message: string }) => void) => () => void
       windowControls: {
         minimize: () => Promise<void>
         minimizeToTray: () => Promise<void>

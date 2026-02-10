@@ -10,6 +10,12 @@ declare global {
 const API = {
   sayHelloFromBridge: () => console.log('\nHello from bridgeAPI! 👋\n\n'),
   username: process.env.USER,
+  onSplashProgress: (callback: (data: { stage: string; message: string }) => void) => {
+    const listener = (_: Electron.IpcRendererEvent, data: { stage: string; message: string }) =>
+      callback(data)
+    ipcRenderer.on('splash:python-progress', listener)
+    return () => ipcRenderer.removeListener('splash:python-progress', listener)
+  },
   windowControls: {
     minimize: () => ipcRenderer.invoke('window:minimize'),
     minimizeToTray: () => ipcRenderer.invoke('window:minimize-to-tray'),
@@ -45,7 +51,10 @@ const API = {
       ipcRenderer.on('launcher:install-progress', (_, data) => callback(data))
     },
     onPythonSetup: (callback: (data: { stage: string; message: string }) => void) => {
-      ipcRenderer.on('launcher:python-setup', (_, data) => callback(data))
+      const listener = (_: Electron.IpcRendererEvent, data: { stage: string; message: string }) =>
+        callback(data)
+      ipcRenderer.on('launcher:python-setup', listener)
+      return () => ipcRenderer.removeListener('launcher:python-setup', listener)
     },
     onLaunchAppStatus: (callback: (data: { message: string }) => void) => {
       ipcRenderer.on('launcher:launch-app-status', (_, data) => callback(data))

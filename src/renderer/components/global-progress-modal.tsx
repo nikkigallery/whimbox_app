@@ -1,6 +1,12 @@
 import { CheckCircle2, Loader2, XCircle } from 'lucide-react'
 import { cn } from 'renderer/lib/utils'
 import { Button } from 'renderer/components/ui/button'
+import {
+  Dialog,
+  DialogContent,
+  DialogFooter,
+  DialogTitle,
+} from 'renderer/components/ui/dialog'
 
 export type TaskProgressState = {
   status: 'idle' | 'running' | 'success' | 'error'
@@ -20,19 +26,17 @@ export function GlobalProgressModal({ state, onClose }: GlobalProgressModalProps
   const visible = status !== 'idle'
   const canClose = status === 'success' || status === 'error'
 
-  if (!visible) return null
-
   return (
-    <div
-      className="fixed inset-0 z-[100] flex items-center justify-center bg-black/50"
-      aria-modal
-      role="dialog"
-      aria-label={title ?? '进度'}
+    <Dialog
+      open={visible}
+      onOpenChange={(open) => {
+        if (!open && canClose) onClose?.()
+      }}
     >
-      <div
-        className={cn(
-          'mx-4 w-full max-w-md rounded-xl border border-slate-200 bg-white p-6 shadow-xl dark:border-slate-700 dark:bg-slate-900',
-        )}
+      <DialogContent
+        showCloseButton={canClose}
+        className="sm:max-w-md"
+        aria-describedby={undefined}
       >
         <div className="flex flex-col gap-4">
           <div className="flex items-center gap-3">
@@ -45,9 +49,9 @@ export function GlobalProgressModal({ state, onClose }: GlobalProgressModalProps
             {status === 'error' && (
               <XCircle className="size-6 shrink-0 text-red-500" aria-hidden />
             )}
-            <h2 className="text-lg font-semibold text-slate-800 dark:text-slate-100">
+            <DialogTitle className="text-lg font-semibold text-slate-800 dark:text-slate-100">
               {title ?? '处理中'}
-            </h2>
+            </DialogTitle>
           </div>
 
           {message && status !== 'error' && (
@@ -75,14 +79,14 @@ export function GlobalProgressModal({ state, onClose }: GlobalProgressModalProps
           )}
 
           {canClose && onClose && (
-            <div className="flex justify-end pt-2">
+            <DialogFooter className="flex justify-end pt-2 sm:justify-end">
               <Button variant="outline" size="sm" onClick={onClose}>
                 关闭
               </Button>
-            </div>
+            </DialogFooter>
           )}
         </div>
-      </div>
-    </div>
+      </DialogContent>
+    </Dialog>
   )
 }

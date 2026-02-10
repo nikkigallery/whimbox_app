@@ -151,4 +151,24 @@ export function registerLauncherIpc(window: BrowserWindow) {
   appManager.on('launch-app-end', (data) => {
     window.webContents.send('launcher:launch-app-end', data)
   })
+
+  // 主窗口不再在此做 Python 环境准备，由启动屏在显示主窗口前完成
+}
+
+/**
+ * 确保 Python 环境存在：先检测，未安装则自动搭建。
+ * 不向任何窗口发送消息，进度由调用方通过 pythonManager 事件或本函数返回值处理。
+ */
+export async function ensurePythonEnvironment(): Promise<{ ok: boolean; message: string }> {
+  try {
+    const result = await pythonManager.detectPythonEnvironment()
+    if (result.installed) {
+      return { ok: true, message: 'Python 环境已就绪' }
+    }
+    await pythonManager.setupEmbeddedPython()
+    return { ok: true, message: 'Python 环境准备完成' }
+  } catch (err) {
+    const message = err instanceof Error ? err.message : String(err)
+    return { ok: false, message }
+  }
 }

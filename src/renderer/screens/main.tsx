@@ -118,12 +118,6 @@ type LauncherAppStatus = {
   entryPoint: string | null
 }
 
-type PythonEnvStatus = {
-  installed: boolean
-  version?: string
-  message?: string
-}
-
 type UpdateState = {
   status: 'idle' | 'checking' | 'available' | 'downloading' | 'installing' | 'up-to-date' | 'error'
   message: string
@@ -172,10 +166,6 @@ export function MainScreen() {
   const [userName, setUserName] = useState<string | null>(null)
   const [userVip, setUserVip] = useState<string>('未登录')
   const [userAvatarUrl, setUserAvatarUrl] = useState<string | null>(null)
-  const [pythonStatus, setPythonStatus] = useState<PythonEnvStatus>({
-    installed: false,
-    message: '未检测',
-  })
   const [appStatus, setAppStatus] = useState<LauncherAppStatus | null>(null)
   const [updateState, setUpdateState] = useState<UpdateState>({
     status: 'idle',
@@ -413,11 +403,9 @@ export function MainScreen() {
         </div>
         <div className="app-no-drag flex items-center gap-3">
           <SettingsDialog
-            pythonStatus={pythonStatus}
             appStatus={appStatus}
             updateState={updateState}
             isProcessing={isProcessing}
-            onSetupPython={()=>{}}
             onCheckUpdate={()=>{}}
             onInstallUpdate={()=>{}}
             onManualUpdate={()=>{}}
