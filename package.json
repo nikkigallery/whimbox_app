@@ -45,6 +45,7 @@
     "next-themes": "^0.4.6",
     "radix-ui": "^1.4.3",
     "react": "^19.2.1",
+    "react-activation": "^0.13.4",
     "react-dom": "^19.2.1",
     "react-router-dom": "^7.10.1",
     "sonner": "^2.0.7",

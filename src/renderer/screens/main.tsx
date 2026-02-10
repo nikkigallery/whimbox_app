@@ -57,6 +57,11 @@ import {
   CollapsibleContent,
   CollapsibleTrigger,
 } from 'renderer/components/ui/collapsible'
+import { AliveScope, KeepAlive } from 'react-activation'
+
+// React 18+ createRoot 下需关闭 autoFreeze，否则 KeepAlive 可能异常
+const keepAlive = KeepAlive as unknown as { defaultProps?: { autoFreeze?: boolean } }
+if (keepAlive.defaultProps) keepAlive.defaultProps.autoFreeze = false
 
 type NavItem =
   | { id: string; label: string; icon: typeof Home }
@@ -82,17 +87,6 @@ const navItems: NavItem[] = [
     ],
   },
   { id: 'script-subscribe', label: '脚本订阅', icon: Rss },
-]
-
-/** 所有可作为 activePage 的页面 id（与侧边栏可切换到的页面一致） */
-const PAGE_IDS = [
-  'home',
-  'one-dragon',
-  'auto-trigger',
-  'auto-navigate',
-  'auto-macro',
-  'auto-music',
-  'script-subscribe',
 ]
 
 const quickActions = [
@@ -173,8 +167,6 @@ export function MainScreen() {
 
   const [rpcState, setRpcState] = useState(rpcClient.getState())
   const [activePage, setActivePage] = useState('home')
-  /** 已访问过的页面 id，仅这些页面会保持挂载，切换时用 CSS 显隐避免重新加载 */
-  const [visitedPages, setVisitedPages] = useState<Set<string>>(() => new Set(['home']))
   const [sessionId, setSessionId] = useState<string | null>(null)
   const [eventLogs, setEventLogs] = useState<RpcEventLog[]>([])
   const [userName, setUserName] = useState<string | null>(null)
@@ -368,10 +360,6 @@ export function MainScreen() {
   const handleToggleMaximize = () => window.App.windowControls.toggleMaximize()
   const handleClose = () => window.App.windowControls.close()
 
-  useEffect(() => {
-    setVisitedPages((prev) => new Set(prev).add(activePage))
-  }, [activePage])
-
   const getPageContent = (pageId: string) => {
     switch (pageId) {
       case 'one-dragon':
@@ -413,6 +401,7 @@ export function MainScreen() {
         state={taskProgressState}
         onClose={() => setTaskProgressState({ status: 'idle' })}
       />
+      <AliveScope>
       <main className="flex h-screen flex-col bg-background text-foreground">
       <header className="app-drag flex items-center justify-between border-b border-slate-100 bg-white/80 px-6 py-3 dark:border-slate-800 dark:bg-slate-900/80">
         <div className="flex items-center gap-2 text-pink-500">
@@ -608,22 +597,17 @@ export function MainScreen() {
               </div>
             </SidebarFooter>
           </Sidebar>
-          <section className="flex min-h-0 flex-1 flex-col overflow-hidden">
-            {PAGE_IDS.filter((id) => visitedPages.has(id)).map((pageId) => (
-              <div
-                key={pageId}
-                className={cn(
-                  'flex min-h-0 flex-1 flex-col overflow-hidden',
-                  activePage !== pageId && 'hidden',
-                )}
-              >
-                {getPageContent(pageId)}
+          <section className="relative flex min-h-0 flex-1 flex-col overflow-hidden">
+            <KeepAlive name={activePage} cacheKey={activePage}>
+              <div className="absolute inset-0 flex flex-col overflow-hidden">
+                {getPageContent(activePage)}
               </div>
-            ))}
+            </KeepAlive>
           </section>
         </div>
       </SidebarProvider>
       </main>
+      </AliveScope>
     </>
   )
 }
