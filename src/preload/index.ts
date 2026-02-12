@@ -20,6 +20,7 @@ type AppUpdateState = {
 const API = {
   sayHelloFromBridge: () => console.log('\nHello from bridgeAPI! 👋\n\n'),
   username: process.env.USER,
+  log: (tag: string, message: string) => ipcRenderer.invoke('app:log', tag, message),
   appUpdater: {
     checkForUpdates: () => ipcRenderer.invoke('app:check-for-updates'),
     downloadAndInstallUpdate: () => ipcRenderer.invoke('app:download-and-install-update'),
@@ -53,17 +54,19 @@ const API = {
       ipcRenderer.invoke('launcher:install-whl', wheelPath, deleteWheel),
     downloadAndInstallWhl: (url: string, md5?: string) =>
       ipcRenderer.invoke('launcher:download-and-install-whl', url, md5),
-    getAppStatus: () => ipcRenderer.invoke('launcher:get-app-status'),
-    launchApp: () => ipcRenderer.invoke('launcher:launch-app'),
-    stopApp: () => ipcRenderer.invoke('launcher:stop-app'),
+    downloadAndInstallLatestWhl: () =>
+      ipcRenderer.invoke('launcher:download-and-install-latest-whl'),
+    getBackendStatus: () => ipcRenderer.invoke('launcher:get-backend-status'),
+    launchBackend: () => ipcRenderer.invoke('launcher:launch-backend'),
+    stopBackend: () => ipcRenderer.invoke('launcher:stop-backend'),
     getAppVersion: () => ipcRenderer.invoke('launcher:get-app-version'),
-    openLogsFolder: () => ipcRenderer.invoke('launcher:open-logs-folder'),
     getAnnouncements: () => ipcRenderer.invoke('launcher:get-announcements'),
     apiRequest: (
       endpoint: string,
       options?: { method?: string; data?: Record<string, unknown>; requireAuth?: boolean },
     ) => ipcRenderer.invoke('launcher:api-request', endpoint, options),
     getAuthState: () => ipcRenderer.invoke('launcher:get-auth-state'),
+    refreshAuth: () => ipcRenderer.invoke('launcher:refresh-auth'),
     logout: () => ipcRenderer.invoke('launcher:logout'),
     onDownloadProgress: (callback: (data: { progress: number }) => void) => {
       ipcRenderer.on('launcher:download-progress', (_, data) => callback(data))
@@ -77,11 +80,11 @@ const API = {
       ipcRenderer.on('launcher:python-setup', listener)
       return () => ipcRenderer.removeListener('launcher:python-setup', listener)
     },
-    onLaunchAppStatus: (callback: (data: { message: string }) => void) => {
-      ipcRenderer.on('launcher:launch-app-status', (_, data) => callback(data))
+    onLaunchBackendStatus: (callback: (data: { message: string }) => void) => {
+      ipcRenderer.on('launcher:launch-backend-status', (_, data) => callback(data))
     },
-    onLaunchAppEnd: (callback: (data: { message: string }) => void) => {
-      ipcRenderer.on('launcher:launch-app-end', (_, data) => callback(data))
+    onLaunchBackendEnd: (callback: (data: { message: string }) => void) => {
+      ipcRenderer.on('launcher:launch-backend-end', (_, data) => callback(data))
     },
     onAuthState: (
       callback: (data: { user: { id: number; username: string; avatar?: string; is_vip: boolean; vip_expiry_data?: string } } | null) => void,

@@ -26,10 +26,6 @@ type SettingItem = {
   value: string
 }
 
-type LauncherAppStatus = {
-  version: string | null
-}
-
 type UpdateState = {
   status:
     | "idle"
@@ -44,19 +40,12 @@ type UpdateState = {
   total?: number
 }
 
-function formatBytes(bytes: number): string {
-  if (bytes >= 1024 ** 3) return `${(bytes / 1024 ** 3).toFixed(1)} GB`
-  if (bytes >= 1024 ** 2) return `${(bytes / 1024 ** 2).toFixed(1)} MB`
-  if (bytes >= 1024) return `${(bytes / 1024).toFixed(1)} KB`
-  return `${bytes} B`
-}
-
 type SettingsDialogProps = {
-  appStatus: LauncherAppStatus | null
+  /** 与主界面一致：前后端版本号中较大者 */
+  displayVersion: string
   updateState: UpdateState
   isProcessing: boolean
   onCheckUpdate: () => void
-  onInstallUpdate: () => void
   onManualUpdate: () => void
   onSyncScripts: () => void
 }
@@ -81,11 +70,10 @@ const settingsContent: Record<
     title: "通用设置",
     description: "应用启动与更新维护。",
     render: ({
-      appStatus,
+      displayVersion,
       updateState,
       isProcessing,
       onCheckUpdate,
-      onInstallUpdate,
       onManualUpdate,
       onSyncScripts,
     }) => (
@@ -111,18 +99,7 @@ const settingsContent: Record<
           <div className="flex flex-wrap items-center justify-between gap-3">
             <div>
               <p className="font-semibold text-slate-700 dark:text-slate-100">
-                当前版本：{appStatus?.version ?? "未安装"}
-              </p>
-              <p className="text-xs text-slate-400">
-                {updateState.message}
-                {updateState.status === "downloading" &&
-                  updateState.transferred != null &&
-                  updateState.total != null &&
-                  updateState.total > 0 && (
-                    <span className="ml-1">
-                      （{formatBytes(updateState.transferred)} / {formatBytes(updateState.total)}）
-                    </span>
-                  )}
+                当前版本：{displayVersion || "—"}
               </p>
             </div>
             <div className="flex flex-wrap gap-2">
@@ -133,16 +110,6 @@ const settingsContent: Record<
                 disabled={isProcessing || updateState.status === "checking"}
               >
                 检查更新
-              </Button>
-              <Button
-                size="sm"
-                onClick={onInstallUpdate}
-                disabled={
-                  isProcessing ||
-                  (updateState.status !== "available" && updateState.status !== "installing")
-                }
-              >
-                {updateState.status === "installing" ? "重启并安装" : "立即更新"}
               </Button>
               <Button
                 variant="ghost"
@@ -209,11 +176,10 @@ const settingsContent: Record<
 }
 
 export function SettingsDialog({
-  appStatus,
+  displayVersion,
   updateState,
   isProcessing,
   onCheckUpdate,
-  onInstallUpdate,
   onManualUpdate,
   onSyncScripts,
 }: SettingsDialogProps) {
@@ -263,11 +229,10 @@ export function SettingsDialog({
             </div>
             {content.render
               ? content.render({
-                  appStatus,
+                  displayVersion,
                   updateState,
                   isProcessing,
                   onCheckUpdate,
-                  onInstallUpdate,
                   onManualUpdate,
                   onSyncScripts,
                 })

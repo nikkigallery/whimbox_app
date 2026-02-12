@@ -10,7 +10,7 @@
   ; 显示安装详情
   DetailPrint ""
   DetailPrint "=========================================="
-  DetailPrint "奇想盒启动器 - 安装中"
+  DetailPrint "奇想盒 - 安装中"
   DetailPrint "安装版本: ${VERSION}"
   DetailPrint "=========================================="
   DetailPrint ""
@@ -84,7 +84,6 @@
   DetailPrint ""
   DetailPrint "======================================"
   DetailPrint "已保留以下用户数据："
-  DetailPrint "  ✓ app-data       (应用数据)"
   DetailPrint "  ✓ configs        (配置文件)"
   DetailPrint "  ✓ python-embedded (运行环境)"
   DetailPrint "  ✓ downloads      (下载文件)"
@@ -94,7 +93,6 @@
   DetailPrint ""
   
   ; 注意：以下目录永远不会被删除
-  ; - $INSTDIR\app-data
   ; - $INSTDIR\configs
   ; - $INSTDIR\python-embedded
   ; - $INSTDIR\downloads
@@ -107,7 +105,7 @@
 ; ------------------------------------------------------------------------------
 !macro customUnInstall
   ; 询问用户是否删除用户数据
-  MessageBox MB_YESNO|MB_ICONQUESTION \
+  MessageBox MB_YESNO|MB_ICONQUESTION|MB_DEFBUTTON2 \
     "是否删除运行环境和配置？$\n$\n建议：如果是在重新安装或者更新，请选择'否'" \
     IDYES delete_userdata IDNO keep_userdata
   

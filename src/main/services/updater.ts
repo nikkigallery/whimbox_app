@@ -4,6 +4,10 @@ import pkg from 'electron-updater'
 const { autoUpdater } = pkg
 
 import { ENVIRONMENT } from 'shared/constants'
+import { getAccessToken } from './auth-store'
+
+/** Electron 更新 feed：请求 latest.yml 需登录且 VIP，下载安装包时也会带同一 Authorization */
+const ELECTRON_UPDATE_FEED_URL = 'https://www.nikkigallery.vip/api/v1/whimbox/latest/electron/'
 
 export type AppUpdateState = {
   status:
@@ -36,13 +40,23 @@ let mainWindow: BrowserWindow | null = null
 /** 最近一次检测到的更新信息，用于「手动更新」打开下载页 */
 let lastUpdateDownloadUrl: string | null = null
 
+function applyUpdaterAuth() {
+  const token = getAccessToken()
+  if (token) {
+    autoUpdater.requestHeaders = { Authorization: `Bearer ${token}` }
+  } else {
+    autoUpdater.requestHeaders = null
+  }
+}
+
 export function registerAppUpdater(window: BrowserWindow) {
   mainWindow = window
 
-  if (ENVIRONMENT.IS_DEV) {
-    autoUpdater.autoDownload = false
-    autoUpdater.autoInstallOnAppQuit = false
-  }
+  autoUpdater.setFeedURL(ELECTRON_UPDATE_FEED_URL)
+
+  autoUpdater.autoDownload = false
+  autoUpdater.autoInstallOnAppQuit = true
+  autoUpdater.autoRunAppAfterInstall = true
 
   autoUpdater.on('checking-for-update', () => {
     sendState(mainWindow, { status: 'checking', message: '正在检查更新…' })
@@ -100,6 +114,15 @@ export function registerAppUpdater(window: BrowserWindow) {
       })
       return
     }
+    const token = getAccessToken()
+    if (!token) {
+      sendState(mainWindow, {
+        status: 'error',
+        message: '请先登录并开通自动更新后再检查更新。',
+      })
+      return
+    }
+    applyUpdaterAuth()
     try {
       sendState(mainWindow, { status: 'checking', message: '正在检查更新…' })
       const result = await autoUpdater.checkForUpdates()
@@ -107,9 +130,10 @@ export function registerAppUpdater(window: BrowserWindow) {
         sendState(mainWindow, { status: 'up-to-date', message: '当前已是最新版本' })
       }
     } catch (e) {
+      const msg = e instanceof Error ? e.message : String(e)
       sendState(mainWindow, {
         status: 'error',
-        message: e instanceof Error ? e.message : String(e),
+        message: msg.includes('401') || msg.includes('403') ? '请先登录并开通自动更新。' : msg,
       })
     }
   })
@@ -119,12 +143,21 @@ export function registerAppUpdater(window: BrowserWindow) {
       sendState(mainWindow, { status: 'error', message: '开发环境下无法安装更新。' })
       return
     }
+    applyUpdaterAuth()
     try {
+      // 下载前重新拉取 feed，拿到新的防盗链 URL（短有效期），再立即下载
+      sendState(mainWindow, { status: 'checking', message: '正在获取下载地址…' })
+      const checkResult = await autoUpdater.checkForUpdates()
+      if (!checkResult?.updateInfo) {
+        sendState(mainWindow, { status: 'up-to-date', message: '当前已是最新版本，无需下载。' })
+        return
+      }
       await autoUpdater.downloadUpdate()
     } catch (e) {
+      const msg = e instanceof Error ? e.message : String(e)
       sendState(mainWindow, {
         status: 'error',
-        message: e instanceof Error ? e.message : String(e),
+        message: msg.includes('401') || msg.includes('403') ? '请先登录并开通自动更新。' : msg,
       })
     }
   })

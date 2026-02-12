@@ -19,12 +19,16 @@ export type TaskProgressState = {
 type GlobalProgressModalProps = {
   state: TaskProgressState
   onClose?: () => void
+  /** 更新应用已下载完成时展示「重启并安装」主按钮 */
+  onRestartAndInstall?: () => void
 }
 
-export function GlobalProgressModal({ state, onClose }: GlobalProgressModalProps) {
+export function GlobalProgressModal({ state, onClose, onRestartAndInstall }: GlobalProgressModalProps) {
   const { status, title, message, progress, error } = state
   const visible = status !== 'idle'
   const canClose = status === 'success' || status === 'error'
+  const showRestartAndInstall =
+    canClose && onRestartAndInstall && title === '更新应用' && message?.includes('重启')
 
   return (
     <Dialog
@@ -55,10 +59,14 @@ export function GlobalProgressModal({ state, onClose }: GlobalProgressModalProps
           </div>
 
           {message && status !== 'error' && (
-            <p className="text-sm text-slate-600 dark:text-slate-300">{message}</p>
+            <p className="min-w-0 break-words line-clamp-2 text-sm text-slate-600 dark:text-slate-300" title={message}>
+              {message}
+            </p>
           )}
           {status === 'error' && error && (
-            <p className="text-sm text-red-600 dark:text-red-400">{error}</p>
+            <p className="min-w-0 break-words text-sm text-red-600 dark:text-red-400">
+              {error}
+            </p>
           )}
 
           {status === 'running' && (
@@ -79,7 +87,12 @@ export function GlobalProgressModal({ state, onClose }: GlobalProgressModalProps
           )}
 
           {canClose && onClose && (
-            <DialogFooter className="flex justify-end pt-2 sm:justify-end">
+            <DialogFooter className="flex justify-end gap-2 pt-2 sm:justify-end">
+              {showRestartAndInstall && (
+                <Button size="sm" onClick={onRestartAndInstall}>
+                  重启并安装
+                </Button>
+              )}
               <Button variant="outline" size="sm" onClick={onClose}>
                 关闭
               </Button>

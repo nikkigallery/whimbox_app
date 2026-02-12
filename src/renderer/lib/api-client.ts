@@ -45,7 +45,7 @@ class APIClient {
   }
 
   async checkWhimboxUpdate() {
-    const response = (await request('/whimbox/latest', {
+    const response = (await request('/whimbox/latest/backend', {
       method: 'GET',
       requireAuth: true,
     })) as { version: string; url: string; md5: string }
@@ -55,7 +55,6 @@ class APIClient {
       md5: response.md5,
       fetchedAt: Date.now(),
     }
-    localStorage.setItem('whimbox_remote_version', JSON.stringify(remoteVersion))
     return remoteVersion
   }
 

@@ -6,6 +6,7 @@ import { loadReactDevtools } from 'lib/electron-app/utils'
 import { ENVIRONMENT } from 'shared/constants'
 import { waitFor } from 'shared/utils'
 import { startAuthServer, stopAuthServer } from './services/auth-server'
+import { registerAppLogger } from './services/app-logger'
 import { ensurePythonEnvironment, registerLauncherIpc } from './services/launcher-ipc'
 import { registerAppUpdater, unregisterAppUpdater } from './services/updater'
 import { pythonManager } from './services/python-manager'
@@ -110,6 +111,7 @@ makeAppWithSingleInstanceLock(async () => {
     }
   })
 
+  registerAppLogger()
   registerLauncherIpc(window)
   registerAppUpdater(window)
   registerRpcBridge()

@@ -64,7 +64,6 @@ export default {
     displayLanguageSelector: false,
     uninstallDisplayName: '奇想盒',
     include: 'installer.nsh', // 自定义安装脚本，用于保护用户数据文件夹
-    differentialPackage: true,
   },
   publish: {
     provider: 'generic',

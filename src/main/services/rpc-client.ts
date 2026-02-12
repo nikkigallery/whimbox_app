@@ -44,7 +44,7 @@ export class RpcClient {
 
   connect() {
     if (this.state === 'open' || this.state === 'connecting') return
-    console.info('[rpc] connect: start', { url: this.url })
+    // console.info('[rpc] connect: start', { url: this.url })
     this.shouldReconnect = true
     if (this.reconnectTimer) {
       clearTimeout(this.reconnectTimer)
@@ -59,17 +59,17 @@ export class RpcClient {
       this.reconnectAttempts = 0
     }
     ws.onclose = (event) => {
-      console.warn('[rpc] connect: close', {
-        code: event.code,
-        reason: event.reason,
-        wasClean: event.wasClean,
-      })
+      // console.warn('[rpc] connect: close', {
+      //   code: event.code,
+      //   reason: event.reason,
+      //   wasClean: event.wasClean,
+      // })
       this.setState('closed')
       this.cleanupPending(new Error('RPC connection closed'))
       this.scheduleReconnect()
     }
     ws.onerror = (event) => {
-      console.warn('[rpc] connect: error', event)
+      // console.warn('[rpc] connect: error', event)
       this.setState('error')
       this.emit('error', { message: 'RPC connection error' })
       this.scheduleReconnect()
@@ -171,7 +171,7 @@ export class RpcClient {
   private setState(state: RpcState) {
     if (this.state === state) return
     this.state = state
-    console.info('[rpc] state:', state)
+    // console.info('[rpc] state:', state)
     this.emit('state', { state })
   }
 
@@ -192,14 +192,14 @@ export class RpcClient {
     const delay = Math.min(baseDelay * 2 ** attempt, maxDelay)
     const jitter = Math.random() * 200
     this.reconnectAttempts += 1
-    console.info('[rpc] reconnect: schedule', {
-      attempt: this.reconnectAttempts,
-      delay: Math.round(delay + jitter),
-    })
+    // console.info('[rpc] reconnect: schedule', {
+    //   attempt: this.reconnectAttempts,
+    //   delay: Math.round(delay + jitter),
+    // })
     this.reconnectTimer = setTimeout(() => {
       this.reconnectTimer = null
       if (this.state === 'open' || this.state === 'connecting') return
-      console.info('[rpc] reconnect: attempt', { attempt: this.reconnectAttempts })
+      // console.info('[rpc] reconnect: attempt', { attempt: this.reconnectAttempts })
       this.connect()
     }, delay + jitter)
   }

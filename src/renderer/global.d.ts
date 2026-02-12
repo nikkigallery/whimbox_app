@@ -5,6 +5,8 @@ declare global {
     App: {
       sayHelloFromBridge: () => void
       username?: string
+      /** 写入主进程日志文件 userData/logs/app.log */
+      log: (tag: string, message: string) => Promise<void>
       onSplashProgress: (callback: (data: { stage: string; message: string }) => void) => () => void
       windowControls: {
         minimize: () => Promise<void>
@@ -34,17 +36,16 @@ declare global {
         selectWhlFile: () => Promise<string | null>
         installWhl: (wheelPath: string, deleteWheel?: boolean) => Promise<unknown>
         downloadAndInstallWhl: (url: string, md5?: string) => Promise<unknown>
-        getAppStatus: () => Promise<{
+        getBackendStatus: () => Promise<{
           installed: boolean
           version: string | null
           installedAt: number | null
           packageName: string | null
           entryPoint: string | null
         }>
-        launchApp: () => Promise<unknown>
-        stopApp: () => Promise<unknown>
+        launchBackend: () => Promise<unknown>
+        stopBackend: () => Promise<unknown>
         getAppVersion: () => Promise<string>
-        openLogsFolder: () => Promise<void>
         getAnnouncements: () => Promise<{
           announcements: Array<{ title: string; url?: string; created_at: string }>
           hash: string
@@ -62,8 +63,8 @@ declare global {
           callback: (data: { output: string; isError?: boolean }) => void,
         ) => void
         onPythonSetup: (callback: (data: { stage: string; message: string }) => void) => void
-        onLaunchAppStatus: (callback: (data: { message: string }) => void) => void
-        onLaunchAppEnd: (callback: (data: { message: string }) => void) => void
+        onLaunchBackendStatus: (callback: (data: { message: string }) => void) => void
+        onLaunchBackendEnd: (callback: (data: { message: string }) => void) => void
         onAuthState: (
           callback: (data: {
             user: { id: number; username: string; avatar?: string; is_vip: boolean; vip_expiry_data?: string }
