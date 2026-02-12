@@ -70,7 +70,10 @@ declare global {
             user: { id: number; username: string; avatar?: string; is_vip: boolean; vip_expiry_data?: string }
           } | null) => void,
         ) => void
-        syncSubscribedScripts: (scriptsData: { scripts: Array<{ name: string; md5: string }> }) => Promise<unknown>
+        syncSubscribedScripts: (
+          scriptsData: { scripts: Array<{ name: string; md5: string }> },
+          options?: { emitNoChangeSuccess?: boolean },
+        ) => Promise<unknown>
         downloadScript: (item: { name: string; md5: string }) => Promise<void>
         deleteScript: (md5: string) => Promise<void>
         onTaskProgress: (

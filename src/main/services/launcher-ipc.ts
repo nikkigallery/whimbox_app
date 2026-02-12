@@ -202,15 +202,22 @@ export function registerLauncherIpc(window: BrowserWindow) {
     window.webContents.send('launcher:task-progress', payload)
   })
 
-  ipcMain.handle('launcher:sync-subscribed-scripts', async (_, scriptsData: { scripts: Array<{ name: string; md5: string }> }) => {
-    try {
-      return await scriptManager.updateSubscribedScripts(scriptsData)
-    } catch (err) {
-      const message = err instanceof Error ? err.message : String(err)
-      window.webContents.send('launcher:task-progress', { status: 'error', title: '同步订阅脚本', error: message })
-      throw err
-    }
-  })
+  ipcMain.handle(
+    'launcher:sync-subscribed-scripts',
+    async (
+      _,
+      scriptsData: { scripts: Array<{ name: string; md5: string }> },
+      options?: { emitNoChangeSuccess?: boolean },
+    ) => {
+      try {
+        return await scriptManager.updateSubscribedScripts(scriptsData, options)
+      } catch (err) {
+        const message = err instanceof Error ? err.message : String(err)
+        window.webContents.send('launcher:task-progress', { status: 'error', title: '同步订阅脚本', error: message })
+        throw err
+      }
+    },
+  )
 
   ipcMain.handle('launcher:download-script', async (_, item: { name: string; md5: string }) => {
     try {

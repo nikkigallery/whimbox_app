@@ -10,7 +10,7 @@ import {
 } from "renderer/components/ui/dialog"
 import { Button } from "renderer/components/ui/button"
 import { SidebarNavItem } from "renderer/components/sidebar-nav-item"
-import { RuntimeEnvironmentSection } from "renderer/components/runtime-environment-section"
+import { ThemeToggle } from "renderer/components/theme-provider"
 import { cn } from "renderer/lib/utils"
 
 type SettingSection = {
@@ -52,7 +52,6 @@ type SettingsDialogProps = {
 
 const settingSections: SettingSection[] = [
   { id: "general", label: "通用", description: "启动与更新", icon: Settings },
-  { id: "appearance", label: "外观", description: "主题与布局", icon: Palette },
   { id: "agent", label: "Agent", description: "模型与交互", icon: Bot },
   { id: "shortcuts", label: "快捷键", description: "操作习惯", icon: Keyboard },
 ]
@@ -78,11 +77,11 @@ const settingsContent: Record<
       onSyncScripts,
     }) => (
       <div className="space-y-3">
+        <ThemeToggle />
         <div className="rounded-xl border border-slate-100 bg-white px-4 py-3 text-sm dark:border-slate-800 dark:bg-slate-900">
           <div className="flex flex-wrap items-center justify-between gap-3">
             <div>
               <p className="font-semibold text-slate-700 dark:text-slate-100">订阅脚本</p>
-              <p className="text-xs text-slate-400">同步已订阅的脚本到本地</p>
             </div>
             <Button
               variant="outline"
@@ -90,11 +89,10 @@ const settingsContent: Record<
               disabled={isProcessing}
               onClick={onSyncScripts}
             >
-              同步订阅脚本
+              刷新订阅脚本
             </Button>
           </div>
         </div>
-        <RuntimeEnvironmentSection />
         <div className="rounded-xl border border-slate-100 bg-white px-4 py-3 text-sm dark:border-slate-800 dark:bg-slate-900">
           <div className="flex flex-wrap items-center justify-between gap-3">
             <div>
@@ -124,22 +122,6 @@ const settingsContent: Record<
         </div>
       </div>
     ),
-  },
-  appearance: {
-    title: "外观设置",
-    description: "界面主题与布局调整。",
-    items: [
-      {
-        label: "主题模式",
-        description: "在白天/夜间主题之间切换。",
-        value: "跟随系统",
-      },
-      {
-        label: "侧边栏宽度",
-        description: "调整主界面导航区宽度。",
-        value: "默认",
-      },
-    ],
   },
   agent: {
     title: "Agent 设置",

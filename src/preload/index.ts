@@ -91,8 +91,10 @@ const API = {
     ) => {
       ipcRenderer.on('launcher:auth-state', (_, data) => callback(data))
     },
-    syncSubscribedScripts: (scriptsData: { scripts: Array<{ name: string; md5: string }> }) =>
-      ipcRenderer.invoke('launcher:sync-subscribed-scripts', scriptsData),
+    syncSubscribedScripts: (
+      scriptsData: { scripts: Array<{ name: string; md5: string }> },
+      options?: { emitNoChangeSuccess?: boolean },
+    ) => ipcRenderer.invoke('launcher:sync-subscribed-scripts', scriptsData, options),
     downloadScript: (item: { name: string; md5: string }) =>
       ipcRenderer.invoke('launcher:download-script', item),
     deleteScript: (md5: string) => ipcRenderer.invoke('launcher:delete-script', md5),

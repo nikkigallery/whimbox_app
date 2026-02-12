@@ -7,7 +7,6 @@ import {
   Layers,
   Map,
   Minus,
-  Moon,
   Keyboard,
   PanelBottomClose,
   Piano,
@@ -15,7 +14,6 @@ import {
   Rss,
   Send,
   Sparkles,
-  Sun,
   Square,
   Target,
   X,
@@ -169,17 +167,6 @@ const formatRpcState = (state: string) => {
 
 
 export function MainScreen() {
-  const [isDark, setIsDark] = useState(() => {
-    const savedTheme =
-      typeof window !== 'undefined' ? localStorage.getItem('theme') : null
-    return savedTheme === 'dark'
-  })
-
-  useEffect(() => {
-    document.documentElement.classList.toggle('dark', isDark)
-    localStorage.setItem('theme', isDark ? 'dark' : 'light')
-  }, [isDark])
-
   const rpcRef = useRef<IpcRpcClient | null>(null)
   if (!rpcRef.current) {
     rpcRef.current = new IpcRpcClient()
@@ -509,29 +496,34 @@ export function MainScreen() {
     }
   }, [updatePromptNew])
 
-  const syncSubscribedScripts = useCallback(async () => {
-    const authState = await launcherApi.getAuthState()
-    if (!authState?.user) return
-    try {
-      const data = await apiClient.getAllSubscribedScripts()
-      if (data.scripts?.length) {
-        await launcherApi.syncSubscribedScripts(data)
-      } else {
+  const syncSubscribedScripts = useCallback(
+    async (opts?: { showFeedbackWhenNoChange?: boolean }) => {
+      const authState = await launcherApi.getAuthState()
+      if (!authState?.user?.is_vip) return
+      try {
+        const data = await apiClient.getAllSubscribedScripts()
+        if (data.scripts?.length) {
+          await launcherApi.syncSubscribedScripts(data, {
+            emitNoChangeSuccess: opts?.showFeedbackWhenNoChange,
+          })
+        } else {
+          setTaskProgressState({
+            status: 'success',
+            title: '同步订阅脚本',
+            message: '暂无订阅脚本',
+          })
+        }
+        refreshBackendScripts()
+      } catch (err) {
         setTaskProgressState({
-          status: 'success',
+          status: 'error',
           title: '同步订阅脚本',
-          message: '暂无订阅脚本',
+          error: err instanceof Error ? err.message : '获取订阅列表失败',
         })
       }
-      refreshBackendScripts()
-    } catch (err) {
-      setTaskProgressState({
-        status: 'error',
-        title: '同步订阅脚本',
-        error: err instanceof Error ? err.message : '获取订阅列表失败',
-      })
-    }
-  }, [launcherApi, refreshBackendScripts])
+    },
+    [launcherApi, refreshBackendScripts],
+  )
 
   useEffect(() => {
     const off = launcherApi.onTaskProgress(
@@ -682,16 +674,8 @@ export function MainScreen() {
             isProcessing={isProcessing}
             onCheckUpdate={handleCheckAppUpdate}
             onManualUpdate={handleManualAppUpdate}
-            onSyncScripts={syncSubscribedScripts}
+            onSyncScripts={() => syncSubscribedScripts({ showFeedbackWhenNoChange: true })}
           />
-          <button
-            type="button"
-            onClick={() => setIsDark((prev) => !prev)}
-            className="flex items-center gap-2 rounded-full border border-slate-200 bg-white/80 px-3 py-1 text-xs text-slate-500 shadow-sm transition hover:bg-slate-50 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-300 dark:hover:bg-slate-700"
-          >
-            {isDark ? <Sun className="size-3" /> : <Moon className="size-3" />}
-            {isDark ? '白天' : '夜间'}
-          </button>
           <NotificationDrawer/>
           <div className="flex items-center gap-2 text-pink-400">
             <button

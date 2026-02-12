@@ -69,8 +69,11 @@ export class ScriptManager extends EventEmitter {
     return index
   }
 
-  /** 全量同步订阅脚本；仅当本地脚本有变动时才 emit 进度，由 IPC 转发给渲染进程 */
-  async updateSubscribedScripts(scriptsData: ScriptsData): Promise<{
+  /** 全量同步订阅脚本；仅当本地脚本有变动时才 emit 进度，由 IPC 转发给渲染进程；options.emitNoChangeSuccess 为 true 时在无变更也 emit 一次成功（供手动刷新时给用户反馈） */
+  async updateSubscribedScripts(
+    scriptsData: ScriptsData,
+    options?: { emitNoChangeSuccess?: boolean },
+  ): Promise<{
     success: boolean
     totalCount: number
     successCount: number
@@ -184,6 +187,13 @@ export class ScriptManager extends EventEmitter {
         failedCount,
         unsubscribedCount: unsubscribedMd5s.length,
       })
+    } else if (options?.emitNoChangeSuccess) {
+      this.emit('progress', {
+        status: 'success',
+        title: '同步订阅脚本',
+        message: '订阅脚本已是最新，无需更新',
+        progress: 100,
+      } as ProgressPayload)
     }
 
     return {
