@@ -5,8 +5,6 @@ declare global {
     App: {
       sayHelloFromBridge: () => void
       username?: string
-      /** 写入主进程日志文件 userData/logs/app.log */
-      log: (tag: string, message: string) => Promise<void>
       onSplashProgress: (callback: (data: { stage: string; message: string }) => void) => () => void
       windowControls: {
         minimize: () => Promise<void>
@@ -63,7 +61,6 @@ declare global {
           callback: (data: { output: string; isError?: boolean }) => void,
         ) => void
         onPythonSetup: (callback: (data: { stage: string; message: string }) => void) => void
-        onLaunchBackendStatus: (callback: (data: { message: string }) => void) => void
         onLaunchBackendEnd: (callback: (data: { message: string }) => void) => void
         onAuthState: (
           callback: (data: {

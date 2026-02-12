@@ -1,6 +1,8 @@
 import { app, dialog, ipcMain, shell, type BrowserWindow } from 'electron'
 
+import { waitFor } from 'shared/utils'
 import { backendManager } from './backend-manager'
+import { reconnectRpcNow, waitForRpcConnected } from './rpc-bridge'
 import { downloader } from './downloader'
 import type { DownloadProgress } from './downloader'
 import { getAuthPort } from './auth-server'
@@ -81,6 +83,23 @@ async function runWhlInstallWithProgress(
   try {
     const result = await work()
     sendTaskProgress(win, { status: 'success', title, message: '安装完成' })
+    try {
+      sendTaskProgress(win, { status: 'running', title, message: '正在重启后台…' })
+      await backendManager.stopBackend()
+      await waitFor(500)
+      await backendManager.launchBackend()
+      sendTaskProgress(win, { status: 'running', title, message: '正在连接…' })
+      reconnectRpcNow()
+      const connected = await waitForRpcConnected(15_000)
+      if (connected) {
+        sendTaskProgress(win, { status: 'success', title, message: '更新完成' })
+      } else {
+        sendTaskProgress(win, { status: 'error', title, error: '连接超时，请稍后查看状态' })
+      }
+    } catch (restartErr) {
+      console.error('更新后重启后台失败:', restartErr)
+      sendTaskProgress(win, { status: 'error', title, error: '重启后台失败' })
+    }
     return result
   } catch (err) {
     const message = err instanceof Error ? err.message : String(err)
@@ -149,11 +168,11 @@ export function registerLauncherIpc(window: BrowserWindow) {
     return null
   })
 
-  ipcMain.handle('launcher:install-whl', async (_, wheelPath: string, deleteWheel = true) =>
+  ipcMain.handle('launcher:install-whl', async (_, wheelPath: string) =>
     runWhlInstallWithProgress(window, '安装后端', {
       initialMessage: '正在安装…',
       withDownload: false,
-      work: () => backendManager.installWhl(wheelPath, deleteWheel),
+      work: () => backendManager.installWhl(wheelPath, false),
     }),
   )
 
@@ -269,10 +288,6 @@ export function registerLauncherIpc(window: BrowserWindow) {
       stage: 'speed-test-complete',
       message: data.message,
     })
-  })
-
-  backendManager.on('launch-backend-status', (data) => {
-    window.webContents.send('launcher:launch-backend-status', data)
   })
 
   backendManager.on('launch-backend-end', (data) => {

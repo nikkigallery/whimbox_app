@@ -6,11 +6,12 @@ import { loadReactDevtools } from 'lib/electron-app/utils'
 import { ENVIRONMENT } from 'shared/constants'
 import { waitFor } from 'shared/utils'
 import { startAuthServer, stopAuthServer } from './services/auth-server'
-import { registerAppLogger } from './services/app-logger'
+import { configureLogFile, registerAppLogger } from './services/app-logger'
+import { backendManager } from './services/backend-manager'
 import { ensurePythonEnvironment, registerLauncherIpc } from './services/launcher-ipc'
 import { registerAppUpdater, unregisterAppUpdater } from './services/updater'
 import { pythonManager } from './services/python-manager'
-import { registerRpcBridge, stopRpcBridge } from './services/rpc-bridge'
+import { registerRpcBridge, stopRpcBridge, waitForRpcConnected } from './services/rpc-bridge'
 import { createTray, destroyTray } from './services/tray'
 import { MainWindow } from './windows/main'
 import { OverlayWindow } from './windows/overlay'
@@ -71,6 +72,7 @@ makeAppWithSingleInstanceLock(async () => {
   })
 
   await app.whenReady()
+  configureLogFile()
 
   const splashWindow = await SplashWindow()
   await new Promise<void>((resolve) => {
@@ -86,16 +88,51 @@ makeAppWithSingleInstanceLock(async () => {
   const result = await ensurePythonEnvironment()
   removeForward()
 
+  let backendStarted = false
   if (result.ok) {
     splashWindow.webContents.send('splash:python-progress', {
       stage: 'ensure-done',
       message: result.message,
     })
+
+    const backendStatus = backendManager.getBackendStatus()
+    if (backendStatus.installed && backendStatus.entryPoint) {
+      try {
+        if (!splashWindow.isDestroyed() && splashWindow.webContents) {
+          splashWindow.webContents.send('splash:python-progress', {
+            stage: 'starting-backend',
+            message: '正在启动奇想盒…',
+          })
+        }
+        await backendManager.launchBackend()
+        backendStarted = true
+      } catch (err) {
+        console.error('启动奇想盒失败:', err)
+      }
+    }
   } else {
     splashWindow.webContents.send('splash:python-progress', {
       stage: 'ensure-error',
       message: result.message,
     })
+  }
+
+  // 提前注册 RPC 并连接；若已启动后台则等待 RPC 连接成功后再进主界面
+  registerRpcBridge()
+  if (backendStarted) {
+    if (!splashWindow.isDestroyed() && splashWindow.webContents) {
+      splashWindow.webContents.send('splash:python-progress', {
+        stage: 'waiting-rpc',
+        message: '奇想盒启动中…',
+      })
+    }
+    const connected = await waitForRpcConnected(30_000)
+    if (connected && !splashWindow.isDestroyed() && splashWindow.webContents) {
+      splashWindow.webContents.send('splash:python-progress', {
+        stage: 'setup-complete',
+        message: '奇想盒启动完成',
+      })
+    }
   }
 
   await waitFor(600)
@@ -114,7 +151,6 @@ makeAppWithSingleInstanceLock(async () => {
   registerAppLogger()
   registerLauncherIpc(window)
   registerAppUpdater(window)
-  registerRpcBridge()
   try {
     await startAuthServer(window)
   } catch (error) {

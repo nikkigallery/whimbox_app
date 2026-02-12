@@ -5,6 +5,8 @@ import { dirname, join } from 'node:path'
 import { EventEmitter } from 'node:events'
 import Store from 'electron-store'
 
+import log from 'electron-log/main.js'
+
 import { downloader } from './downloader'
 import { pythonManager } from './python-manager'
 
@@ -140,23 +142,13 @@ export class BackendManager extends EventEmitter {
     )
     this.backendProcess = proc
 
-    proc.stdout.on('data', (data: Buffer) => {
-      const output = data.toString('utf-8')
-      if (output.includes('WAIT_FOR_GAME_START')) {
-        this.emit('launch-backend-status', { message: '等待游戏启动' })
-      } else if (output.includes('GAME_STARTED')) {
-        this.emit('launch-backend-status', { message: '奇想盒启动中' })
-      } else if (output.includes('WHIMBOX_READY')) {
-        this.emit('launch-backend-status', { message: '奇想盒运行中' })
-      }
-    })
-
     proc.stderr.on('data', (data: Buffer) => {
-      console.error(`运行异常: ${data.toString('utf-8')}`)
+      const text = data.toString('utf-8').trim()
+      if (text) log.scope('backend-stderr').info(text)
     })
 
     proc.on('error', (error) => {
-      console.error(`运行异常: ${error.message}`)
+      log.scope('backend-error').error(error.message)
     })
 
     proc.on('close', (code) => {

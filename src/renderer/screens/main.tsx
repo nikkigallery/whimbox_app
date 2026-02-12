@@ -1,3 +1,4 @@
+import log from 'electron-log/renderer'
 import {
   Bot,
   ChevronDown,
@@ -464,7 +465,7 @@ export function MainScreen() {
     }
     if (result.hasElectron) {
       const status = updateState.status
-      window.App.log('更新应用', `handleUpdatePromptUpdate status: ${status}`)
+      log.scope('更新应用').info(`handleUpdatePromptUpdate status: ${status}`)
       electronUpdateInModalRef.current = true
       setTaskProgressState({
         status: 'running',

@@ -42,6 +42,17 @@ export class RpcClient {
     return this.state
   }
 
+  /** 取消当前重连定时器并立即发起一次连接（用于后台重启后立刻重连） */
+  reconnectNow() {
+    if (this.state === 'open' || this.state === 'connecting') return
+    if (this.reconnectTimer) {
+      clearTimeout(this.reconnectTimer)
+      this.reconnectTimer = null
+    }
+    this.shouldReconnect = true
+    this.connect()
+  }
+
   connect() {
     if (this.state === 'open' || this.state === 'connecting') return
     // console.info('[rpc] connect: start', { url: this.url })

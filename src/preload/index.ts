@@ -20,7 +20,6 @@ type AppUpdateState = {
 const API = {
   sayHelloFromBridge: () => console.log('\nHello from bridgeAPI! 👋\n\n'),
   username: process.env.USER,
-  log: (tag: string, message: string) => ipcRenderer.invoke('app:log', tag, message),
   appUpdater: {
     checkForUpdates: () => ipcRenderer.invoke('app:check-for-updates'),
     downloadAndInstallUpdate: () => ipcRenderer.invoke('app:download-and-install-update'),
@@ -79,9 +78,6 @@ const API = {
         callback(data)
       ipcRenderer.on('launcher:python-setup', listener)
       return () => ipcRenderer.removeListener('launcher:python-setup', listener)
-    },
-    onLaunchBackendStatus: (callback: (data: { message: string }) => void) => {
-      ipcRenderer.on('launcher:launch-backend-status', (_, data) => callback(data))
     },
     onLaunchBackendEnd: (callback: (data: { message: string }) => void) => {
       ipcRenderer.on('launcher:launch-backend-end', (_, data) => callback(data))

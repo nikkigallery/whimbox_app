@@ -43,6 +43,31 @@ export function registerRpcBridge() {
   rpcClient.connect()
 }
 
+/** 立即发起一次 RPC 重连（用于后台重启后立刻重连，避免等指数退避） */
+export function reconnectRpcNow() {
+  rpcClient.reconnectNow()
+}
+
+/**
+ * 等待 RPC 连接成功（state === 'open'），超时后 resolve(false)。
+ */
+export function waitForRpcConnected(timeoutMs: number): Promise<boolean> {
+  if (rpcClient.getState() === 'open') return Promise.resolve(true)
+  return new Promise((resolve) => {
+    const timer = setTimeout(() => {
+      off()
+      resolve(false)
+    }, timeoutMs)
+    const off = rpcClient.on('state', ({ state }) => {
+      if (state === 'open') {
+        clearTimeout(timer)
+        off()
+        resolve(true)
+      }
+    })
+  })
+}
+
 export function stopRpcBridge() {
   rpcClient.disconnect()
 }

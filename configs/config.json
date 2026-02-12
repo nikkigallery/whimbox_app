@@ -29,7 +29,7 @@
             "description": "UI窗口的高度（像素）"
         }
     },
-    "Path":{
+    "Path": {
         "launcher_path": {
             "value": "",
             "description": "叠纸启动器路径(launcher.exe的完整路径)"
@@ -66,19 +66,19 @@
         }
     },
     "Agent": {
-        "model":{
+        "model": {
             "value": "Qwen/Qwen3-30B-A3B-Instruct-2507",
             "description": "模型名称(model)"
         },
-        "model_provider":{
+        "model_provider": {
             "value": "openai",
             "description": "提供商(model_provider)"
         },
-        "base_url":{
+        "base_url": {
             "value": "https://api.siliconflow.cn/v1/",
             "description": "API地址(base_url)"
         },
-        "api_key":{
+        "api_key": {
             "value": "",
             "description": "API密钥(api_key)"
         }
@@ -126,111 +126,111 @@
         }
     },
     "Keybinds": {
-        "map":{
+        "map": {
             "value": "m",
             "description": "地图"
         },
-        "daily_task":{
+        "daily_task": {
             "value": "l",
             "description": "奇想日历"
         },
-        "dress":{
+        "dress": {
             "value": "c",
             "description": "换装"
         },
-        "take_photo":{
+        "take_photo": {
             "value": "p",
             "description": "拍照"
         },
-        "monthly_pass":{
+        "monthly_pass": {
             "value": "j",
             "description": "奇迹之旅/乐园构想"
         },
-        "item":{
+        "item": {
             "value": "z",
             "description": "使用消耗品"
         },
-        "event":{
+        "event": {
             "value": "k",
             "description": "活动大厅"
         },
-        "interaction":{
+        "interaction": {
             "value": "f",
             "description": "交互"
         },
-        "bell":{
+        "bell": {
             "value": "x",
             "description": "摇铃"
         },
-        "ability_derivation_world_1":{
+        "ability_derivation_world_1": {
             "value": "g",
             "description": "能力衍生功能1"
         },
-        "ability_derivation_1":{
+        "ability_derivation_1": {
             "value": "r",
             "description": "家园能力衍生功能1"
         },
-        "forward":{
+        "forward": {
             "value": "w",
             "description": "前进"
         },
-        "jump":{
+        "jump": {
             "value": "space",
             "description": "跳跃"
         },
-        "falling":{
+        "falling": {
             "value": "q",
             "description": "急坠"
         },
-        "sprint":{
+        "sprint": {
             "value": "shift",
             "description": "冲刺"
         },
-        "tab":{
+        "tab": {
             "value": "tab",
             "description": "套装切换"
         },
-        "back":{
+        "back": {
             "value": "backspace",
             "description": "退出关卡"
         },
-        "chat":{
+        "chat": {
             "value": "enter",
             "description": "聊天"
         },
-        "fishing_reel_in":{
+        "fishing_reel_in": {
             "value": "mouse_right",
             "description": "钓鱼收线"
         },
-        "ability_1":{
+        "ability_1": {
             "value": "1",
             "description": "能力切换1"
         },
-        "ability_2":{
+        "ability_2": {
             "value": "2",
             "description": "能力切换2"
         },
-        "ability_3":{
+        "ability_3": {
             "value": "3",
             "description": "能力切换3"
         },
-        "ability_4":{
+        "ability_4": {
             "value": "4",
             "description": "能力切换4"
         },
-        "ability_5":{
+        "ability_5": {
             "value": "5",
             "description": "能力切换5"
         },
-        "ability_6":{
+        "ability_6": {
             "value": "6",
             "description": "能力切换6"
         },
-        "ability_7":{
+        "ability_7": {
             "value": "7",
             "description": "能力切换7"
         },
-        "ability_8":{
+        "ability_8": {
             "value": "8",
             "description": "能力切换8"
         }
