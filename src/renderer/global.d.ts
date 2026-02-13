@@ -73,6 +73,8 @@ declare global {
         ) => Promise<unknown>
         downloadScript: (item: { name: string; md5: string }) => Promise<void>
         deleteScript: (md5: string) => Promise<void>
+        openScriptsFolder: () => Promise<void>
+        openLogsFolder: () => Promise<void>
         onTaskProgress: (
           callback: (data: {
             status: string

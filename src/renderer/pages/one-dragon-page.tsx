@@ -10,7 +10,7 @@ import {
   ComboboxList,
 } from "renderer/components/ui/combobox"
 import { ScrollCenterLayout } from "renderer/components/scroll-center-layout"
-import { IpcRpcClient } from "renderer/lib/ipc-rpc"
+import type { IpcRpcClient } from "renderer/lib/ipc-rpc"
 import { Button } from "renderer/components/ui/button"
 import { Spinner } from "renderer/components/ui/spinner"
 import { Checkbox } from "renderer/components/ui/checkbox"
@@ -36,6 +36,7 @@ type ConfigMeta = {
 }
 
 type OneDragonPageProps = {
+  rpcClient: IpcRpcClient
   sessionId: string | null
   rpcState: "idle" | "connecting" | "open" | "closed" | "error"
 }
@@ -46,15 +47,7 @@ const isBooleanLike = (value: unknown) =>
   value === "true" ||
   value === "false"
 
-export function OneDragonPage({ sessionId, rpcState }: OneDragonPageProps) {
-  const rpcRef = useRef<IpcRpcClient | null>(null)
-  if (!rpcRef.current) {
-    rpcRef.current = new IpcRpcClient()
-  }
-  const rpcClient = rpcRef.current
-
-  useEffect(() => () => rpcRef.current?.destroy(), [])
-
+export function OneDragonPage({ rpcClient, sessionId, rpcState }: OneDragonPageProps) {
   const [gameConfig, setGameConfig] = useState<ConfigSection | null>(null)
   const [draftConfig, setDraftConfig] = useState<ConfigSection | null>(null)
   const [configMeta, setConfigMeta] = useState<ConfigMeta | null>(null)

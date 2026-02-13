@@ -8,12 +8,6 @@ type UiMessage = {
   title?: string
 }
 
-type RpcEventLog = {
-  id: string
-  method: string
-  detail: string
-}
-
 type ConversationPanelProps = {
   messages: UiMessage[]
 }

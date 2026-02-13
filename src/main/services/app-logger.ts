@@ -7,6 +7,12 @@ import log from 'electron-log/main.js'
 const LOG_RETAIN_DAYS = 7
 const LOG_FILE_PREFIX = 'app-'
 
+/** 返回与 configureLogFile 一致的日志目录路径 */
+export function getLogsDir(): string {
+  const appDir = app.isPackaged ? dirname(process.execPath) : app.getAppPath()
+  return join(appDir, 'logs')
+}
+
 /** 删除超过保留天数的按日日志文件 */
 function deleteOldLogs(logsDir: string) {
   const now = Date.now()
@@ -29,8 +35,7 @@ function deleteOldLogs(logsDir: string) {
 
 /** 配置日志：按天存储为 logs/app-YYYY-MM-DD.log，超过 7 天自动删除。需在 app ready 后调用。 */
 export function configureLogFile() {
-  const appDir = app.isPackaged ? dirname(process.execPath) : app.getAppPath()
-  const logsDir = join(appDir, 'logs')
+  const logsDir = getLogsDir()
   if (!existsSync(logsDir)) {
     mkdirSync(logsDir, { recursive: true })
   }

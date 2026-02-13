@@ -9,6 +9,7 @@ import { getAuthPort } from './auth-server'
 import { clearAuth, getAuthState as getStoredAuthState, getRefreshToken } from './auth-store'
 import { apiRequest, completeLogin, getAnnouncements } from './launcher-api'
 import { pythonManager } from './python-manager'
+import { getLogsDir } from './app-logger'
 import { scriptManager } from './script-manager'
 
 type TaskProgressPayload = {
@@ -90,7 +91,7 @@ async function runWhlInstallWithProgress(
       await backendManager.launchBackend()
       sendTaskProgress(win, { status: 'running', title, message: '正在连接…' })
       reconnectRpcNow()
-      const connected = await waitForRpcConnected(15_000)
+      const connected = await waitForRpcConnected(30_000)
       if (connected) {
         sendTaskProgress(win, { status: 'success', title, message: '更新完成' })
       } else {
@@ -251,6 +252,9 @@ export function registerLauncherIpc(window: BrowserWindow) {
   ipcMain.handle('launcher:delete-script', (_, md5: string) => {
     scriptManager.deleteScript(md5)
   })
+
+  ipcMain.handle('launcher:open-scripts-folder', () => scriptManager.openScriptsFolder())
+  ipcMain.handle('launcher:open-logs-folder', () => shell.openPath(getLogsDir()))
 
   downloader.on('progress', (progress) => {
     window.webContents.send('launcher:download-progress', progress)

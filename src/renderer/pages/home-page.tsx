@@ -1,6 +1,6 @@
 import type { ComponentType } from "react"
 
-import { Gift, Send } from "lucide-react"
+import { Bot, FileText, Gift, Send, Target } from "lucide-react"
 
 import { ConversationPanel } from "renderer/components/conversation-panel"
 import { useHomeConversation } from "renderer/hooks/use-home-conversation"
@@ -12,29 +12,23 @@ type QuickAction = {
   title: string
 }
 
+const quickActions: QuickAction[] = [
+  { icon: FileText, title: "请帮我执行下日常任务-一条龙" },
+  { icon: Bot, title: "待定1" },
+  { icon: Target, title: "待定2" },
+]
+
 type HomePageProps = {
-  quickActions: QuickAction[]
   rpcClient: IpcRpcClient
   sessionId: string | null
   rpcState: string
-  addEventLog: (method: string, detail?: string) => void
-  formatError: (error: unknown) => string
 }
 
-export function HomePage({
-  quickActions,
-  rpcClient,
-  sessionId,
-  rpcState,
-  addEventLog,
-  formatError,
-}: HomePageProps) {
+export function HomePage({ rpcClient, sessionId, rpcState }: HomePageProps) {
   const { messages, input, setInput, handleSend } = useHomeConversation({
     rpcClient,
     sessionId,
     rpcState,
-    addEventLog,
-    formatError,
   })
 
   const hasConversation = messages.length > 0

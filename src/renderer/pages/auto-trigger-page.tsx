@@ -1,10 +1,10 @@
-import { useEffect, useMemo, useRef, useState } from "react"
+import { useEffect, useMemo, useState } from "react"
 import { toast } from "sonner"
 
 import { ScrollCenterLayout } from "renderer/components/scroll-center-layout"
 import { Checkbox } from "renderer/components/ui/checkbox"
 import { Spinner } from "renderer/components/ui/spinner"
-import { IpcRpcClient } from "renderer/lib/ipc-rpc"
+import type { IpcRpcClient } from "renderer/lib/ipc-rpc"
 
 type BackgroundState = {
   running: boolean
@@ -19,14 +19,11 @@ const FEATURE_ITEMS = [
   { key: "auto_flourish", label: "自动芳间巡游（按鼠标右键启停）" },
 ]
 
-export function AutoTriggerPage() {
-  const rpcRef = useRef<IpcRpcClient | null>(null)
-  if (!rpcRef.current) {
-    rpcRef.current = new IpcRpcClient()
-  }
-  const rpcClient = rpcRef.current
+type AutoTriggerPageProps = {
+  rpcClient: IpcRpcClient
+}
 
-  useEffect(() => () => rpcRef.current?.destroy(), [])
+export function AutoTriggerPage({ rpcClient }: AutoTriggerPageProps) {
 
   const [loading, setLoading] = useState(true)
   const [savingKey, setSavingKey] = useState<string | null>(null)

@@ -17,7 +17,6 @@ import { APP_RELEASE_PAGE_URL } from "shared/constants"
 type SettingSection = {
   id: string
   label: string
-  description: string
   icon: typeof Settings
 }
 
@@ -52,9 +51,9 @@ type SettingsDialogProps = {
 }
 
 const settingSections: SettingSection[] = [
-  { id: "general", label: "通用", description: "启动与更新", icon: Settings },
-  { id: "agent", label: "Agent", description: "模型与交互", icon: Bot },
-  { id: "shortcuts", label: "快捷键", description: "操作习惯", icon: Keyboard },
+  { id: "whimbox", label: "奇想盒", icon: Settings },
+  { id: "agent", label: "Agent", icon: Bot },
+  { id: "shortcuts", label: "快捷键", icon: Keyboard },
 ]
 
 const settingsContent: Record<
@@ -66,9 +65,9 @@ const settingsContent: Record<
     render?: (props: SettingsDialogProps) => React.ReactNode
   }
 > = {
-  general: {
-    title: "通用设置",
-    description: "应用启动与更新维护。",
+  whimbox: {
+    title: "奇想盒设置",
+    description: "奇想盒本身的设置",
     render: ({
       displayVersion,
       updateState,
@@ -83,23 +82,49 @@ const settingsContent: Record<
           <div className="flex flex-wrap items-center justify-between gap-3">
             <div>
               <p className="font-semibold text-slate-700 dark:text-slate-100">脚本</p>
-              <p className="text-xs text-slate-400">如果发现脚本列表里缺了什么，可以来这里刷新一下</p>
+              <p className="text-xs text-slate-400">订阅/导入脚本后看不到？来这里刷新一下</p>
+            </div>
+            <div className="flex flex-wrap gap-2">
+              <Button
+                variant="outline"
+                size="sm"
+                disabled={isProcessing}
+                onClick={onSyncScripts}
+              >
+                刷新脚本
+              </Button>
+              <Button
+                variant="outline"
+                size="sm"
+                disabled={isProcessing}
+                onClick={() => window.App?.launcher?.openScriptsFolder?.()}
+              >
+                打开脚本目录
+              </Button>
+            </div>
+          </div>
+        </div>
+        <div className="rounded-xl border border-slate-100 bg-white px-4 py-3 text-sm dark:border-slate-800 dark:bg-slate-900">
+          <div className="flex flex-wrap items-center justify-between gap-3">
+            <div>
+              <p className="font-semibold text-slate-700 dark:text-slate-100">日志</p>
+              <p className="text-xs text-slate-400">奇想盒运行产生的日志</p>
             </div>
             <Button
               variant="outline"
               size="sm"
               disabled={isProcessing}
-              onClick={onSyncScripts}
+              onClick={() => window.App?.launcher?.openLogsFolder?.()}
             >
-              刷新脚本
+              打开日志目录
             </Button>
           </div>
         </div>
         <div className="rounded-xl border border-slate-100 bg-white px-4 py-3 text-sm dark:border-slate-800 dark:bg-slate-900">
           <div className="flex flex-wrap items-center justify-between gap-3">
             <div>
-              <p className="font-semibold text-slate-700 dark:text-slate-100">版本</p>
-              <p className="text-xs text-slate-400">当前版本：{displayVersion || "—"}</p>
+              <p className="font-semibold text-slate-700 dark:text-slate-100">更新</p>
+              <p className="text-xs text-slate-400">如果之前忽略了更新，可以在这里重新检查</p>
             </div>
             <div className="flex flex-wrap gap-2">
               <Button
@@ -201,7 +226,6 @@ export function SettingsDialog({
               <SidebarNavItem
                 key={section.id}
                 label={section.label}
-                description={section.description}
                 icon={section.icon}
                 active={activeSection === section.id}
                 onClick={() => setActiveSection(section.id)}

@@ -5,15 +5,6 @@ import { useHomeConversation } from 'renderer/hooks/use-home-conversation'
 import { IpcRpcClient } from 'renderer/lib/ipc-rpc'
 import { cn } from 'renderer/lib/utils'
 
-const formatError = (error: unknown) => {
-  if (error == null) return ''
-  if (typeof error === 'string') return error
-  if (typeof error === 'object' && 'message' in error) {
-    return String((error as { message?: unknown }).message ?? '')
-  }
-  return String(error)
-}
-
 export function OverlayScreen() {
   const rpcRef = useRef<IpcRpcClient | null>(null)
   if (!rpcRef.current) rpcRef.current = new IpcRpcClient()
@@ -38,14 +29,10 @@ export function OverlayScreen() {
     }
   }, [rpcClient])
 
-  const addEventLog = useCallback(() => {}, [])
-
   const { messages, input, setInput, handleSend } = useHomeConversation({
     rpcClient,
     sessionId,
     rpcState,
-    addEventLog,
-    formatError,
   })
 
   const isSendDisabled = !input.trim() || rpcState !== 'open' || !sessionId

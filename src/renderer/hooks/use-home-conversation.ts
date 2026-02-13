@@ -16,16 +16,12 @@ export type UseHomeConversationOptions = {
   rpcClient: IpcRpcClient
   sessionId: string | null
   rpcState: string
-  addEventLog?: (method: string, detail?: string) => void
-  formatError?: (error: unknown) => string
 }
 
 export function useHomeConversation({
   rpcClient,
   sessionId,
   rpcState,
-  addEventLog = () => {},
-  formatError = (e) => String(e),
 }: UseHomeConversationOptions) {
   const [messages, setMessages] = useState<UiMessage[]>([])
   const [input, setInput] = useState('')
@@ -43,15 +39,6 @@ export function useHomeConversation({
         notification.method === 'event.agent.message'
           ? (params?.message as { message?: unknown } | undefined)?.message
           : params?.detail ?? params?.status ?? params?.message
-      const detail =
-        typeof detailValue === 'string'
-          ? detailValue
-          : detailValue
-            ? JSON.stringify(detailValue).slice(0, 120)
-            : ''
-
-      addEventLog(notification.method, detail)
-
       if (notification.method === 'event.agent.status') {
         const status = typeof params?.status === 'string' ? params.status : ''
         const detailText =
@@ -187,7 +174,7 @@ export function useHomeConversation({
       }
     })
     return () => offNotification()
-  }, [rpcClient, addEventLog, sessionId])
+  }, [rpcClient, sessionId])
 
   const handleSend = useCallback(async () => {
     const text = input.trim()
@@ -219,8 +206,7 @@ export function useHomeConversation({
             : message,
         ),
       )
-    } catch (error) {
-      addEventLog('agent.send_message.error', formatError(error))
+    } catch {
       setMessages((prev) =>
         prev.map((message) =>
           message.id === assistantId
@@ -237,7 +223,7 @@ export function useHomeConversation({
         pendingAssistantIdRef.current = null
       }
     }
-  }, [input, rpcState, sessionId, rpcClient, addEventLog, formatError])
+  }, [input, rpcState, sessionId, rpcClient])
 
   return { messages, input, setInput, handleSend }
 }

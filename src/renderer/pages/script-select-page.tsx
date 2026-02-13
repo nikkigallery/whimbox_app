@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useRef, useState } from "react"
+import { useEffect, useMemo, useState } from "react"
 import { toast } from "sonner"
 
 import { ScrollCenterLayout } from "renderer/components/scroll-center-layout"
@@ -22,7 +22,7 @@ import {
   TableHeader,
   TableRow,
 } from "renderer/components/ui/table"
-import { IpcRpcClient } from "renderer/lib/ipc-rpc"
+import type { IpcRpcClient } from "renderer/lib/ipc-rpc"
 
 type ScriptMode = "path" | "macro" | "music"
 
@@ -37,6 +37,7 @@ type ScriptRow = {
 
 type ScriptSelectPageProps = {
   mode: ScriptMode
+  rpcClient: IpcRpcClient
   sessionId: string | null
   rpcState: "idle" | "connecting" | "open" | "closed" | "error"
 }
@@ -112,17 +113,10 @@ const normalizeScripts = (payload: unknown): ScriptRow[] => {
 
 export function ScriptSelectPage({
   mode,
+  rpcClient,
   sessionId,
   rpcState,
 }: ScriptSelectPageProps) {
-  const rpcRef = useRef<IpcRpcClient | null>(null)
-  if (!rpcRef.current) {
-    rpcRef.current = new IpcRpcClient()
-  }
-  const rpcClient = rpcRef.current
-
-  useEffect(() => () => rpcRef.current?.destroy(), [])
-
   const [loading, setLoading] = useState(true)
   const [scripts, setScripts] = useState<ScriptRow[]>([])
   const [error, setError] = useState<string>("")
