@@ -123,7 +123,7 @@ export class ScriptManager extends EventEmitter {
         const progress = scripts.length > 0 ? Math.round(((i + 1) / scripts.length) * 100) : 100
         this.emit('progress', {
           status: 'running',
-          title: '同步订阅脚本',
+          title: '刷新脚本',
           message: `正在处理 ${i + 1}/${scripts.length}: ${script.name}`,
           progress,
         } as ProgressPayload)
@@ -176,7 +176,7 @@ export class ScriptManager extends EventEmitter {
     if (hasLocalChange) {
       this.emit('progress', {
         status: 'success',
-        title: '同步订阅脚本',
+        title: '刷新脚本',
         message: `已完成，成功 ${successCount}/${scripts.length} 个，删除 ${unsubscribedMd5s.length} 个退订`,
         progress: 100,
       } as ProgressPayload)
@@ -190,8 +190,8 @@ export class ScriptManager extends EventEmitter {
     } else if (options?.emitNoChangeSuccess) {
       this.emit('progress', {
         status: 'success',
-        title: '同步订阅脚本',
-        message: '订阅脚本已是最新，无需更新',
+        title: '刷新脚本',
+        message: '脚本列表已是最新，无需刷新',
         progress: 100,
       } as ProgressPayload)
     }

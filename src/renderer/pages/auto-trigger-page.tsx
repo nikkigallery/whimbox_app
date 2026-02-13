@@ -26,6 +26,8 @@ export function AutoTriggerPage() {
   }
   const rpcClient = rpcRef.current
 
+  useEffect(() => () => rpcRef.current?.destroy(), [])
+
   const [loading, setLoading] = useState(true)
   const [savingKey, setSavingKey] = useState<string | null>(null)
   const [state, setState] = useState<BackgroundState>({

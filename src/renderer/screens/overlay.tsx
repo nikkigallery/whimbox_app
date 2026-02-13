@@ -34,6 +34,7 @@ export function OverlayScreen() {
     return () => {
       offSession()
       offState()
+      rpcRef.current?.destroy()
     }
   }, [rpcClient])
 

@@ -87,7 +87,7 @@ const navItems: NavItem[] = [
       { id: 'auto-music', label: '演奏脚本', icon: Piano },
     ],
   },
-  { id: 'script-subscribe', label: '脚本订阅', icon: Rss },
+  { id: 'script-subscribe', label: '订阅脚本', icon: Rss },
 ]
 
 const quickActions = [
@@ -207,6 +207,8 @@ export function MainScreen() {
     launcherApi.getAppVersion().then((v) => setElectronVersion(v ?? '0.0.0'))
     launcherApi.getBackendStatus().then((status) => setBackendStatus(status))
   }, [launcherApi])
+
+  useEffect(() => () => rpcRef.current?.destroy(), [])
 
   const pendingUnifiedCheckRef = useRef(false)
   type UnifiedBackend = { version: string; url: string; md5: string } | null
@@ -424,9 +426,14 @@ export function MainScreen() {
     [launcherApi, appUpdater, backendStatus?.version],
   )
 
-  const handleCheckAppUpdate = useCallback(() => {
+  const handleCheckAppUpdate = useCallback(async () => {
+    const authState = await launcherApi.getAuthState()
+    if (!authState?.user?.is_vip) {
+      toast.error('请先开通自动更新')
+      return
+    }
     runUnifiedUpdateCheck(true)
-  }, [runUnifiedUpdateCheck])
+  }, [launcherApi, runUnifiedUpdateCheck])
 
   const handleManualAppUpdate = useCallback(async () => {
     const path = await launcherApi.selectWhlFile()
@@ -434,7 +441,7 @@ export function MainScreen() {
     setTaskProgressState({ status: 'running', title: '安装后端', message: '正在安装…' })
     try {
       await launcherApi.installWhl(path)
-      setTaskProgressState({ status: 'success', title: '安装后端', message: '安装完成' })
+      // setTaskProgressState({ status: 'success', title: '安装后端', message: '安装完成' })
       const status = await launcherApi.getBackendStatus()
       setBackendStatus(status)
     } catch (err) {
@@ -453,7 +460,9 @@ export function MainScreen() {
       setTaskProgressState({ status: 'running', title: '更新后端', message: '正在下载安装…' })
       try {
         await launcherApi.downloadAndInstallLatestWhl()
-        setTaskProgressState({ status: 'success', title: '更新后端', message: '安装完成' })
+        // setTaskProgressState({ status: 'success', title: '更新后端', message: '安装完成' })
+        const status = await launcherApi.getBackendStatus()
+        setBackendStatus(status)
       } catch (err) {
         setTaskProgressState({
           status: 'error',
@@ -500,25 +509,33 @@ export function MainScreen() {
   const syncSubscribedScripts = useCallback(
     async (opts?: { showFeedbackWhenNoChange?: boolean }) => {
       const authState = await launcherApi.getAuthState()
-      if (!authState?.user?.is_vip) return
-      try {
-        const data = await apiClient.getAllSubscribedScripts()
-        if (data.scripts?.length) {
-          await launcherApi.syncSubscribedScripts(data, {
-            emitNoChangeSuccess: opts?.showFeedbackWhenNoChange,
-          })
-        } else {
+      try{
+        if (!authState?.user?.is_vip) {
+          refreshBackendScripts()
           setTaskProgressState({
             status: 'success',
-            title: '同步订阅脚本',
-            message: '暂无订阅脚本',
+            title: '刷新脚本',
+            message: '刷新脚本完成',
           })
+        }else{
+          const data = await apiClient.getAllSubscribedScripts()
+          if (data.scripts?.length) {
+            await launcherApi.syncSubscribedScripts(data, {
+              emitNoChangeSuccess: opts?.showFeedbackWhenNoChange,
+            })
+          } else {
+            setTaskProgressState({
+              status: 'success',
+              title: '刷新脚本',
+              message: '暂无订阅脚本',
+            })
+          }
+          refreshBackendScripts()
         }
-        refreshBackendScripts()
       } catch (err) {
         setTaskProgressState({
           status: 'error',
-          title: '同步订阅脚本',
+          title: '刷新脚本',
           error: err instanceof Error ? err.message : '获取订阅列表失败',
         })
       }
@@ -844,11 +861,17 @@ export function MainScreen() {
             </SidebarFooter>
           </Sidebar>
           <section className="relative flex min-h-0 flex-1 flex-col overflow-hidden">
-            <KeepAlive name={activePage} cacheKey={activePage}>
+            {['auto-navigate', 'auto-macro', 'auto-music'].includes(activePage) ? (
               <div className="absolute inset-0 flex flex-col overflow-hidden">
                 {getPageContent(activePage)}
               </div>
-            </KeepAlive>
+            ) : (
+              <KeepAlive name={activePage} cacheKey={activePage}>
+                <div className="absolute inset-0 flex flex-col overflow-hidden">
+                  {getPageContent(activePage)}
+                </div>
+              </KeepAlive>
+            )}
           </section>
         </div>
       </SidebarProvider>

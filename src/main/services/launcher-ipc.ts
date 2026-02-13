@@ -81,12 +81,12 @@ async function runWhlInstallWithProgress(
   pythonManager.on('install-progress', onInstallProgress)
 
   try {
+    await backendManager.stopBackend()
+    await waitFor(1000)
     const result = await work()
     sendTaskProgress(win, { status: 'success', title, message: '安装完成' })
     try {
       sendTaskProgress(win, { status: 'running', title, message: '正在重启后台…' })
-      await backendManager.stopBackend()
-      await waitFor(500)
       await backendManager.launchBackend()
       sendTaskProgress(win, { status: 'running', title, message: '正在连接…' })
       reconnectRpcNow()
@@ -94,7 +94,7 @@ async function runWhlInstallWithProgress(
       if (connected) {
         sendTaskProgress(win, { status: 'success', title, message: '更新完成' })
       } else {
-        sendTaskProgress(win, { status: 'error', title, error: '连接超时，请稍后查看状态' })
+        sendTaskProgress(win, { status: 'error', title, error: '连接超时，重启奇想盒试试？' })
       }
     } catch (restartErr) {
       console.error('更新后重启后台失败:', restartErr)
@@ -232,7 +232,7 @@ export function registerLauncherIpc(window: BrowserWindow) {
         return await scriptManager.updateSubscribedScripts(scriptsData, options)
       } catch (err) {
         const message = err instanceof Error ? err.message : String(err)
-        window.webContents.send('launcher:task-progress', { status: 'error', title: '同步订阅脚本', error: message })
+        window.webContents.send('launcher:task-progress', { status: 'error', title: '刷新脚本', error: message })
         throw err
       }
     },

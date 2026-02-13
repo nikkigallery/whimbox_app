@@ -21,7 +21,10 @@ export function StartingScreen() {
     }
   }, [])
 
-  const isError = progress.stage === 'ensure-error'
+  const isError =
+    progress.stage === 'ensure-error' ||
+    progress.stage === 'backend-start-error' ||
+    progress.stage === 'backend-unavailable'
   const isDone = progress.stage === 'ensure-done' || progress.stage === 'setup-complete'
 
   return (

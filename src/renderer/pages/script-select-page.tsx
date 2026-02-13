@@ -121,6 +121,8 @@ export function ScriptSelectPage({
   }
   const rpcClient = rpcRef.current
 
+  useEffect(() => () => rpcRef.current?.destroy(), [])
+
   const [loading, setLoading] = useState(true)
   const [scripts, setScripts] = useState<ScriptRow[]>([])
   const [error, setError] = useState<string>("")

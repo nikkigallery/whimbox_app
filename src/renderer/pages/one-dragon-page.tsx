@@ -53,6 +53,8 @@ export function OneDragonPage({ sessionId, rpcState }: OneDragonPageProps) {
   }
   const rpcClient = rpcRef.current
 
+  useEffect(() => () => rpcRef.current?.destroy(), [])
+
   const [gameConfig, setGameConfig] = useState<ConfigSection | null>(null)
   const [draftConfig, setDraftConfig] = useState<ConfigSection | null>(null)
   const [configMeta, setConfigMeta] = useState<ConfigMeta | null>(null)

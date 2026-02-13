@@ -153,6 +153,7 @@ export class BackendManager extends EventEmitter {
 
     proc.on('close', (code) => {
       this.backendProcess = null
+      log.scope('backend-close').info(`backend process closed with code: ${code}`)
       this.emit('launch-backend-end', { message: code != null ? String(code) : 'null' })
     })
 

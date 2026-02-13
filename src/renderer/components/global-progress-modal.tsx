@@ -80,7 +80,7 @@ export function GlobalProgressModal({ state, onClose, onRestartAndInstall }: Glo
                   width:
                     typeof progress === 'number' && progress >= 0
                       ? `${Math.min(100, Math.max(0, progress))}%`
-                      : '35%',
+                      : '0%',
                 }}
               />
             </div>

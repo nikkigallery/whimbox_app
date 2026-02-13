@@ -339,7 +339,7 @@ export function ScriptSubscribePage({
               <Table>
                 <TableHeader>
                   <TableRow>
-                    <TableHead className="min-w-30 max-w-52">脚本名称</TableHead>
+                    <TableHead className="min-w-20 max-w-52">脚本名称</TableHead>
                     <TableHead className="w-10">类型</TableHead>
                     <TableHead className="w-24">目标</TableHead>
                     <TableHead className="w-10">数量</TableHead>
@@ -359,7 +359,7 @@ export function ScriptSubscribePage({
                   ) : (
                     tableData.map((row) => (
                       <TableRow key={row.id}>
-                        <TableCell className="min-w-30 max-w-52 truncate font-medium">
+                        <TableCell className="min-w-20 max-w-52 truncate">
                           {row.name}
                         </TableCell>
                         <TableCell className="w-10">{row.type ?? "-"}</TableCell>
@@ -367,7 +367,7 @@ export function ScriptSubscribePage({
                           {row.target ?? "-"}
                         </TableCell>
                         <TableCell className="w-10">{row.count ?? "-"}</TableCell>
-                        <TableCell className="truncate hidden xl:table-cell">
+                        <TableCell className="w-20 truncate hidden xl:table-cell">
                           {row.uploader_name ?? "-"}
                         </TableCell>
                         <TableCell className="w-10">
@@ -377,7 +377,7 @@ export function ScriptSubscribePage({
                           {row.description || "暂无描述"}
                         </TableCell>
                         <TableCell className="w-10 text-center">
-                          <div className="flex justify-end gap-1">
+                          <div className="flex justify-end">
                             <Button
                               variant="ghost"
                               size="xs"

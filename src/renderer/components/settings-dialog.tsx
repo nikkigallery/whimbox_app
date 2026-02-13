@@ -12,6 +12,7 @@ import { Button } from "renderer/components/ui/button"
 import { SidebarNavItem } from "renderer/components/sidebar-nav-item"
 import { ThemeToggle } from "renderer/components/theme-provider"
 import { cn } from "renderer/lib/utils"
+import { APP_RELEASE_PAGE_URL } from "shared/constants"
 
 type SettingSection = {
   id: string
@@ -81,7 +82,8 @@ const settingsContent: Record<
         <div className="rounded-xl border border-slate-100 bg-white px-4 py-3 text-sm dark:border-slate-800 dark:bg-slate-900">
           <div className="flex flex-wrap items-center justify-between gap-3">
             <div>
-              <p className="font-semibold text-slate-700 dark:text-slate-100">订阅脚本</p>
+              <p className="font-semibold text-slate-700 dark:text-slate-100">脚本</p>
+              <p className="text-xs text-slate-400">如果发现脚本列表里缺了什么，可以来这里刷新一下</p>
             </div>
             <Button
               variant="outline"
@@ -89,16 +91,15 @@ const settingsContent: Record<
               disabled={isProcessing}
               onClick={onSyncScripts}
             >
-              刷新订阅脚本
+              刷新脚本
             </Button>
           </div>
         </div>
         <div className="rounded-xl border border-slate-100 bg-white px-4 py-3 text-sm dark:border-slate-800 dark:bg-slate-900">
           <div className="flex flex-wrap items-center justify-between gap-3">
             <div>
-              <p className="font-semibold text-slate-700 dark:text-slate-100">
-                当前版本：{displayVersion || "—"}
-              </p>
+              <p className="font-semibold text-slate-700 dark:text-slate-100">版本</p>
+              <p className="text-xs text-slate-400">当前版本：{displayVersion || "—"}</p>
             </div>
             <div className="flex flex-wrap gap-2">
               <Button
@@ -107,15 +108,23 @@ const settingsContent: Record<
                 onClick={onCheckUpdate}
                 disabled={isProcessing || updateState.status === "checking"}
               >
-                检查更新
+                自动更新
               </Button>
               <Button
-                variant="ghost"
+                variant="secondary"
+                size="sm"
+                onClick={() => window.App?.launcher?.openExternal(APP_RELEASE_PAGE_URL)}
+                disabled={isProcessing}
+              >
+                手动更新前端
+              </Button>
+              <Button
+                variant="secondary"
                 size="sm"
                 onClick={onManualUpdate}
                 disabled={isProcessing}
               >
-                手动更新
+                手动更新后端
               </Button>
             </div>
           </div>

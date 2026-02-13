@@ -108,6 +108,13 @@ makeAppWithSingleInstanceLock(async () => {
         backendStarted = true
       } catch (err) {
         console.error('启动奇想盒失败:', err)
+        const message = err instanceof Error ? err.message : '奇想盒启动失败'
+        if (!splashWindow.isDestroyed() && splashWindow.webContents) {
+          splashWindow.webContents.send('splash:python-progress', {
+            stage: 'backend-start-error',
+            message,
+          })
+        }
       }
     }
   } else {
@@ -126,11 +133,24 @@ makeAppWithSingleInstanceLock(async () => {
         message: '奇想盒启动中…',
       })
     }
-    const connected = await waitForRpcConnected(30_000)
+    // 方案 A：后端进程提前退出时立即结束等待，不卡满 30 秒
+    const backendExitPromise = new Promise<boolean>((resolve) => {
+      backendManager.once('launch-backend-end', () => resolve(false))
+    })
+    const connected = await Promise.race([
+      waitForRpcConnected(30_000),
+      backendExitPromise,
+    ])
     if (connected && !splashWindow.isDestroyed() && splashWindow.webContents) {
       splashWindow.webContents.send('splash:python-progress', {
         stage: 'setup-complete',
         message: '奇想盒启动完成',
+      })
+    } else if (!splashWindow.isDestroyed() && splashWindow.webContents) {
+      // 方案 B：RPC 超时或后端提前退出时明确提示失败
+      splashWindow.webContents.send('splash:python-progress', {
+        stage: 'backend-unavailable',
+        message: '奇想盒未能启动，请稍后重试',
       })
     }
   }

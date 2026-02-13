@@ -45,19 +45,19 @@
     },
     "BackgroundTask": {
         "auto_fishing": {
-            "value": "false",
+            "value": "true",
             "description": "是否启用自动钓鱼"
         },
         "auto_dialogue": {
-            "value": "false",
+            "value": "true",
             "description": "是否启用自动对话"
         },
         "auto_pickup": {
-            "value": "false",
+            "value": "true",
             "description": "是否启用自动采集"
         },
         "auto_clear": {
-            "value": "false",
+            "value": "true",
             "description": "是否启用自动清洁跳过"
         },
         "auto_flourish": {
