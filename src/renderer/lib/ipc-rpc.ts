@@ -1,4 +1,5 @@
 import type { RpcError, RpcNotification, RpcState } from 'shared/rpc-types'
+import log from 'electron-log/renderer'
 
 type RpcResponse = {
   id: number
@@ -49,14 +50,16 @@ export class IpcRpcClient {
         this.emit('error', payload)
       }),
     )
-    void rpc
-      .getState()
+    const getStatePromise = rpc.getState()
+    void getStatePromise
       .then((state) => {
         if (this.destroyed) return
         this.state = state
         this.emit('state', { state })
       })
-      .catch(() => {})
+      .catch((err) => {
+        log.warn('IPC RPC getState() rejected:', err)
+      })
   }
 
   /** 移除所有 IPC 监听，避免 MaxListenersExceededWarning。组件卸载时调用。 */
@@ -70,6 +73,14 @@ export class IpcRpcClient {
 
   getState() {
     return this.state
+  }
+
+  /** 从主进程拉取当前状态（用于挂载后同步一次，避免漏掉「open」广播） */
+  getStateAsync(): Promise<RpcState> {
+    return window.App.rpc.getState().then((state) => {
+      if (!this.destroyed) this.state = state
+      return state
+    })
   }
 
   on<K extends ListenerKey>(

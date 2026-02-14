@@ -101,19 +101,19 @@
             "description": "激化幻境的默认消耗材料，备选1"
         },
         "jihua_cost_3": {
-            "value": "小棉菊",
+            "value": "布布果",
             "description": "激化幻境的默认消耗材料，备选2"
         },
         "bless_target": {
-            "value": "巨蛇遗迹试炼",
+            "value": "伊闪闪宝库",
             "description": "祝福闪光幻境的默认目标"
         },
         "monster_target": {
-            "value": "攀越",
+            "value": "迷踪 | 典雅 2.0焕新",
             "description": "魔物试炼幻境的默认目标"
         },
         "realm_target": {
-            "value": "全部",
+            "value": "卷卷",
             "description": "周本的默认目标"
         },
         "ability_plan": {

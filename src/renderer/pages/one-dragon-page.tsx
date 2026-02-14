@@ -1,39 +1,12 @@
-import { useEffect, useMemo, useRef, useState } from "react"
-import { toast } from "sonner"
-
-import {
-  Combobox,
-  ComboboxContent,
-  ComboboxEmpty,
-  ComboboxInput,
-  ComboboxItem,
-  ComboboxList,
-} from "renderer/components/ui/combobox"
+import { useEffect, useState } from "react"
 import { ScrollCenterLayout } from "renderer/components/scroll-center-layout"
+import { SettingsPageLayout } from "renderer/components/settings-page-layout"
+import { ConfigFormFields } from "renderer/components/config-form-fields"
+import { useConfigForm } from "renderer/hooks/use-config-form"
 import type { IpcRpcClient } from "renderer/lib/ipc-rpc"
 import { Button } from "renderer/components/ui/button"
 import { Spinner } from "renderer/components/ui/spinner"
-import { Checkbox } from "renderer/components/ui/checkbox"
-import { Input } from "renderer/components/ui/input"
-
-type ConfigItem = {
-  value: string | number | boolean
-  description?: string
-}
-
-type ConfigSection = Record<string, ConfigItem>
-
-type ConfigMetaItem = {
-  key: string
-  description?: string
-  type: "string" | "number" | "boolean"
-  options?: string[]
-}
-
-type ConfigMeta = {
-  section: string
-  items: ConfigMetaItem[]
-}
+import { toast } from "sonner"
 
 type OneDragonPageProps = {
   rpcClient: IpcRpcClient
@@ -41,54 +14,18 @@ type OneDragonPageProps = {
   rpcState: "idle" | "connecting" | "open" | "closed" | "error"
 }
 
-const isBooleanLike = (value: unknown) =>
-  value === true ||
-  value === false ||
-  value === "true" ||
-  value === "false"
-
 export function OneDragonPage({ rpcClient, sessionId, rpcState }: OneDragonPageProps) {
-  const [gameConfig, setGameConfig] = useState<ConfigSection | null>(null)
-  const [draftConfig, setDraftConfig] = useState<ConfigSection | null>(null)
-  const [configMeta, setConfigMeta] = useState<ConfigMeta | null>(null)
   const [isRunning, setIsRunning] = useState(false)
-  const originalConfigRef = useRef<ConfigSection | null>(null)
-  const [loading, setLoading] = useState(true)
-  const [saving, setSaving] = useState(false)
-  const [status, setStatus] = useState<string>("")
 
-  useEffect(() => {
-    let active = true
-    setLoading(true)
-    setStatus("")
-    rpcClient
-      .sendRequest<{ value?: ConfigSection }>("config.get", { path: "Game" })
-      .then((result) => {
-        if (!active) return
-        const value = result?.value ?? {}
-        setGameConfig(value)
-        setDraftConfig(value)
-        originalConfigRef.current = value
-      })
-      .catch(() => {
-        if (!active) return
-        setStatus("读取配置失败，请稍后重试。")
-      })
-      .finally(() => {
-        if (!active) return
-        setLoading(false)
-      })
-    rpcClient
-      .sendRequest<ConfigMeta>("config.meta", { section: "Game" })
-      .then((result) => {
-        if (!active) return
-        setConfigMeta(result)
-      })
-      .catch(() => {})
-    return () => {
-      active = false
-    }
-  }, [rpcClient])
+  const {
+    loading,
+    loadError,
+    items,
+    draftConfig,
+    saving,
+    handleValueChange,
+    handleSave,
+  } = useConfigForm({ section: "Game", rpcClient })
 
   useEffect(() => {
     const offNotification = rpcClient.on("notification", (notification) => {
@@ -111,67 +48,8 @@ export function OneDragonPage({ rpcClient, sessionId, rpcState }: OneDragonPageP
     }
   }, [rpcClient])
 
-  const items = useMemo(() => {
-    if (configMeta?.items?.length) {
-      return configMeta.items
-    }
-    const config = draftConfig ?? {}
-    return Object.keys(config).map((key) => ({
-      key,
-      description: config[key]?.description,
-      type: isBooleanLike(config[key]?.value) ? "boolean" : "string",
-    })) as ConfigMetaItem[]
-  }, [configMeta, draftConfig])
-
-  const handleValueChange = (key: string, value: string | number | boolean) => {
-    setDraftConfig((prev) => {
-      if (!prev) return prev
-      return {
-        ...prev,
-        [key]: {
-          ...prev[key],
-          value,
-        },
-      }
-    })
-  }
-
-  const handleSave = async () => {
-    if (!draftConfig) return
-    const original = originalConfigRef.current ?? {}
-    const updates = Object.entries(draftConfig)
-      .filter(([key, item]) => {
-        const originalValue = original[key]?.value
-        return String(item.value) !== String(originalValue ?? "")
-      })
-      .map(([key, item]) => ({
-        path: `Game.${key}`,
-        value: item.value,
-      }))
-    if (updates.length === 0) {
-      toast.info("暂无需要保存的修改。")
-      return
-    }
-    setSaving(true)
-    setStatus("")
-    try {
-      await rpcClient.sendRequest("config.update", { updates })
-      originalConfigRef.current = draftConfig
-      setGameConfig(draftConfig)
-      toast.success("配置保存成功")
-    } catch {
-      toast.error("配置保存失败")
-    } finally {
-      setSaving(false)
-    }
-  }
-
   const handleRun = async () => {
-    if (!sessionId || rpcState !== "open") {
-      setStatus("RPC 未连接，暂无法启动任务。")
-      return
-    }
-    setStatus("")
+    if (!sessionId || rpcState !== "open") return
     try {
       await rpcClient.sendRequest("task.run", {
         session_id: sessionId,
@@ -180,132 +58,56 @@ export function OneDragonPage({ rpcClient, sessionId, rpcState }: OneDragonPageP
       })
       setIsRunning(true)
     } catch {
-      setStatus("启动失败，请稍后重试。")
+      toast.error("启动失败")
     }
   }
 
   return (
     <ScrollCenterLayout innerClassName="flex flex-col gap-4 px-10 py-8">
-      <div className="flex flex-wrap items-center justify-between gap-3">
-        <div>
-          <h1 className="text-xl font-semibold text-slate-800 dark:text-slate-100">
-            一条龙配置
-          </h1>
-        </div>
-        <div className="flex items-center gap-3">
-          <Button
-            onClick={handleSave}
-            disabled={loading || saving}
-            variant="outline"
-            className="rounded-xl"
-          >
-            {saving ? (
-              <>
-                <Spinner className="size-4" />
-                保存中...
-              </>
-            ) : (
-              "保存设置"
-            )}
-          </Button>
-          <Button
-            onClick={handleRun}
-            disabled={rpcState !== "open" || !sessionId || isRunning}
-            className="rounded-xl bg-pink-400 text-white shadow-sm transition hover:bg-pink-500"
-          >
-            {isRunning ? "一条龙运行中" : "开始一条龙"}
-          </Button>
-        </div>
-      </div>
-
-      <div className="space-y-4">
-        {loading ? (
-          <div className="flex items-center gap-2 text-sm text-slate-400">
-            <Spinner className="size-4" />
-            正在读取配置...
+      <SettingsPageLayout
+        title="一条龙配置"
+        actions={
+          <div className="flex items-center gap-3">
+            <Button
+              onClick={() =>
+                handleSave({
+                  successMessage: "配置保存成功",
+                  noChangeMessage: "暂无需要保存的修改。",
+                })
+              }
+              disabled={loading || saving}
+              variant="outline"
+              className="rounded-xl"
+            >
+              {saving ? (
+                <>
+                  <Spinner className="size-4" />
+                  保存中...
+                </>
+              ) : (
+                "保存设置"
+              )}
+            </Button>
+            <Button
+              onClick={handleRun}
+              disabled={rpcState !== "open" || !sessionId || isRunning}
+              className="rounded-xl bg-pink-400 text-white shadow-sm transition hover:bg-pink-500"
+            >
+              {isRunning ? "一条龙运行中" : "开始一条龙"}
+            </Button>
           </div>
-        ) : items.length === 0 ? (
-          <div className="text-sm text-slate-400">暂无可用配置</div>
-        ) : (
-          items.map((meta) => {
-            const key = meta.key
-            const value = draftConfig?.[key]?.value ?? ""
-            const booleanLike =
-              meta.type === "boolean" || isBooleanLike(value)
-            const label = meta.description || key
-            const options = meta.options ?? []
-            return (
-              <div
-                key={key}
-                className="flex flex-col gap-2 rounded-xl border border-slate-100 bg-slate-50 px-4 py-3 dark:border-slate-800 dark:bg-slate-950/40"
-              >
-                <div className="flex flex-wrap items-center justify-between gap-2">
-                  <div>
-                    <div className="text-sm font-medium text-slate-700 dark:text-slate-100">
-                      {label}
-                    </div>
-                  </div>
-                  {booleanLike ? (
-                    <label className="inline-flex items-center gap-2 text-sm text-slate-600 dark:text-slate-300">
-                      <Checkbox
-                        checked={String(value) === "true"}
-                        onCheckedChange={(checked) =>
-                          handleValueChange(key, checked ? "true" : "false")
-                        }
-                        className="data-[state=checked]:bg-pink-400 data-[state=checked]:border-pink-400 data-[state=checked]:text-white"
-                      />
-                      {String(value) === "true" ? "开启" : "关闭"}
-                    </label>
-                  ) : options.length > 0 ? (
-                    <Combobox
-                      items={options}
-                      value={
-                        options.includes(String(value)) ? String(value) : null
-                      }
-                      inputValue={String(value)}
-                      onValueChange={(nextValue) =>
-                        handleValueChange(
-                          key,
-                          nextValue ? String(nextValue) : "",
-                        )
-                      }
-                      onInputValueChange={(inputValue) =>
-                        handleValueChange(key, inputValue)
-                      }
-                    >
-                      <ComboboxInput
-                        className="w-full"
-                        placeholder="请输入或选择"
-                      />
-                      <ComboboxContent>
-                        <ComboboxList>
-                          {(option, index) => (
-                            <ComboboxItem
-                              key={`${String(option)}-${index}`}
-                              value={option}
-                            >
-                              {String(option)}
-                            </ComboboxItem>
-                          )}
-                        </ComboboxList>
-                        <ComboboxEmpty>没有匹配项</ComboboxEmpty>
-                      </ComboboxContent>
-                    </Combobox>
-                  ) : (
-                    <Input
-                      value={String(value)}
-                      onChange={(event) =>
-                        handleValueChange(key, event.target.value)
-                      }
-                      className="w-full"
-                    />
-                  )}
-                </div>
-              </div>
-            )
-          })
-        )}
-      </div>
+        }
+      >
+        <ConfigFormFields
+          items={items}
+          draftConfig={draftConfig}
+          onValueChange={handleValueChange}
+          loading={loading}
+          loadError={loadError}
+          emptyMessage="暂无可用配置"
+          itemClassName="rounded-xl border border-slate-100 bg-slate-50 px-4 py-3 text-sm dark:border-slate-800 dark:bg-slate-950/40"
+        />
+      </SettingsPageLayout>
     </ScrollCenterLayout>
   )
 }

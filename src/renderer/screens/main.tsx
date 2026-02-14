@@ -55,6 +55,7 @@ import {
   CollapsibleTrigger,
 } from 'renderer/components/ui/collapsible'
 import { AliveScope, KeepAlive } from 'react-activation'
+import log from 'electron-log/renderer'
 
 // React 18+ createRoot 下需关闭 autoFreeze，否则 KeepAlive 可能异常
 const keepAlive = KeepAlive as unknown as { defaultProps?: { autoFreeze?: boolean } }
@@ -228,6 +229,7 @@ export function MainScreen() {
 
   useEffect(() => {
     const offState = rpcClient.on('state', ({ state }) => {
+      log.debug('main screen RPC state changed:', state)
       setRpcState(state)
       if (state !== 'open') {
         setSessionId(null)
@@ -236,6 +238,8 @@ export function MainScreen() {
     const offError = rpcClient.on('error', (payload) => {
       toast.error(payload.message || 'RPC 连接异常')
     })
+    // 挂载后主动拉取一次当前状态，避免 RPC 在 starting 阶段已 open 而主界面未收到广播
+    void rpcClient.getStateAsync().then(setRpcState)
     return () => {
       offState()
       offError()
@@ -349,6 +353,7 @@ export function MainScreen() {
             onCheckUpdate={handleCheckAppUpdate}
             onManualUpdate={handleManualAppUpdate}
             onSyncScripts={() => syncSubscribedScripts({ showFeedbackWhenNoChange: true })}
+            rpcClient={rpcClient}
           />
           <NotificationDrawer/>
           <div className="flex items-center gap-2 text-pink-400">
