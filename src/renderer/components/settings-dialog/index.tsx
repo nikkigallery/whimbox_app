@@ -48,7 +48,7 @@ const settingsContent: Record<
   shortcuts: {
     title: shortcutsSettings.content.title,
     description: shortcutsSettings.content.description,
-    items: shortcutsSettings.content.items,
+    render: shortcutsSettings.content.render,
   },
 }
 

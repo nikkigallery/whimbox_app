@@ -9,7 +9,7 @@ import type { SettingSection, SettingContent } from "./types"
 
 export const section: SettingSection = {
   id: "agent",
-  label: "Agent",
+  label: "大模型",
   icon: Bot,
 }
 
@@ -73,8 +73,8 @@ function AgentConfigForm({
 }
 
 export const content: SettingContent = {
-  title: "Agent 设置",
-  description: "大模型与 API 配置，以及 Agent 行为与输出偏好。",
+  title: "大模型",
+  description: "大语言模型相关的配置",
   render: (props, slots) => {
     if (props.rpcClient) {
       return (
