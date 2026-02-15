@@ -104,8 +104,51 @@ export function useConfigForm({ section, rpcClient }: UseConfigFormOptions) {
     })
   }
 
-  const handleSave = async (options?: { successMessage?: string; noChangeMessage?: string }) => {
+  /** 修改后立即保存单条（用于「改完即存」模式，不弹成功 toast） */
+  const handleValueChangeAndSave = async (
+    key: string,
+    value: string | number | boolean
+  ) => {
     if (!draftConfig) return
+    const prevValue = draftConfig[key]?.value
+    if (String(value) === String(prevValue ?? "")) return
+
+    setDraftConfig((prev) => {
+      if (!prev) return prev
+      return {
+        ...prev,
+        [key]: { ...prev[key], value },
+      }
+    })
+    setSaving(true)
+    try {
+      await rpcClient.sendRequest("config.update", {
+        path: `${section}.${key}`,
+        value,
+      })
+      originalConfigRef.current = {
+        ...originalConfigRef.current,
+        [key]: { ...(originalConfigRef.current?.[key] ?? {}), value },
+      }
+    } catch {
+      toast.error("保存失败，请稍后重试")
+      setDraftConfig((prev) => {
+        if (!prev) return prev
+        return {
+          ...prev,
+          [key]: { ...prev[key], value: prevValue },
+        }
+      })
+    } finally {
+      setSaving(false)
+    }
+  }
+
+  const handleSave = async (options?: {
+    successMessage?: string
+    noChangeMessage?: string
+  }): Promise<boolean> => {
+    if (!draftConfig) return false
     const original = originalConfigRef.current ?? {}
     const updates = Object.entries(draftConfig)
       .filter(([key, item]) => {
@@ -118,7 +161,7 @@ export function useConfigForm({ section, rpcClient }: UseConfigFormOptions) {
       }))
     if (updates.length === 0) {
       toast.info(options?.noChangeMessage ?? "暂无需要保存的修改。")
-      return
+      return false
     }
     setSaving(true)
     try {
@@ -126,8 +169,10 @@ export function useConfigForm({ section, rpcClient }: UseConfigFormOptions) {
       originalConfigRef.current = draftConfig
       setConfig(draftConfig)
       toast.success(options?.successMessage ?? "配置已保存")
+      return true
     } catch {
       toast.error("保存失败，请稍后重试")
+      return false
     } finally {
       setSaving(false)
     }
@@ -141,6 +186,7 @@ export function useConfigForm({ section, rpcClient }: UseConfigFormOptions) {
     items,
     saving,
     handleValueChange,
+    handleValueChangeAndSave,
     handleSave,
     originalConfigRef,
   }

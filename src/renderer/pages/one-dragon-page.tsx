@@ -5,7 +5,6 @@ import { ConfigFormFields } from "renderer/components/config-form-fields"
 import { useConfigForm } from "renderer/hooks/use-config-form"
 import type { IpcRpcClient } from "renderer/lib/ipc-rpc"
 import { Button } from "renderer/components/ui/button"
-import { Spinner } from "renderer/components/ui/spinner"
 import { toast } from "sonner"
 
 type OneDragonPageProps = {
@@ -22,9 +21,7 @@ export function OneDragonPage({ rpcClient, sessionId, rpcState }: OneDragonPageP
     loadError,
     items,
     draftConfig,
-    saving,
-    handleValueChange,
-    handleSave,
+    handleValueChangeAndSave,
   } = useConfigForm({ section: "Game", rpcClient })
 
   useEffect(() => {
@@ -63,45 +60,27 @@ export function OneDragonPage({ rpcClient, sessionId, rpcState }: OneDragonPageP
   }
 
   return (
-    <ScrollCenterLayout innerClassName="flex flex-col gap-4 px-10 py-8">
+    <ScrollCenterLayout
+      scrollOuter={false}
+      innerClassName="flex flex-1 flex-col min-h-0 gap-4 px-10 py-8"
+    >
       <SettingsPageLayout
+        className="flex-1 min-h-0"
         title="一条龙配置"
         actions={
-          <div className="flex items-center gap-3">
-            <Button
-              onClick={() =>
-                handleSave({
-                  successMessage: "配置保存成功",
-                  noChangeMessage: "暂无需要保存的修改。",
-                })
-              }
-              disabled={loading || saving}
-              variant="outline"
-              className="rounded-xl"
-            >
-              {saving ? (
-                <>
-                  <Spinner className="size-4" />
-                  保存中...
-                </>
-              ) : (
-                "保存设置"
-              )}
-            </Button>
-            <Button
-              onClick={handleRun}
-              disabled={rpcState !== "open" || !sessionId || isRunning}
-              className="rounded-xl bg-pink-400 text-white shadow-sm transition hover:bg-pink-500"
-            >
-              {isRunning ? "一条龙运行中" : "开始一条龙"}
-            </Button>
-          </div>
+          <Button
+            onClick={handleRun}
+            disabled={rpcState !== "open" || !sessionId || isRunning}
+            className="rounded-xl bg-pink-400 text-white shadow-sm transition hover:bg-pink-500"
+          >
+            {isRunning ? "一条龙运行中" : "开始一条龙"}
+          </Button>
         }
       >
         <ConfigFormFields
           items={items}
           draftConfig={draftConfig}
-          onValueChange={handleValueChange}
+          onValueChange={handleValueChangeAndSave}
           loading={loading}
           loadError={loadError}
           emptyMessage="暂无可用配置"

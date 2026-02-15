@@ -83,13 +83,13 @@ async function runWhlInstallWithProgress(
 
   try {
     await backendManager.stopBackend()
-    await waitFor(1000)
+    await waitFor(2000)
     const result = await work()
     sendTaskProgress(win, { status: 'success', title, message: '安装完成' })
     try {
-      sendTaskProgress(win, { status: 'running', title, message: '正在重启后台…' })
+      sendTaskProgress(win, { status: 'running', title, message: '正在重启奇想盒后台…' })
       await backendManager.launchBackend()
-      sendTaskProgress(win, { status: 'running', title, message: '正在连接…' })
+      sendTaskProgress(win, { status: 'running', title, message: '奇想盒后台启动中…' })
       reconnectRpcNow()
       const connected = await waitForRpcConnected(30_000)
       if (connected) {
@@ -112,6 +112,32 @@ async function runWhlInstallWithProgress(
     }
     pythonManager.off('install-start', onInstallStart)
     pythonManager.off('install-progress', onInstallProgress)
+  }
+}
+
+/**
+ * 仅重启后台并发送进度（与更新后端时的重启提示一致）。
+ * 用于「保存并应用」等场景。
+ */
+async function runRestartBackend(win: BrowserWindow, title: string): Promise<void> {
+  sendTaskProgress(win, { status: 'running', title, message: '正在重启奇想盒后台…' })
+  try {
+    await backendManager.stopBackend()
+    await waitFor(5000)
+    await backendManager.launchBackend()
+    sendTaskProgress(win, { status: 'running', title, message: '奇想盒后台启动中…' })
+    reconnectRpcNow()
+    const connected = await waitForRpcConnected(30_000)
+    if (connected) {
+      sendTaskProgress(win, { status: 'success', title, message: '重启完成' })
+    } else {
+      sendTaskProgress(win, { status: 'error', title, error: '连接超时，重启奇想盒试试？' })
+    }
+  } catch (err) {
+    console.error('重启后台失败:', err)
+    const message = err instanceof Error ? err.message : String(err)
+    sendTaskProgress(win, { status: 'error', title, error: message })
+    throw err
   }
 }
 
@@ -203,6 +229,9 @@ export function registerLauncherIpc(window: BrowserWindow) {
   ipcMain.handle('launcher:get-backend-status', () => backendManager.getBackendStatus())
   ipcMain.handle('launcher:launch-backend', () => backendManager.launchBackend())
   ipcMain.handle('launcher:stop-backend', () => backendManager.stopBackend())
+  ipcMain.handle('launcher:restart-backend', async (_, title?: string) =>
+    runRestartBackend(window, title ?? '重启后台'),
+  )
   ipcMain.handle('launcher:get-app-version', () => app.getVersion())
   ipcMain.handle('launcher:get-announcements', () => getAnnouncements())
   ipcMain.handle(
