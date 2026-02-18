@@ -228,7 +228,7 @@ export function ScriptSelectPage({
       return
     }
     if (rpcState !== "open" || !sessionId) {
-      toast.error("RPC 未连接，暂无法启动任务。")
+      toast.error("奇想盒后台未启动，暂无法启动任务。")
       return
     }
     try {

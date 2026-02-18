@@ -96,7 +96,18 @@ makeAppWithSingleInstanceLock(async () => {
     })
 
     const backendStatus = backendManager.getBackendStatus()
-    if (backendStatus.installed && backendStatus.entryPoint) {
+    const skipLaunchInDev = ENVIRONMENT.IS_DEV
+    if (skipLaunchInDev && !splashWindow.isDestroyed() && splashWindow.webContents) {
+      splashWindow.webContents.send('splash:python-progress', {
+        stage: 'ensure-done',
+        message: '开发模式：请手动启动后端',
+      })
+    }
+    if (
+      backendStatus.installed &&
+      backendStatus.entryPoint &&
+      !skipLaunchInDev
+    ) {
       try {
         if (!splashWindow.isDestroyed() && splashWindow.webContents) {
           splashWindow.webContents.send('splash:python-progress', {

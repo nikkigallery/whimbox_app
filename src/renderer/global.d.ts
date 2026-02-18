@@ -94,6 +94,11 @@ declare global {
           method: string,
           params?: Record<string, unknown>,
         ) => Promise<T>
+        requestStream: (
+          method: string,
+          params: Record<string, unknown> | undefined,
+          onStreamEvent: (data: RpcNotification) => void,
+        ) => Promise<unknown>
         notify: (method: string, params?: Record<string, unknown>) => void
         onState: (callback: (data: { state: RpcState }) => void) => () => void
         onNotification: (callback: (data: RpcNotification) => void) => () => void

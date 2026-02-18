@@ -1,12 +1,5 @@
 import { useEffect, useRef } from "react"
-
-type UiMessage = {
-  id: string
-  role: "user" | "assistant" | "system"
-  content: string
-  pending?: boolean
-  title?: string
-}
+import type { UiMessage } from "renderer/hooks/use-home-conversation"
 
 type ConversationPanelProps = {
   messages: UiMessage[]
@@ -52,10 +45,32 @@ export function ConversationPanel({ messages }: ConversationPanelProps) {
                   </div>
                 </div>
               ) : (
-                <div className="w-full text-slate-700 dark:text-slate-200">
-                  <div className="whitespace-pre-wrap">
-                    {message.content || (message.pending ? "处理中..." : "")}
-                  </div>
+                <div className="w-full space-y-3 text-slate-700 dark:text-slate-200">
+                  {message.blocks && message.blocks.length > 0 ? (
+                    message.blocks.map((block, i) =>
+                      block.type === "text" ? (
+                        <div key={i} className="whitespace-pre-wrap">
+                          {block.content || (message.pending && i === message.blocks!.length - 1 ? "处理中..." : "")}
+                        </div>
+                      ) : (
+                        <div
+                          key={i}
+                          className="rounded-2xl border border-slate-200 bg-slate-50 px-4 py-3 text-slate-600 shadow-sm dark:border-slate-700 dark:bg-slate-900/60 dark:text-slate-300"
+                        >
+                          <div className="text-xs font-semibold uppercase tracking-wide text-slate-400 dark:text-slate-500">
+                            {block.title ? `工具 · ${block.title}` : "工具运行日志"}
+                          </div>
+                          <div className="mt-2 whitespace-pre-wrap text-sm">
+                            {block.content || (message.pending ? "处理中..." : "")}
+                          </div>
+                        </div>
+                      )
+                    )
+                  ) : (
+                    <div className="whitespace-pre-wrap">
+                      {message.content || (message.pending ? "处理中..." : "")}
+                    </div>
+                  )}
                 </div>
               )}
             </div>

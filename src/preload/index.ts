@@ -7,6 +7,26 @@ declare global {
   }
 }
 
+let rpcRequestId = 0
+const rpcPending = new Map<
+  number,
+  { resolve: (v: unknown) => void; reject: (e: unknown) => void }
+>()
+ipcRenderer.on(
+  'rpc:response',
+  (
+    _: Electron.IpcRendererEvent,
+    data: { requestId: number; result?: unknown; error?: RpcError },
+  ) => {
+    const p = rpcPending.get(data.requestId)
+    rpcPending.delete(data.requestId)
+    if (p) {
+      if (data.error != null) p.reject(data.error)
+      else p.resolve(data.result)
+    }
+  },
+)
+
 /** 与 main 进程 AppUpdateState 一致，供渲染进程使用 */
 type AppUpdateState = {
   status: string
@@ -117,8 +137,44 @@ const API = {
       ipcRenderer.on('rpc:session-id', listener)
       return () => ipcRenderer.removeListener('rpc:session-id', listener)
     },
-    request: (method: string, params?: Record<string, unknown>) =>
-      ipcRenderer.invoke('rpc:request', method, params),
+    request: (method: string, params?: Record<string, unknown>) => {
+      const requestId = ++rpcRequestId
+      ipcRenderer.send('rpc:request', { requestId, method, params })
+      return new Promise<unknown>((resolve, reject) => {
+        rpcPending.set(requestId, { resolve, reject })
+      })
+    },
+    requestStream: (
+      method: string,
+      params: Record<string, unknown> | undefined,
+      onStreamEvent: (data: RpcNotification) => void,
+    ): Promise<unknown> => {
+      const requestId = ++rpcRequestId
+      const streamChannel = `rpc:stream:${requestId}`
+      return new Promise<unknown>((resolve, reject) => {
+        const listener = (
+          _: Electron.IpcRendererEvent,
+          msg: { type: string; data?: RpcNotification; result?: unknown; error?: RpcError },
+        ) => {
+          if (msg.type === 'stream_event' && msg.data) {
+            onStreamEvent(msg.data)
+            return
+          }
+          if (msg.type === 'done') {
+            ipcRenderer.removeAllListeners(streamChannel)
+            if (msg.error != null) reject(msg.error)
+            else resolve(msg.result)
+          }
+        }
+        ipcRenderer.on(streamChannel, listener)
+        ipcRenderer.send('rpc:request-stream', {
+          requestId,
+          method,
+          params,
+          streamChannel,
+        })
+      })
+    },
     notify: (method: string, params?: Record<string, unknown>) =>
       ipcRenderer.send('rpc:notify', method, params),
     onState: (callback: (data: { state: RpcState }) => void) => {

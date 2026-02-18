@@ -105,6 +105,14 @@ export class IpcRpcClient {
     return window.App.rpc.request(method, params) as Promise<T>
   }
 
+  sendStreamingRequest<T = unknown>(
+    method: string,
+    params: Record<string, unknown> | undefined,
+    onStreamEvent: (n: RpcNotification) => void,
+  ): Promise<T> {
+    return window.App.rpc.requestStream(method, params, onStreamEvent) as Promise<T>
+  }
+
   sendNotification(method: string, params?: Record<string, unknown>) {
     window.App.rpc.notify(method, params)
   }

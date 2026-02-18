@@ -90,7 +90,7 @@ export function HomePage({ rpcClient, sessionId, rpcState }: HomePageProps) {
               placeholder={
                 rpcState === "open"
                   ? "请输入内容..."
-                  : "RPC 未连接，暂无法发送"
+                  : "奇想盒后台未启动，无法发送消息"
               }
               onChange={(event) => {
                 const target = event.currentTarget

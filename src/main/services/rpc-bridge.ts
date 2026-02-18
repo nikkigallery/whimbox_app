@@ -24,7 +24,6 @@ export function registerRpcBridge() {
     broadcast('rpc:state', payload)
   })
   rpcClient.on('notification', (payload) => broadcast('rpc:notification', payload))
-  rpcClient.on('response', (payload) => broadcast('rpc:response', payload))
   rpcClient.on('error', (payload) => broadcast('rpc:error', payload))
 
   ipcMain.handle('rpc:get-state', () => rpcClient.getState())
@@ -33,8 +32,48 @@ export function registerRpcBridge() {
     currentSessionId = id
     broadcast('rpc:session-id', id)
   })
-  ipcMain.handle('rpc:request', (_event, method: string, params?: Record<string, unknown>) =>
-    rpcClient.sendRequest(method, params),
+  ipcMain.on(
+    'rpc:request',
+    (
+      event: Electron.IpcMainEvent,
+      payload: { requestId: number; method: string; params?: Record<string, unknown> },
+    ) => {
+      const { requestId, method, params } = payload
+      rpcClient
+        .sendRequest(method, params)
+        .then((result) => {
+          event.sender.send('rpc:response', { requestId, result })
+        })
+        .catch((err) => {
+          event.sender.send('rpc:response', { requestId, error: err })
+        })
+    },
+  )
+  ipcMain.on(
+    'rpc:request-stream',
+    (
+      event: Electron.IpcMainEvent,
+      payload: {
+        requestId: number
+        method: string
+        params?: Record<string, unknown>
+        streamChannel: string
+      },
+    ) => {
+      const { streamChannel, method, params } = payload
+      rpcClient
+        .sendStreamingRequest(method, params, {
+          onStreamEvent: (n) => {
+            event.sender.send(streamChannel, { type: 'stream_event', data: n })
+          },
+        })
+        .then((result) => {
+          event.sender.send(streamChannel, { type: 'done', result })
+        })
+        .catch((err) => {
+          event.sender.send(streamChannel, { type: 'done', error: err })
+        })
+    },
   )
   ipcMain.on('rpc:notify', (_event, method: string, params?: Record<string, unknown>) => {
     rpcClient.sendNotification(method, params)

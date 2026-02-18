@@ -17,18 +17,25 @@ type RpcListenerMap = {
 type ListenerKey = keyof RpcListenerMap
 type Listener<T> = (payload: T) => void
 
+const STREAM_EVENT_METHODS = [
+  'event.agent.message',
+  'event.agent.status',
+  'event.task.log',
+  'event.task.progress',
+] as const
+
+type PendingEntry = {
+  resolve: (value: unknown) => void
+  reject: (error: unknown) => void
+  onStreamEvent?: (n: RpcNotification) => void
+}
+
 export class RpcClient {
   private url: string
   private ws: WebSocket | null = null
   private state: RpcState = 'idle'
   private listeners = new Map<ListenerKey, Set<Listener<unknown>>>()
-  private pending = new Map<
-    number,
-    {
-      resolve: (value: unknown) => void
-      reject: (error: unknown) => void
-    }
-  >()
+  private pending = new Map<number, PendingEntry>()
   private requestId = 1
   private reconnectTimer: ReturnType<typeof setTimeout> | null = null
   private reconnectAttempts = 0
@@ -124,18 +131,38 @@ export class RpcClient {
   }
 
   sendRequest<T = unknown>(method: string, params?: Record<string, unknown>) {
+    return this.sendRequestInternal(method, params) as Promise<T>
+  }
+
+  /**
+   * 流式请求：onStreamEvent 会在收到 event.agent.message / event.agent.status / event.task.log 时立即被调用，
+   * 最后 Promise 以完整 result resolve。同一时间只应有一个流式请求。
+   */
+  sendStreamingRequest<T = unknown>(
+    method: string,
+    params: Record<string, unknown> | undefined,
+    options: { onStreamEvent: (n: RpcNotification) => void },
+  ): Promise<T> {
+    return this.sendRequestInternal(method, params, options) as Promise<T>
+  }
+
+  private sendRequestInternal(
+    method: string,
+    params?: Record<string, unknown>,
+    options?: { onStreamEvent: (n: RpcNotification) => void },
+  ): Promise<unknown> {
     if (!this.ws || this.state !== 'open') {
       return Promise.reject(new Error('RPC not connected'))
     }
     const id = this.requestId++
     const payload = { jsonrpc: '2.0', id, method, params: params ?? {} }
-    const message = JSON.stringify(payload)
-    return new Promise<T>((resolve, reject) => {
+    this.ws.send(JSON.stringify(payload))
+    return new Promise<unknown>((resolve, reject) => {
       this.pending.set(id, {
-        resolve: resolve as (value: unknown) => void,
+        resolve,
         reject,
+        onStreamEvent: options?.onStreamEvent,
       })
-      this.ws?.send(message)
     })
   }
 
@@ -173,11 +200,29 @@ export class RpcClient {
     }
 
     if ('method' in payload && payload.method) {
-      this.emit('notification', {
+      const notification: RpcNotification = {
         method: payload.method,
         params: 'params' in payload ? payload.params : undefined,
-      })
+      }
+      const streaming = this.getStreamingPending()
+      if (
+        streaming?.onStreamEvent &&
+        STREAM_EVENT_METHODS.includes(
+          payload.method as (typeof STREAM_EVENT_METHODS)[number],
+        )
+      ) {
+        streaming.onStreamEvent(notification)
+        return
+      }
+      this.emit('notification', notification)
     }
+  }
+
+  private getStreamingPending(): PendingEntry | undefined {
+    for (const entry of this.pending.values()) {
+      if (entry.onStreamEvent) return entry
+    }
+    return undefined
   }
 
   private setState(state: RpcState) {
