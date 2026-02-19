@@ -33,10 +33,10 @@ export function useHomeConversation({
   const [input, setInput] = useState('')
   const pendingAssistantIdRef = useRef<string | null>(null)
 
-  const handleSend = useCallback(async () => {
-    const text = input.trim()
+  const handleSend = useCallback(async (overrideText?: string) => {
+    const text = (overrideText != null && overrideText !== '' ? overrideText : input).trim()
     if (!text || rpcState !== 'open' || !sessionId) return
-    setInput('')
+    if (overrideText == null) setInput('')
     const assistantId = createId()
     pendingAssistantIdRef.current = assistantId
     setMessages((prev) => [

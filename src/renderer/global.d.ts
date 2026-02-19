@@ -22,6 +22,22 @@ declare global {
         show: () => Promise<void>
         addShownAsBallListener: (callback: () => void) => () => void
       }
+      conversation: {
+        getState: () => Promise<{
+          messages: Array<{
+            id: string
+            role: 'user' | 'assistant' | 'system'
+            content: string
+            pending?: boolean
+            title?: string
+            blocks?: Array<{ type: 'text' | 'log'; content: string; title?: string }>
+          }>
+        }>
+        pushState: (payload: { messages: unknown[] }) => void
+        send: (text: string) => void
+        onState: (callback: (data: { messages: unknown[] }) => void) => () => void
+        onRunSend: (callback: (text: string) => void) => () => void
+      }
       launcher: {
         openExternal: (url: string) => void
         getAuthPort: () => Promise<number>

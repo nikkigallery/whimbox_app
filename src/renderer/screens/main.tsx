@@ -46,6 +46,7 @@ import { AutoMusicPage } from '../pages/auto-music-page'
 import { ScriptSubscribePage } from '../pages/script-subscribe-page'
 import { IpcRpcClient } from 'renderer/lib/ipc-rpc'
 import { apiClient } from 'renderer/lib/api-client'
+import { useHomeConversation } from 'renderer/hooks/use-home-conversation'
 import { useUnifiedUpdate } from 'renderer/hooks/use-unified-update'
 import { toast } from 'sonner'
 import { Toaster } from 'renderer/components/ui/sonner'
@@ -126,6 +127,24 @@ export function MainScreen() {
   })
 
   useEffect(() => () => rpcRef.current?.destroy(), [])
+
+  const homeConversation = useHomeConversation({
+    rpcClient,
+    sessionId,
+    rpcState,
+  })
+  const { messages, input, setInput, handleSend } = homeConversation
+
+  useEffect(() => {
+    window.App.conversation.pushState({ messages })
+  }, [messages])
+
+  useEffect(() => {
+    const off = window.App.conversation.onRunSend((text: string) => {
+      handleSend(text)
+    })
+    return () => off()
+  }, [handleSend])
 
   const applyAuthState = useCallback(
     (state: { user: { username?: string; avatar?: string; is_vip?: boolean; vip_expiry_data?: string } } | null) => {
@@ -316,7 +335,16 @@ export function MainScreen() {
         )
       case 'home':
       default:
-        return <HomePage rpcClient={rpcClient} sessionId={sessionId} rpcState={rpcState} />
+        return (
+          <HomePage
+            messages={messages}
+            input={input}
+            setInput={setInput}
+            handleSend={handleSend}
+            rpcState={rpcState}
+            sessionId={sessionId}
+          />
+        )
     }
   }
 
@@ -351,10 +379,10 @@ export function MainScreen() {
             type="button"
             onClick={() => window.App?.overlay?.show?.()}
             className="flex items-center gap-2 rounded-full border border-slate-200 bg-white/80 px-3 py-1 text-xs text-slate-500 shadow-sm transition hover:bg-slate-50 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-300 dark:hover:bg-slate-700"
-            title="悬浮窗关闭后，点击可重新显示悬浮球"
+            title="悬浮窗关闭后，点击可重新显示悬浮窗"
           >
             <CircleDot className="size-3" />
-            悬浮球
+            悬浮窗
           </button>
           <SettingsDialog
             displayVersion={displayVersion}

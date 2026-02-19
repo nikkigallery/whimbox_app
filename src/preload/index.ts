@@ -89,6 +89,37 @@ const API = {
       }
     },
   },
+  conversation: {
+    getState: () =>
+      ipcRenderer.invoke('conversation:get-state') as Promise<{
+        messages: Array<{
+          id: string
+          role: 'user' | 'assistant' | 'system'
+          content: string
+          pending?: boolean
+          title?: string
+          blocks?: Array<{ type: 'text' | 'log'; content: string; title?: string }>
+        }>
+      }>,
+    pushState: (payload: { messages: unknown[] }) =>
+      ipcRenderer.send('conversation:push-state', payload),
+    send: (text: string) => ipcRenderer.send('conversation:send', text),
+    onState: (callback: (data: { messages: unknown[] }) => void) => {
+      const listener = (_: Electron.IpcRendererEvent, data: { messages: unknown[] }) =>
+        callback(data)
+      ipcRenderer.on('conversation:state', listener)
+      return () => {
+        ipcRenderer.removeListener('conversation:state', listener)
+      }
+    },
+    onRunSend: (callback: (text: string) => void) => {
+      const listener = (_: Electron.IpcRendererEvent, text: string) => callback(text)
+      ipcRenderer.on('conversation:run-send', listener)
+      return () => {
+        ipcRenderer.removeListener('conversation:run-send', listener)
+      }
+    },
+  },
   launcher: {
     openExternal: (url: string) => ipcRenderer.send('launcher:open-external', url),
     getAuthPort: () => ipcRenderer.invoke('launcher:get-auth-port'),

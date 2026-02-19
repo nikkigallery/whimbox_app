@@ -5,7 +5,8 @@ import windowStateKeeper from 'electron-window-state'
 
 import { createWindow } from 'lib/electron-app/factories/windows/create'
 
-const BALL_SIZE = 48
+const PANEL_DEFAULT_WIDTH = 420
+const PANEL_DEFAULT_HEIGHT = 360
 const MARGIN = 16
 
 let overlayWindowRef: BrowserWindow | null = null
@@ -42,7 +43,7 @@ function registerOverlayIpc() {
   ipcMain.handle('overlay:get-bounds', (event) => {
     const win = BrowserWindow.fromWebContents(event.sender)
     if (!win || win.isDestroyed())
-      return { x: 0, y: 0, width: BALL_SIZE, height: BALL_SIZE }
+      return { x: 0, y: 0, width: PANEL_DEFAULT_WIDTH, height: PANEL_DEFAULT_HEIGHT }
     return win.getBounds() as { x: number; y: number; width: number; height: number }
   })
   ipcMain.handle(
@@ -71,25 +72,21 @@ function registerOverlayIpc() {
   ipcMain.handle('overlay:show', () => {
     const win = overlayWindowRef
     if (!win || win.isDestroyed()) return
-    const b = win.getBounds()
-    const ballX = b.x + b.width - BALL_SIZE
-    const ballY = b.y + b.height - BALL_SIZE
-    win.setBounds({ x: ballX, y: ballY, width: BALL_SIZE, height: BALL_SIZE })
-    scheduleSaveOverlayState(win)
     win.show()
-    if (!win.webContents.isDestroyed()) {
-      win.webContents.send('overlay:shown-as-ball')
-    }
   })
 }
 
 registerOverlayIpc()
 
-/** 半透明小窗，用于展示消息和发送消息（与主窗口共享同一 RPC 会话） */
+export function getOverlayWindow() {
+  return overlayWindowRef
+}
+
+/** 半透明小窗，用于展示消息和发送消息（与主窗口共享同一 RPC 会话）；仅当游戏窗口出现时由后端通知显示。 */
 export async function OverlayWindow() {
   const overlayState = windowStateKeeper({
-    defaultWidth: BALL_SIZE,
-    defaultHeight: BALL_SIZE,
+    defaultWidth: PANEL_DEFAULT_WIDTH,
+    defaultHeight: PANEL_DEFAULT_HEIGHT,
     file: 'overlay-window-state.json',
     maximize: false,
     fullScreen: false,
@@ -99,13 +96,13 @@ export async function OverlayWindow() {
   const x =
     overlayState.x !== undefined
       ? overlayState.x
-      : workArea.x + workArea.width - BALL_SIZE - MARGIN
+      : workArea.x + workArea.width - PANEL_DEFAULT_WIDTH - MARGIN
   const y =
     overlayState.y !== undefined
       ? overlayState.y
       : workArea.y + workArea.height * 0.65
-  const width = overlayState.width
-  const height = overlayState.height
+  const width = overlayState.width ?? PANEL_DEFAULT_WIDTH
+  const height = overlayState.height ?? PANEL_DEFAULT_HEIGHT
 
   const window = createWindow({
     id: 'overlay',
@@ -114,8 +111,8 @@ export async function OverlayWindow() {
     y,
     width,
     height,
-    minWidth: BALL_SIZE,
-    minHeight: BALL_SIZE,
+    minWidth: 260,
+    minHeight: 330,
     show: false,
     frame: false,
     transparent: true,
@@ -134,7 +131,7 @@ export async function OverlayWindow() {
   overlayWindowState = overlayState
   overlayWindowRef = window
 
-  // 关闭时只隐藏不销毁，便于主界面「重新显示悬浮球」再次显示
+  // 关闭时只隐藏不销毁，由 event.game_window.visible 或用户操作再次显示
   window.on('close', (e) => {
     e.preventDefault()
     window.hide()
@@ -146,9 +143,7 @@ export async function OverlayWindow() {
 
   window.setVisibleOnAllWorkspaces(true, { visibleOnFullScreen: true })
 
-  window.webContents.on('did-finish-load', () => {
-    window.show()
-  })
+  // 不在此处 show()，仅当后端通知游戏窗口出现时由 rpc-bridge 显示
 
   return window
 }

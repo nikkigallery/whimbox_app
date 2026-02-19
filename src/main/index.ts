@@ -13,6 +13,7 @@ import { registerAppUpdater, unregisterAppUpdater } from './services/updater'
 import { pythonManager } from './services/python-manager'
 import { registerRpcBridge, stopRpcBridge, waitForRpcConnected } from './services/rpc-bridge'
 import { createTray, destroyTray } from './services/tray'
+import { registerConversationBridge } from './services/conversation-bridge'
 import { MainWindow } from './windows/main'
 import { OverlayWindow } from './windows/overlay'
 import { SplashWindow } from './windows/splash'
@@ -173,6 +174,7 @@ makeAppWithSingleInstanceLock(async () => {
   const overlayWindow = await OverlayWindow()
   void overlayWindow
 
+  registerConversationBridge(window)
   createTray(window)
   ipcMain.handle('window:minimize-to-tray', () => {
     if (window && !window.isDestroyed()) {

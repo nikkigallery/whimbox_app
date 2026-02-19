@@ -1,6 +1,7 @@
 import { BrowserWindow, ipcMain } from 'electron'
 
 import { RpcClient } from './rpc-client'
+import { getOverlayWindow } from '../windows/overlay'
 
 let initialized = false
 const rpcClient = new RpcClient()
@@ -23,7 +24,17 @@ export function registerRpcBridge() {
     }
     broadcast('rpc:state', payload)
   })
-  rpcClient.on('notification', (payload) => broadcast('rpc:notification', payload))
+  rpcClient.on('notification', (payload) => {
+    broadcast('rpc:notification', payload)
+    if (payload.method === 'event.game_window.visible') {
+      const visible = (payload.params as { visible?: boolean } | undefined)?.visible === true
+      const overlay = getOverlayWindow()
+      if (overlay && !overlay.isDestroyed()) {
+        if (visible) overlay.show()
+        else overlay.hide()
+      }
+    }
+  })
   rpcClient.on('error', (payload) => broadcast('rpc:error', payload))
 
   ipcMain.handle('rpc:get-state', () => rpcClient.getState())
