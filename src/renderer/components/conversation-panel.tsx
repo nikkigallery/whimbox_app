@@ -15,7 +15,7 @@ export function ConversationPanel({ messages }: ConversationPanelProps) {
   }, [messages])
 
   return (
-    <div ref={scrollRef} className="flex-1 space-y-4 overflow-auto">
+    <div ref={scrollRef} className="flex-1 space-y-4 overflow-auto select-text">
       {messages.length === 0 ? (
         <div className="rounded-xl border border-dashed border-slate-200 px-4 py-6 text-center text-sm text-slate-400 dark:border-slate-700">
           暂无对话内容
