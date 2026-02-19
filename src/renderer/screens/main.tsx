@@ -1,5 +1,6 @@
 import {
   ChevronDown,
+  CircleDot,
   Gift,
   Home,
   Layers,
@@ -346,6 +347,15 @@ export function MainScreen() {
           </div>
         </div>
         <div className="app-no-drag flex items-center gap-3">
+          <button
+            type="button"
+            onClick={() => window.App?.overlay?.show?.()}
+            className="flex items-center gap-2 rounded-full border border-slate-200 bg-white/80 px-3 py-1 text-xs text-slate-500 shadow-sm transition hover:bg-slate-50 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-300 dark:hover:bg-slate-700"
+            title="悬浮窗关闭后，点击可重新显示悬浮球"
+          >
+            <CircleDot className="size-3" />
+            悬浮球
+          </button>
           <SettingsDialog
             displayVersion={displayVersion}
             updateState={updateState}

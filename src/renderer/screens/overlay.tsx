@@ -1,9 +1,74 @@
+import type { CSSProperties } from 'react'
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
-import { Send, X } from 'lucide-react'
+import { ChevronDown, Send, X } from 'lucide-react'
 import { ConversationPanel } from 'renderer/components/conversation-panel'
 import { useHomeConversation } from 'renderer/hooks/use-home-conversation'
+import type { UiMessage } from 'renderer/hooks/use-home-conversation'
 import { IpcRpcClient } from 'renderer/lib/ipc-rpc'
 import { cn } from 'renderer/lib/utils'
+
+/** Electron 无边框窗口拖拽区域，TypeScript 不包含此非标准属性，需断言 */
+const appRegionDrag = { WebkitAppRegion: 'drag' } as CSSProperties
+const appRegionNoDrag = { WebkitAppRegion: 'no-drag' } as CSSProperties
+
+const BALL_SIZE = 48
+const PANEL_MIN_WIDTH = 260
+const PANEL_MIN_HEIGHT = 330
+const PANEL_DEFAULT_WIDTH = 420
+const PANEL_DEFAULT_HEIGHT = 360
+const CLICK_THRESHOLD = 5
+const CLICK_MAX_MS = 300
+
+function useToolPassthrough(rpcClient: IpcRpcClient) {
+  useEffect(() => {
+    if (!window.App.overlay) return
+    const off = rpcClient.on('notification', (n) => {
+      if (n.method !== 'event.agent.status') return
+      const params = n.params as { status?: string } | undefined
+      const status = params?.status ?? ''
+      if (status === 'on_tool_start') {
+        window.App.overlay?.setIgnoreMouseEvents(true)
+      } else if (status === 'on_tool_end' || status === 'on_tool_error') {
+        window.App.overlay?.setIgnoreMouseEvents(false)
+      }
+    })
+    return () => off()
+  }, [rpcClient])
+}
+
+function BallTicker({ messages }: { messages: UiMessage[] }) {
+  const lastThree = useMemo(
+    () =>
+      messages
+        .slice(-3)
+        .map((m) =>
+          m.role === 'user'
+            ? m.content
+            : m.content || (m.pending ? '…' : ''),
+        )
+        .filter(Boolean),
+    [messages],
+  )
+  if (lastThree.length === 0) return null
+  return (
+    <div
+      className="absolute left-0 right-0 bottom-full mb-1 flex max-h-14 flex-col overflow-hidden rounded-lg bg-slate-800/90 px-2 py-1 text-xs text-slate-200 shadow-lg"
+      style={{ width: Math.max(120, BALL_SIZE * 2) }}
+    >
+      <div className="animate-overlay-ticker flex flex-col gap-0.5">
+        {lastThree.map((text, i) => (
+          <div
+            key={i}
+            className="truncate rounded px-1"
+            title={text}
+          >
+            {text}
+          </div>
+        ))}
+      </div>
+    </div>
+  )
+}
 
 export function OverlayScreen() {
   const rpcRef = useRef<IpcRpcClient | null>(null)
@@ -35,34 +100,267 @@ export function OverlayScreen() {
     rpcState,
   })
 
-  const isSendDisabled = !input.trim() || rpcState !== 'open' || !sessionId
-  const hasConversation = messages.length > 0
+  useToolPassthrough(rpcClient)
+
+  const [isBall, setIsBall] = useState(true)
+  const dragRef = useRef<{
+    startScreenX: number
+    startScreenY: number
+    startWinX: number
+    startWinY: number
+    startTime: number
+  } | null>(null)
+  type ResizeEdge = 'e' | 'w' | 'n' | 's'
+  const resizeRef = useRef<{
+    edge: ResizeEdge
+    startX: number
+    startY: number
+    startW: number
+    startH: number
+    startWinX: number
+    startWinY: number
+  } | null>(null)
+
+  const savedPanelSizeRef = useRef<{ width: number; height: number } | null>(null)
+
+  useEffect(() => {
+    if (!window.App.overlay) return
+    window.App.overlay.getBounds().then((b) => {
+      const isBallSize = b.width <= BALL_SIZE + 10 && b.height <= BALL_SIZE + 10
+      if (!isBallSize) {
+        savedPanelSizeRef.current = {
+          width: Math.max(PANEL_MIN_WIDTH, b.width),
+          height: Math.max(PANEL_MIN_HEIGHT, b.height),
+        }
+        const ballX = b.x + b.width - BALL_SIZE
+        const ballY = b.y + b.height - BALL_SIZE
+        window.App.overlay?.setBoundsNoSave?.(ballX, ballY, BALL_SIZE, BALL_SIZE)
+        setIsBall(true)
+      } else {
+        setIsBall(true)
+      }
+    })
+  }, [])
+
+  useEffect(() => {
+    const unsubscribe = window.App.overlay?.addShownAsBallListener?.(() => setIsBall(true))
+    return () => unsubscribe?.()
+  }, [])
+
+  const handleBallMouseDown = useCallback(
+    (e: React.MouseEvent) => {
+      if (e.button !== 0 || !window.App.overlay) return
+      e.preventDefault()
+      window.App.overlay.getBounds().then((b) => {
+        dragRef.current = {
+          startScreenX: e.screenX,
+          startScreenY: e.screenY,
+          startWinX: b.x,
+          startWinY: b.y,
+          startTime: Date.now(),
+        }
+        let lastScreenX = e.screenX
+        let lastScreenY = e.screenY
+        const onMove = (ev: MouseEvent) => {
+          const d = dragRef.current
+          if (!d) return
+          if (ev.screenX === lastScreenX && ev.screenY === lastScreenY) return
+          lastScreenX = ev.screenX
+          lastScreenY = ev.screenY
+          const dx = ev.screenX - d.startScreenX
+          const dy = ev.screenY - d.startScreenY
+          window.App.overlay?.setPosition(d.startWinX + dx, d.startWinY + dy)
+        }
+        const onUp = (ev: MouseEvent) => {
+          const d = dragRef.current
+          if (!d || ev.button !== 0) return
+          dragRef.current = null
+          const dx = ev.screenX - d.startScreenX
+          const dy = ev.screenY - d.startScreenY
+          const dist = Math.hypot(dx, dy)
+          const elapsed = Date.now() - d.startTime
+          window.removeEventListener('mousemove', onMove)
+          window.removeEventListener('mouseup', onUp)
+          if (dist < CLICK_THRESHOLD && elapsed < CLICK_MAX_MS) {
+            window.App.overlay?.getBounds().then((bounds) => {
+              const raw = savedPanelSizeRef.current ?? {
+                width: PANEL_DEFAULT_WIDTH,
+                height: PANEL_DEFAULT_HEIGHT,
+              }
+              const size = {
+                width: Math.max(PANEL_MIN_WIDTH, raw.width),
+                height: Math.max(PANEL_MIN_HEIGHT, raw.height),
+              }
+              savedPanelSizeRef.current = size
+              const panelX = bounds.x + bounds.width - size.width
+              const panelY = bounds.y + bounds.height - size.height
+              window.App.overlay?.setBounds(
+                panelX,
+                panelY,
+                size.width,
+                size.height,
+              )
+              setIsBall(false)
+            })
+          }
+        }
+        window.addEventListener('mousemove', onMove)
+        window.addEventListener('mouseup', onUp)
+      })
+    },
+    [],
+  )
+
+  const handleCollapseToBall = useCallback(() => {
+    if (!window.App.overlay) return
+    window.App.overlay.getBounds().then((b) => {
+      const ballX = b.x + b.width - BALL_SIZE
+      const ballY = b.y + b.height - BALL_SIZE
+      window.App.overlay?.setBounds(ballX, ballY, BALL_SIZE, BALL_SIZE)
+      setIsBall(true)
+    })
+  }, [])
 
   const handleClose = useCallback(() => {
     window.App.windowControls.close()
   }, [])
 
+  const handleResizeMouseDown = useCallback(
+    (edge: ResizeEdge) => (e: React.MouseEvent) => {
+      if (e.button !== 0 || !window.App.overlay) return
+      e.preventDefault()
+      e.stopPropagation()
+      window.App.overlay.getBounds().then((b) => {
+        resizeRef.current = {
+          edge,
+          startX: e.screenX,
+          startY: e.screenY,
+          startW: b.width,
+          startH: b.height,
+          startWinX: b.x,
+          startWinY: b.y,
+        }
+        const onMove = (ev: MouseEvent) => {
+          const r = resizeRef.current
+          if (!r || !window.App.overlay) return
+          const dx = ev.screenX - r.startX
+          const dy = ev.screenY - r.startY
+          let x = r.startWinX
+          let y = r.startWinY
+          let w = r.startW
+          let h = r.startH
+          if (r.edge === 'e') {
+            w = Math.max(PANEL_MIN_WIDTH, r.startW + dx)
+          } else if (r.edge === 'w') {
+            const newW = Math.max(PANEL_MIN_WIDTH, r.startW - dx)
+            x = r.startWinX + r.startW - newW
+            w = newW
+          } else if (r.edge === 's') {
+            h = Math.max(PANEL_MIN_HEIGHT, r.startH + dy)
+          } else if (r.edge === 'n') {
+            const newH = Math.max(PANEL_MIN_HEIGHT, r.startH - dy)
+            y = r.startWinY + r.startH - newH
+            h = newH
+          }
+          window.App.overlay.setBounds(x, y, w, h)
+        }
+        const onUp = () => {
+          resizeRef.current = null
+          window.removeEventListener('mousemove', onMove)
+          window.removeEventListener('mouseup', onUp)
+          window.App.overlay?.getBounds().then((b) => {
+            savedPanelSizeRef.current = { width: b.width, height: b.height }
+          })
+        }
+        window.addEventListener('mousemove', onMove)
+        window.addEventListener('mouseup', onUp)
+      })
+    },
+    [],
+  )
+
+  const isSendDisabled = !input.trim() || rpcState !== 'open' || !sessionId
+  const hasConversation = messages.length > 0
+
+  if (isBall) {
+    return (
+      <div className="flex h-full items-center justify-center">
+        <div
+          className="relative flex cursor-grab items-center justify-center rounded-full bg-slate-700/95 shadow-lg backdrop-blur-md active:cursor-grabbing"
+          style={{ width: BALL_SIZE, height: BALL_SIZE }}
+          onMouseDown={handleBallMouseDown}
+          role="button"
+          tabIndex={0}
+          onKeyDown={(e) => {
+            if (e.key === 'Enter' || e.key === ' ') {
+              e.preventDefault()
+              window.App.overlay?.getBounds().then((b) => {
+                const raw = savedPanelSizeRef.current ?? {
+                  width: PANEL_DEFAULT_WIDTH,
+                  height: PANEL_DEFAULT_HEIGHT,
+                }
+                const size = {
+                  width: Math.max(PANEL_MIN_WIDTH, raw.width),
+                  height: Math.max(PANEL_MIN_HEIGHT, raw.height),
+                }
+                savedPanelSizeRef.current = size
+                const panelX = b.x + b.width - size.width
+                const panelY = b.y + b.height - size.height
+                window.App.overlay?.setBounds(
+                  panelX,
+                  panelY,
+                  size.width,
+                  size.height,
+                )
+                setIsBall(false)
+              })
+            }
+          }}
+        >
+          <BallTicker messages={messages} />
+          <img
+            src="/icons/icon.ico"
+            alt=""
+            className="size-5 object-contain"
+            width={20}
+            height={20}
+            draggable={false}
+          />
+        </div>
+      </div>
+    )
+  }
+
   return (
     <div
       className={cn(
-        'flex h-screen flex-col rounded-2xl overflow-hidden',
+        'relative flex h-screen flex-col rounded-2xl overflow-hidden',
         'bg-slate-900/95 dark:bg-slate-900/95 backdrop-blur-md',
         'border border-slate-700/50 shadow-2xl',
       )}
     >
       <div
         className="flex items-center justify-between border-b border-slate-700/50 px-3 py-2 app-drag"
-        style={{ WebkitAppRegion: 'drag' }}
+        style={appRegionDrag}
       >
         <span className="text-xs font-medium text-slate-300">奇想盒</span>
-        <button
-          type="button"
-          onClick={handleClose}
-          className="rounded p-1.5 text-slate-400 hover:bg-slate-700/50 hover:text-white app-no-drag"
-          style={{ WebkitAppRegion: 'no-drag' }}
-        >
-          <X className="size-4" />
-        </button>
+        <div className="flex items-center gap-1 app-no-drag" style={appRegionNoDrag}>
+          <button
+            type="button"
+            onClick={handleCollapseToBall}
+            className="rounded p-1.5 text-slate-400 hover:bg-slate-700/50 hover:text-white"
+            title="收起为悬浮球"
+          >
+            <ChevronDown className="size-4" />
+          </button>
+          <button
+            type="button"
+            onClick={handleClose}
+            className="rounded p-1.5 text-slate-400 hover:bg-slate-700/50 hover:text-white"
+          >
+            <X className="size-4" />
+          </button>
+        </div>
       </div>
 
       <div className="flex flex-1 min-h-0 flex-col p-2">
@@ -115,6 +413,28 @@ export function OverlayScreen() {
           </button>
         </div>
       </div>
+
+      {/* 四边调整大小 */}
+      <div
+        className="absolute left-0 right-0 top-0 h-2 cursor-n-resize"
+        onMouseDown={handleResizeMouseDown('n')}
+        style={appRegionNoDrag}
+      />
+      <div
+        className="absolute right-0 top-0 bottom-0 w-2 cursor-e-resize"
+        onMouseDown={handleResizeMouseDown('e')}
+        style={appRegionNoDrag}
+      />
+      <div
+        className="absolute left-0 right-0 bottom-0 h-2 cursor-s-resize"
+        onMouseDown={handleResizeMouseDown('s')}
+        style={appRegionNoDrag}
+      />
+      <div
+        className="absolute left-0 top-0 bottom-0 w-2 cursor-w-resize"
+        onMouseDown={handleResizeMouseDown('w')}
+        style={appRegionNoDrag}
+      />
     </div>
   )
 }

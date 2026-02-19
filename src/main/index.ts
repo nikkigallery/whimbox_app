@@ -170,7 +170,8 @@ makeAppWithSingleInstanceLock(async () => {
   splashWindow.close()
 
   const window = await makeAppSetup(MainWindow)
-  await OverlayWindow()
+  const overlayWindow = await OverlayWindow()
+  void overlayWindow
 
   createTray(window)
   ipcMain.handle('window:minimize-to-tray', () => {

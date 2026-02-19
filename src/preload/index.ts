@@ -63,6 +63,32 @@ const API = {
     toggleMaximize: () => ipcRenderer.invoke('window:toggle-maximize'),
     close: () => ipcRenderer.invoke('window:close'),
   },
+  overlay: {
+    setIgnoreMouseEvents: (ignore: boolean) =>
+      ipcRenderer.invoke('overlay:set-ignore-mouse-events', ignore),
+    setPosition: (x: number, y: number) =>
+      ipcRenderer.invoke('overlay:set-position', x, y),
+    getBounds: () =>
+      ipcRenderer.invoke('overlay:get-bounds') as Promise<{
+        x: number
+        y: number
+        width: number
+        height: number
+      }>,
+    setBounds: (x: number, y: number, width: number, height: number) =>
+      ipcRenderer.invoke('overlay:set-bounds', x, y, width, height),
+    setBoundsNoSave: (x: number, y: number, width: number, height: number) =>
+      ipcRenderer.invoke('overlay:set-bounds-no-save', x, y, width, height),
+    hide: () => ipcRenderer.invoke('overlay:hide'),
+    show: () => ipcRenderer.invoke('overlay:show'),
+    addShownAsBallListener: (callback: () => void) => {
+      const listener = () => callback()
+      ipcRenderer.on('overlay:shown-as-ball', listener)
+      return () => {
+        ipcRenderer.removeListener('overlay:shown-as-ball', listener)
+      }
+    },
+  },
   launcher: {
     openExternal: (url: string) => ipcRenderer.send('launcher:open-external', url),
     getAuthPort: () => ipcRenderer.invoke('launcher:get-auth-port'),

@@ -12,6 +12,16 @@ declare global {
         toggleMaximize: () => Promise<boolean>
         close: () => Promise<void>
       }
+      overlay?: {
+        setIgnoreMouseEvents: (ignore: boolean) => Promise<void>
+        setPosition: (x: number, y: number) => Promise<void>
+        getBounds: () => Promise<{ x: number; y: number; width: number; height: number }>
+        setBounds: (x: number, y: number, width: number, height: number) => Promise<void>
+        setBoundsNoSave: (x: number, y: number, width: number, height: number) => Promise<void>
+        hide: () => Promise<void>
+        show: () => Promise<void>
+        addShownAsBallListener: (callback: () => void) => () => void
+      }
       launcher: {
         openExternal: (url: string) => void
         getAuthPort: () => Promise<number>

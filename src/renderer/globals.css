@@ -147,3 +147,21 @@
 .overlay-window body {
   background: transparent !important;
 }
+
+/* 悬浮球上方 3 条消息滚动 */
+@keyframes overlay-ticker {
+  0% {
+    transform: translateY(0);
+  }
+  100% {
+    transform: translateY(-50%);
+  }
+}
+
+.animate-overlay-ticker {
+  animation: overlay-ticker 8s linear infinite;
+}
+
+.resize-handle {
+  background: linear-gradient(135deg, transparent 50%, rgba(148, 163, 184, 0.3) 50%);
+}
