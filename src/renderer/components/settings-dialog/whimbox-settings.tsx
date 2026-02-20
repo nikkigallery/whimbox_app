@@ -1,8 +1,13 @@
 import { Settings } from "lucide-react"
 import { Button } from "renderer/components/ui/button"
 import { ThemeToggle } from "renderer/components/theme-provider"
+import { ConfigFormFields } from "renderer/components/config-form-fields"
+import { useConfigForm } from "renderer/hooks/use-config-form"
+import type { IpcRpcClient } from "renderer/lib/ipc-rpc"
 import { APP_RELEASE_PAGE_URL } from "shared/constants"
 import type { SettingSection, SettingContent, SettingsDialogProps } from "./types"
+
+const WHIMBOX_SECTION = "Whimbox"
 
 export const section: SettingSection = {
   id: "whimbox",
@@ -10,16 +15,44 @@ export const section: SettingSection = {
   icon: Settings,
 }
 
+function WhimboxConfigForm({ rpcClient }: { rpcClient: IpcRpcClient }) {
+  const {
+    loading,
+    loadError,
+    items,
+    draftConfig,
+    handleValueChangeAndSave,
+  } = useConfigForm({ section: WHIMBOX_SECTION, rpcClient })
+
+  if (items.length === 0 && !loading && !loadError) return null
+
+  return (
+    <ConfigFormFields
+      items={items}
+      draftConfig={draftConfig}
+      onValueChange={handleValueChangeAndSave}
+      loading={loading}
+      loadError={loadError}
+      emptyMessage="暂无运行配置项"
+      itemClassName="rounded-lg border border-slate-100 bg-slate-50/50 px-3 py-2 text-sm dark:border-slate-700 dark:bg-slate-800/50"
+    />
+  )
+}
+
 export const content: SettingContent = {
   title: "奇想盒设置",
   description: "奇想盒本身的设置",
-  render: ({
-    isProcessing,
-    updateState,
-    onCheckUpdate,
-    onManualUpdate,
-    onSyncScripts,
-  }: SettingsDialogProps) => (
+  render: (
+    {
+      isProcessing,
+      updateState,
+      onCheckUpdate,
+      onManualUpdate,
+      onSyncScripts,
+      rpcClient,
+    }: SettingsDialogProps,
+    slots
+  ) => (
     <div className="space-y-3">
       <ThemeToggle />
       <div className="rounded-xl border border-slate-100 bg-white px-4 py-3 text-sm dark:border-slate-800 dark:bg-slate-900">
@@ -98,6 +131,7 @@ export const content: SettingContent = {
           </div>
         </div>
       </div>
+      {rpcClient ? <WhimboxConfigForm rpcClient={rpcClient} /> : null}
     </div>
   ),
 }

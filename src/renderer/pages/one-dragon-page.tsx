@@ -22,7 +22,7 @@ export function OneDragonPage({ rpcClient, sessionId, rpcState }: OneDragonPageP
     items,
     draftConfig,
     handleValueChangeAndSave,
-  } = useConfigForm({ section: "Game", rpcClient })
+  } = useConfigForm({ section: "OneDragon", rpcClient })
 
   useEffect(() => {
     const offNotification = rpcClient.on("notification", (notification) => {

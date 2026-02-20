@@ -82,7 +82,7 @@ export function ConfigFormFields({
                     }
                     className="data-[state=checked]:bg-pink-400 data-[state=checked]:border-pink-400 data-[state=checked]:text-white"
                   />
-                  {String(value) === "true" ? "开启" : "关闭"}
+                  {/* {String(value) === "true" ? "开启" : "关闭"} */}
                 </label>
               ) : options.length > 0 ? (
                 <Combobox
