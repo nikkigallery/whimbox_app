@@ -212,7 +212,6 @@ export class RpcClient {
         )
       ) {
         streaming.onStreamEvent(notification)
-        return
       }
       this.emit('notification', notification)
     }

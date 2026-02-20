@@ -100,13 +100,34 @@ const API = {
           title?: string
           blocks?: Array<{ type: 'text' | 'log'; content: string; title?: string }>
         }>
+        rpcState?: 'idle' | 'connecting' | 'open' | 'closed' | 'error'
+        sessionId?: string | null
+        toolRunning?: boolean
       }>,
-    pushState: (payload: { messages: unknown[] }) =>
-      ipcRenderer.send('conversation:push-state', payload),
+    pushState: (payload: {
+      messages: unknown[]
+      rpcState?: 'idle' | 'connecting' | 'open' | 'closed' | 'error'
+      sessionId?: string | null
+      toolRunning?: boolean
+    }) => ipcRenderer.send('conversation:push-state', payload),
     send: (text: string) => ipcRenderer.send('conversation:send', text),
-    onState: (callback: (data: { messages: unknown[] }) => void) => {
-      const listener = (_: Electron.IpcRendererEvent, data: { messages: unknown[] }) =>
-        callback(data)
+    onState: (
+      callback: (data: {
+        messages: unknown[]
+        rpcState?: 'idle' | 'connecting' | 'open' | 'closed' | 'error'
+        sessionId?: string | null
+        toolRunning?: boolean
+      }) => void,
+    ) => {
+      const listener = (
+        _: Electron.IpcRendererEvent,
+        data: {
+          messages: unknown[]
+          rpcState?: 'idle' | 'connecting' | 'open' | 'closed' | 'error'
+          sessionId?: string | null
+          toolRunning?: boolean
+        },
+      ) => callback(data)
       ipcRenderer.on('conversation:state', listener)
       return () => {
         ipcRenderer.removeListener('conversation:state', listener)

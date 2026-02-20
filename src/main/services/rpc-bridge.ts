@@ -2,6 +2,7 @@ import { BrowserWindow, ipcMain } from 'electron'
 
 import { RpcClient } from './rpc-client'
 import { getOverlayWindow } from '../windows/overlay'
+import log from 'electron-log/main.js'
 
 let initialized = false
 const rpcClient = new RpcClient()

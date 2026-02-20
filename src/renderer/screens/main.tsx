@@ -104,6 +104,7 @@ export function MainScreen() {
   const [userAvatarUrl, setUserAvatarUrl] = useState<string | null>(null)
   const [isProcessing, setIsProcessing] = useState(false)
   const [taskProgressState, setTaskProgressState] = useState<TaskProgressState>({ status: 'idle' })
+  const [toolRunning, setToolRunning] = useState(false)
 
   const launcherApi = useMemo(() => window.App.launcher, [])
   const appUpdater = useMemo(() => window.App.appUpdater, [])
@@ -126,7 +127,13 @@ export function MainScreen() {
     setTaskProgressState,
   })
 
-  useEffect(() => () => rpcRef.current?.destroy(), [])
+  useEffect(
+    () => () => {
+      rpcRef.current?.destroy()
+      rpcRef.current = null
+    },
+    [],
+  )
 
   const homeConversation = useHomeConversation({
     rpcClient,
@@ -136,8 +143,24 @@ export function MainScreen() {
   const { messages, input, setInput, handleSend } = homeConversation
 
   useEffect(() => {
-    window.App.conversation.pushState({ messages })
-  }, [messages])
+    const off = rpcClient.on('notification', (n) => {
+      if (n.method !== 'event.agent.status') return
+      const params = n.params as { status?: string } | undefined
+      const status = params?.status ?? ''
+      if (status === 'on_tool_start') setToolRunning(true)
+      else if (status === 'on_tool_end' || status === 'on_tool_error') setToolRunning(false)
+    })
+    return () => off()
+  }, [rpcClient])
+
+  useEffect(() => {
+    window.App.conversation.pushState({
+      messages,
+      rpcState,
+      sessionId,
+      toolRunning,
+    })
+  }, [messages, rpcState, sessionId, toolRunning])
 
   useEffect(() => {
     const off = window.App.conversation.onRunSend((text: string) => {
@@ -249,7 +272,6 @@ export function MainScreen() {
 
   useEffect(() => {
     const offState = rpcClient.on('state', ({ state }) => {
-      log.debug('main screen RPC state changed:', state)
       setRpcState(state)
       if (state !== 'open') {
         setSessionId(null)

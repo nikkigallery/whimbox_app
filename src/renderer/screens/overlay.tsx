@@ -3,7 +3,6 @@ import { useCallback, useEffect, useRef, useState } from 'react'
 import { Send, X } from 'lucide-react'
 import { ConversationPanel } from 'renderer/components/conversation-panel'
 import type { UiMessage } from 'renderer/hooks/use-home-conversation'
-import { IpcRpcClient } from 'renderer/lib/ipc-rpc'
 import { cn } from 'renderer/lib/utils'
 
 /** Electron 无边框窗口拖拽区域，TypeScript 不包含此非标准属性，需断言 */
@@ -15,28 +14,14 @@ const PANEL_MIN_HEIGHT = 330
 const PANEL_DEFAULT_WIDTH = 420
 const PANEL_DEFAULT_HEIGHT = 360
 
-function useToolPassthrough(rpcClient: IpcRpcClient) {
+function useToolPassthroughFromState(toolRunning: boolean) {
   useEffect(() => {
     if (!window.App.overlay) return
-    const off = rpcClient.on('notification', (n) => {
-      if (n.method !== 'event.agent.status') return
-      const params = n.params as { status?: string } | undefined
-      const status = params?.status ?? ''
-      if (status === 'on_tool_start') {
-        window.App.overlay?.setIgnoreMouseEvents(true)
-      } else if (status === 'on_tool_end' || status === 'on_tool_error') {
-        window.App.overlay?.setIgnoreMouseEvents(false)
-      }
-    })
-    return () => off()
-  }, [rpcClient])
+    void window.App.overlay.setIgnoreMouseEvents(toolRunning)
+  }, [toolRunning])
 }
 
 export function OverlayScreen() {
-  const rpcRef = useRef<IpcRpcClient | null>(null)
-  if (!rpcRef.current) rpcRef.current = new IpcRpcClient()
-  const rpcClient = rpcRef.current
-
   useEffect(() => {
     document.documentElement.classList.add('overlay-window')
     document.body.classList.add('overlay-window')
@@ -46,28 +31,26 @@ export function OverlayScreen() {
     }
   }, [])
 
-  const [sessionId, setSessionId] = useState<string | null>(null)
-  const [rpcState, setRpcState] = useState(rpcClient.getState())
   const [messages, setMessages] = useState<UiMessage[]>([])
+  const [rpcState, setRpcState] = useState<'idle' | 'connecting' | 'open' | 'closed' | 'error'>('idle')
+  const [sessionId, setSessionId] = useState<string | null>(null)
+  const [toolRunning, setToolRunning] = useState(false)
   const [input, setInput] = useState('')
 
   useEffect(() => {
-    void rpcClient.getStateAsync().then(setRpcState)
-    window.App.rpc.getSessionId().then(setSessionId)
-    const offSession = window.App.rpc.onSessionId(setSessionId)
-    const offState = rpcClient.on('state', ({ state }) => setRpcState(state))
-    return () => {
-      offSession()
-      offState()
-      rpcRef.current?.destroy()
+    const applyState = (s: {
+      messages?: unknown[]
+      rpcState?: 'idle' | 'connecting' | 'open' | 'closed' | 'error'
+      sessionId?: string | null
+      toolRunning?: boolean
+    }) => {
+      setMessages((s.messages ?? []) as UiMessage[])
+      setRpcState(s.rpcState ?? 'idle')
+      setSessionId(s.sessionId ?? null)
+      setToolRunning(s.toolRunning ?? false)
     }
-  }, [rpcClient])
-
-  useEffect(() => {
-    window.App.conversation.getState().then((s) => setMessages(s.messages as UiMessage[]))
-    const off = window.App.conversation.onState((s) =>
-      setMessages((s.messages ?? []) as UiMessage[]),
-    )
+    window.App.conversation.getState().then(applyState)
+    const off = window.App.conversation.onState(applyState)
     return () => off()
   }, [])
 
@@ -78,7 +61,7 @@ export function OverlayScreen() {
     window.App.conversation.send(text)
   }, [input, rpcState, sessionId])
 
-  useToolPassthrough(rpcClient)
+  useToolPassthroughFromState(toolRunning)
 
   type ResizeEdge = 'e' | 'w' | 'n' | 's'
   const resizeRef = useRef<{

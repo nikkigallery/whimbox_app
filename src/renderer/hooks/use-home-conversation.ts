@@ -1,5 +1,6 @@
-import { useCallback, useRef, useState } from 'react'
+import { useCallback, useEffect, useRef, useState } from 'react'
 import type { IpcRpcClient } from 'renderer/lib/ipc-rpc'
+import log from 'electron-log/renderer'
 
 export type AssistantBlock =
   | { type: 'text'; content: string }
@@ -31,14 +32,167 @@ export function useHomeConversation({
 }: UseHomeConversationOptions) {
   const [messages, setMessages] = useState<UiMessage[]>([])
   const [input, setInput] = useState('')
-  const pendingAssistantIdRef = useRef<string | null>(null)
+  /** 当前由用户发消息产生的 assistant 消息 id，用于 event.agent.* / event.task.log（agent 调工具） */
+  const currentAgentMessageIdRef = useRef<string | null>(null)
+  /** 由 task.run 等独立任务创建的「任务日志」assistant 消息 id，用于 event.task.log */
+  const pendingStandaloneTaskIdRef = useRef<string | null>(null)
+
+  // 单一 notification 监听：所有 event.agent.* / event.task.* 统一在此驱动 messages，主界面与 overlay 共用
+  useEffect(() => {
+    const off = rpcClient.on('notification', (notification) => {
+      const method = notification.method
+      const isAgent =
+        method === 'event.agent.message' || method === 'event.agent.status'
+      const isTask =
+        method === 'event.task.progress' || method === 'event.task.log'
+      if (!isAgent && !isTask) return
+
+      const params =
+        notification.params && typeof notification.params === 'object'
+          ? (notification.params as Record<string, unknown>)
+          : undefined
+      const targetSessionId =
+        typeof params?.session_id === 'string' ? params.session_id : null
+      if (targetSessionId && sessionId && targetSessionId !== sessionId) return
+
+      if (method === 'event.agent.message') {
+        const assistantId = currentAgentMessageIdRef.current
+        if (!assistantId) return
+        const chunk =
+          (params?.message as { message?: string } | undefined)?.message ?? ''
+        if (!chunk) return
+        setMessages((prev) => {
+          const index = prev.findIndex((m) => m.id === assistantId)
+          if (index < 0) return prev
+          const cur = prev[index]
+          const blocks = cur.blocks ?? []
+          const last = blocks[blocks.length - 1]
+          let nextBlocks: AssistantBlock[]
+          if (last?.type === 'text') {
+            nextBlocks = blocks.slice(0, -1).concat({
+              type: 'text',
+              content: last.content + chunk,
+            })
+          } else {
+            nextBlocks = [...blocks, { type: 'text', content: chunk }]
+          }
+          const next = [...prev]
+          next[index] = {
+            ...cur,
+            content: cur.content + chunk,
+            blocks: nextBlocks,
+            pending: true,
+          }
+          return next
+        })
+        return
+      }
+
+      if (method === 'event.agent.status') {
+        const assistantId = currentAgentMessageIdRef.current
+        const status = typeof params?.status === 'string' ? params.status : ''
+        const detailText =
+          typeof params?.detail === 'string' && params.detail
+            ? params.detail
+            : ''
+        if (status === 'on_tool_start' && assistantId) {
+          setMessages((prev) => {
+            const index = prev.findIndex((m) => m.id === assistantId)
+            if (index < 0) return prev
+            const cur = prev[index]
+            const blocks = cur.blocks ?? []
+            const nextBlocks: AssistantBlock[] = [
+              ...blocks,
+              { type: 'log', content: '', title: detailText },
+            ]
+            const next = [...prev]
+            next[index] = { ...cur, blocks: nextBlocks, pending: true }
+            return next
+          })
+        }
+        if (
+          (status === 'on_tool_end' || status === 'on_tool_error') &&
+          assistantId
+        ) {
+          currentAgentMessageIdRef.current = null
+          setMessages((prev) =>
+            prev.map((m) =>
+              m.id === assistantId ? { ...m, pending: false } : m,
+            ),
+          )
+        }
+        return
+      }
+
+      if (method === 'event.task.progress') {
+        const detail = typeof params?.detail === 'string' ? params.detail : ''
+        if (detail === 'started') {
+          const taskMessageId = createId()
+          const toolId = typeof params?.tool_id === 'string' ? params.tool_id : ''
+          const title = toolId || '任务'
+          pendingStandaloneTaskIdRef.current = taskMessageId
+          setMessages((prev) => [
+            ...prev,
+            {
+              id: taskMessageId,
+              role: 'assistant',
+              content: '',
+              pending: true,
+              blocks: [{ type: 'log', content: '', title }],
+            },
+          ])
+        } else if (detail === 'completed' || detail === 'cancelled') {
+          const id = pendingStandaloneTaskIdRef.current
+          if (id) {
+            pendingStandaloneTaskIdRef.current = null
+            setMessages((prev) =>
+              prev.map((m) =>
+                m.id === id ? { ...m, pending: false } : m,
+              ),
+            )
+          }
+        }
+        return
+      }
+
+      if (method === 'event.task.log') {
+        const id =
+          pendingStandaloneTaskIdRef.current ?? currentAgentMessageIdRef.current
+        if (!id) return
+        const logLine =
+          typeof params?.message === 'string'
+            ? params.message
+            : typeof params?.raw_message === 'string'
+              ? params.raw_message
+              : ''
+        if (!logLine) return
+        setMessages((prev) => {
+          const index = prev.findIndex((m) => m.id === id)
+          if (index < 0) return prev
+          const cur = prev[index]
+          const blocks = cur.blocks ?? []
+          const last = blocks[blocks.length - 1]
+          if (last?.type !== 'log') return prev
+          const nextBlocks = blocks.slice(0, -1).concat({
+            type: 'log',
+            content: last.content ? `${last.content}\n${logLine}` : logLine,
+            title: last.title,
+          })
+          const next = [...prev]
+          next[index] = { ...cur, blocks: nextBlocks, pending: true }
+          return next
+        })
+      }
+    })
+    return () => off()
+  }, [rpcClient, sessionId])
 
   const handleSend = useCallback(async (overrideText?: string) => {
     const text = (overrideText != null && overrideText !== '' ? overrideText : input).trim()
     if (!text || rpcState !== 'open' || !sessionId) return
     if (overrideText == null) setInput('')
     const assistantId = createId()
-    pendingAssistantIdRef.current = assistantId
+    currentAgentMessageIdRef.current = assistantId
     setMessages((prev) => [
       ...prev,
       { id: createId(), role: 'user', content: text },
@@ -48,125 +202,7 @@ export function useHomeConversation({
       const result = await rpcClient.sendStreamingRequest<{ message?: string }>(
         'agent.send_message',
         { session_id: sessionId, message: text },
-        (notification) => {
-          const params =
-            notification.params && typeof notification.params === 'object'
-              ? (notification.params as Record<string, unknown>)
-              : undefined
-
-          if (notification.method === 'event.agent.message') {
-            const chunk =
-              (params?.message as { message?: string } | undefined)?.message ??
-              ''
-            if (!chunk) return
-            setMessages((prev) => {
-              const index = prev.findIndex((m) => m.id === assistantId)
-              if (index < 0) return prev
-              const cur = prev[index]
-              const blocks = cur.blocks ?? []
-              const last = blocks[blocks.length - 1]
-              let nextBlocks: AssistantBlock[]
-              if (last?.type === 'text') {
-                nextBlocks = blocks.slice(0, -1).concat({
-                  type: 'text',
-                  content: last.content + chunk,
-                })
-              } else {
-                nextBlocks = [...blocks, { type: 'text', content: chunk }]
-              }
-              const next = [...prev]
-              next[index] = {
-                ...cur,
-                content: cur.content + chunk,
-                blocks: nextBlocks,
-                pending: true,
-              }
-              return next
-            })
-            return
-          }
-
-          if (notification.method === 'event.agent.status') {
-            const status = typeof params?.status === 'string' ? params.status : ''
-            const detailText =
-              typeof params?.detail === 'string' && params.detail
-                ? params.detail
-                : ''
-            if (status === 'on_tool_start') {
-              if (pendingAssistantIdRef.current) {
-                setMessages((prev) =>
-                  prev.map((message) =>
-                    message.id === pendingAssistantIdRef.current
-                      ? { ...message, pending: false }
-                      : message,
-                  ),
-                )
-                pendingAssistantIdRef.current = null
-              }
-              setMessages((prev) => {
-                const index = prev.findIndex((m) => m.id === assistantId)
-                if (index < 0) return prev
-                const cur = prev[index]
-                const blocks = cur.blocks ?? []
-                const nextBlocks: AssistantBlock[] = [
-                  ...blocks,
-                  { type: 'log', content: '', title: detailText },
-                ]
-                const next = [...prev]
-                next[index] = {
-                  ...cur,
-                  blocks: nextBlocks,
-                  pending: true,
-                }
-                return next
-              })
-            }
-            if (status === 'on_tool_end' || status === 'on_tool_error') {
-              if (pendingAssistantIdRef.current) {
-                setMessages((prev) =>
-                  prev.map((message) =>
-                    message.id === pendingAssistantIdRef.current
-                      ? { ...message, pending: false }
-                      : message,
-                  ),
-                )
-                pendingAssistantIdRef.current = null
-              }
-            }
-            return
-          }
-
-          if (notification.method === 'event.task.log') {
-            const targetSessionId =
-              typeof params?.session_id === 'string' ? params.session_id : null
-            if (targetSessionId && sessionId && targetSessionId !== sessionId) {
-              return
-            }
-            const logLine =
-              typeof params?.message === 'string'
-                ? params.message
-                : typeof params?.raw_message === 'string'
-                  ? params.raw_message
-                  : ''
-            if (!logLine) return
-            setMessages((prev) => {
-              const index = prev.findIndex((m) => m.id === assistantId)
-              if (index < 0) return prev
-              const cur = prev[index]
-              const blocks = cur.blocks ?? []
-              const last = blocks[blocks.length - 1]
-              if (last?.type !== 'log') return prev
-              const nextBlocks = blocks.slice(0, -1).concat({
-                type: 'log',
-                content: last.content ? `${last.content}\n${logLine}` : logLine,
-                title: last.title,
-              })
-              const next = [...prev]
-              next[index] = { ...cur, blocks: nextBlocks, pending: true }
-              return next
-            })
-          }
-        },
+        () => {},
       )
       setMessages((prev) =>
         prev.map((message) =>
@@ -192,8 +228,8 @@ export function useHomeConversation({
         ),
       )
     } finally {
-      if (pendingAssistantIdRef.current === assistantId) {
-        pendingAssistantIdRef.current = null
+      if (currentAgentMessageIdRef.current === assistantId) {
+        currentAgentMessageIdRef.current = null
       }
     }
   }, [input, rpcState, sessionId, rpcClient])

@@ -13,8 +13,15 @@ type StoredMessage = {
   blocks?: Array<{ type: 'text' | 'log'; content: string; title?: string }>
 }
 
+export type ConversationState = {
+  messages: StoredMessage[]
+  rpcState?: 'idle' | 'connecting' | 'open' | 'closed' | 'error'
+  sessionId?: string | null
+  toolRunning?: boolean
+}
+
 let mainWindowRef: BrowserWindow | null = null
-let conversationMessages: StoredMessage[] = []
+let conversationState: ConversationState = { messages: [] }
 
 function sendToOverlay(channel: string, payload: unknown) {
   const win = getOverlayWindow()
@@ -26,15 +33,18 @@ function sendToOverlay(channel: string, payload: unknown) {
 export function registerConversationBridge(mainWindow: BrowserWindow) {
   mainWindowRef = mainWindow
 
-  ipcMain.handle('conversation:get-state', () => ({
-    messages: conversationMessages,
-  }))
+  ipcMain.handle('conversation:get-state', () => conversationState)
 
   ipcMain.on(
     'conversation:push-state',
-    (_event, payload: { messages: StoredMessage[] }) => {
-      conversationMessages = payload.messages ?? []
-      sendToOverlay('conversation:state', { messages: conversationMessages })
+    (_event, payload: ConversationState) => {
+      conversationState = {
+        messages: payload.messages ?? [],
+        rpcState: payload.rpcState,
+        sessionId: payload.sessionId,
+        toolRunning: payload.toolRunning,
+      }
+      sendToOverlay('conversation:state', conversationState)
     },
   )
 

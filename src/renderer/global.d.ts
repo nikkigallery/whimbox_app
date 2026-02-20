@@ -32,10 +32,23 @@ declare global {
             title?: string
             blocks?: Array<{ type: 'text' | 'log'; content: string; title?: string }>
           }>
+          rpcState?: 'idle' | 'connecting' | 'open' | 'closed' | 'error'
+          sessionId?: string | null
+          toolRunning?: boolean
         }>
-        pushState: (payload: { messages: unknown[] }) => void
+        pushState: (payload: {
+          messages: unknown[]
+          rpcState?: 'idle' | 'connecting' | 'open' | 'closed' | 'error'
+          sessionId?: string | null
+          toolRunning?: boolean
+        }) => void
         send: (text: string) => void
-        onState: (callback: (data: { messages: unknown[] }) => void) => () => void
+        onState: (callback: (data: {
+          messages: unknown[]
+          rpcState?: 'idle' | 'connecting' | 'open' | 'closed' | 'error'
+          sessionId?: string | null
+          toolRunning?: boolean
+        }) => void) => () => void
         onRunSend: (callback: (text: string) => void) => () => void
       }
       launcher: {
