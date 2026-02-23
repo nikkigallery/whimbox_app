@@ -36,6 +36,8 @@ export function useHomeConversation({
   const currentAgentMessageIdRef = useRef<string | null>(null)
   /** 由 task.run 等独立任务创建的「任务日志」assistant 消息 id，用于 event.task.log */
   const pendingStandaloneTaskIdRef = useRef<string | null>(null)
+  /** 后台任务（非 task.run）日志消息 id，用于 event.task.log(type=add/update/finalize_ai_message) */
+  const backgroundLogMessageIdRef = useRef<string | null>(null)
 
   // 单一 notification 监听：所有 event.agent.* / event.task.* 统一在此驱动 messages，主界面与 overlay 共用
   useEffect(() => {
@@ -110,6 +112,31 @@ export function useHomeConversation({
             return next
           })
         }
+        if (status === 'on_tool_stopping' && assistantId) {
+          console.log("on_tool_stopping")
+          setMessages((prev) => {
+            const index = prev.findIndex((m) => m.id === assistantId)
+            if (index < 0) return prev
+            const cur = prev[index]
+            const blocks = cur.blocks ?? []
+            const stoppingText = '⏳ 工具结束中，请稍候...'
+            const last = blocks[blocks.length - 1]
+            let nextBlocks: AssistantBlock[]
+            if (last?.type === 'log') {
+              if (last.content.includes(stoppingText)) return prev
+              nextBlocks = blocks.slice(0, -1).concat({
+                type: 'log',
+                title: last.title,
+                content: last.content ? `${last.content}\n${stoppingText}` : stoppingText,
+              })
+            } else {
+              nextBlocks = [...blocks, { type: 'log', title: detailText, content: stoppingText }]
+            }
+            const next = [...prev]
+            next[index] = { ...cur, blocks: nextBlocks, pending: true }
+            return next
+          })
+        }
         if (status === 'on_tool_error' && assistantId) {
           // 工具报错时通常会结束本轮响应，提前收口避免一直 pending。
           currentAgentMessageIdRef.current = null
@@ -155,8 +182,9 @@ export function useHomeConversation({
 
       if (method === 'event.task.log') {
         const id =
-          pendingStandaloneTaskIdRef.current ?? currentAgentMessageIdRef.current
-        if (!id) return
+          pendingStandaloneTaskIdRef.current
+          ?? currentAgentMessageIdRef.current
+          ?? backgroundLogMessageIdRef.current
         const logLine =
           typeof params?.message === 'string'
             ? params.message
@@ -164,6 +192,26 @@ export function useHomeConversation({
               ? params.raw_message
               : ''
         if (!logLine) return
+        const logType = typeof params?.type === 'string' ? params.type : ''
+
+        if (!id) {
+          const messageId = createId()
+          backgroundLogMessageIdRef.current = messageId
+          const isFinalize = logType === 'finalize_ai_message'
+          setMessages((prev) => [
+            ...prev,
+            {
+              id: messageId,
+              role: 'assistant',
+              content: '',
+              pending: !isFinalize,
+              blocks: [{ type: 'log', content: logLine, title: '自动触发' }],
+            },
+          ])
+          if (isFinalize) backgroundLogMessageIdRef.current = null
+          return
+        }
+
         setMessages((prev) => {
           const index = prev.findIndex((m) => m.id === id)
           if (index < 0) return prev
@@ -177,7 +225,11 @@ export function useHomeConversation({
             title: last.title,
           })
           const next = [...prev]
-          next[index] = { ...cur, blocks: nextBlocks, pending: true }
+          const isFinalize = logType === 'finalize_ai_message'
+          next[index] = { ...cur, blocks: nextBlocks, pending: !isFinalize }
+          if (isFinalize && backgroundLogMessageIdRef.current === id) {
+            backgroundLogMessageIdRef.current = null
+          }
           return next
         })
       }

@@ -12,6 +12,7 @@ const MARGIN = 16
 let overlayWindowRef: BrowserWindow | null = null
 let overlayWindowState: ReturnType<typeof windowStateKeeper> | null = null
 let overlaySaveTimer: ReturnType<typeof setTimeout> | null = null
+let suppressAutoShowAfterManualClose = false
 
 function scheduleSaveOverlayState(win: BrowserWindow) {
   if (overlaySaveTimer) clearTimeout(overlaySaveTimer)
@@ -67,11 +68,15 @@ function registerOverlayIpc() {
   )
   ipcMain.handle('overlay:hide', (event) => {
     const win = BrowserWindow.fromWebContents(event.sender)
-    if (win && !win.isDestroyed()) win.hide()
+    if (win && !win.isDestroyed()) {
+      suppressAutoShowAfterManualClose = true
+      win.hide()
+    }
   })
   ipcMain.handle('overlay:show', () => {
     const win = overlayWindowRef
     if (!win || win.isDestroyed()) return
+    suppressAutoShowAfterManualClose = false
     win.show()
   })
 }
@@ -82,7 +87,21 @@ export function getOverlayWindow() {
   return overlayWindowRef
 }
 
-/** 半透明小窗，用于展示消息和发送消息（与主窗口共享同一 RPC 会话）；仅当游戏窗口出现时由后端通知显示。 */
+/** 工具启动时自动显示悬浮窗；若用户手动关闭过则不自动显示。 */
+export function showOverlayOnToolStart() {
+  const win = overlayWindowRef
+  if (!win || win.isDestroyed()) return
+  if (suppressAutoShowAfterManualClose) return
+  win.show()
+}
+
+export function setOverlayIgnoreMouseEvents(ignore: boolean) {
+  const win = overlayWindowRef
+  if (!win || win.isDestroyed()) return
+  win.setIgnoreMouseEvents(ignore, { forward: true })
+}
+
+/** 半透明小窗，用于展示消息和发送消息（与主窗口共享同一 RPC 会话）。 */
 export async function OverlayWindow() {
   const overlayState = windowStateKeeper({
     defaultWidth: PANEL_DEFAULT_WIDTH,
@@ -111,8 +130,8 @@ export async function OverlayWindow() {
     y,
     width,
     height,
-    minWidth: 260,
-    minHeight: 330,
+    minWidth: 200,
+    minHeight: 250,
     show: false,
     frame: false,
     transparent: true,
@@ -131,9 +150,10 @@ export async function OverlayWindow() {
   overlayWindowState = overlayState
   overlayWindowRef = window
 
-  // 关闭时只隐藏不销毁，由 event.game_window.visible 或用户操作再次显示
+  // 关闭时只隐藏不销毁；视为手动关闭并抑制后续自动弹窗
   window.on('close', (e) => {
     e.preventDefault()
+    suppressAutoShowAfterManualClose = true
     window.hide()
   })
 
@@ -143,7 +163,7 @@ export async function OverlayWindow() {
 
   window.setVisibleOnAllWorkspaces(true, { visibleOnFullScreen: true })
 
-  // 不在此处 show()，仅当后端通知游戏窗口出现时由 rpc-bridge 显示
+  // 不在此处 show()，由用户手动打开或工具启动事件触发显示
 
   return window
 }

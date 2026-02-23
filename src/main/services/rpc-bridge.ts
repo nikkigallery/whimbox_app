@@ -1,7 +1,7 @@
 import { BrowserWindow, ipcMain } from 'electron'
 
 import { RpcClient } from './rpc-client'
-import { getOverlayWindow } from '../windows/overlay'
+import { setOverlayIgnoreMouseEvents, showOverlayOnToolStart } from '../windows/overlay'
 import log from 'electron-log/main.js'
 
 let initialized = false
@@ -27,12 +27,13 @@ export function registerRpcBridge() {
   })
   rpcClient.on('notification', (payload) => {
     broadcast('rpc:notification', payload)
-    if (payload.method === 'event.game_window.visible') {
-      const visible = (payload.params as { visible?: boolean } | undefined)?.visible === true
-      const overlay = getOverlayWindow()
-      if (overlay && !overlay.isDestroyed()) {
-        if (visible) overlay.show()
-        else overlay.hide()
+    if (payload.method === 'event.agent.status') {
+      const status = (payload.params as { status?: string } | undefined)?.status
+      if (status === 'on_tool_start') {
+        setOverlayIgnoreMouseEvents(true)
+        showOverlayOnToolStart()
+      } else if (status === 'on_tool_end' || status === 'on_tool_error') {
+        setOverlayIgnoreMouseEvents(false)
       }
     }
   })

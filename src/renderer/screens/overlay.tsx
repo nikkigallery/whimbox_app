@@ -9,17 +9,10 @@ import { cn } from 'renderer/lib/utils'
 const appRegionDrag = { WebkitAppRegion: 'drag' } as CSSProperties
 const appRegionNoDrag = { WebkitAppRegion: 'no-drag' } as CSSProperties
 
-const PANEL_MIN_WIDTH = 260
-const PANEL_MIN_HEIGHT = 330
+const PANEL_MIN_WIDTH = 200
+const PANEL_MIN_HEIGHT = 250
 const PANEL_DEFAULT_WIDTH = 420
 const PANEL_DEFAULT_HEIGHT = 360
-
-function useToolPassthroughFromState(toolRunning: boolean) {
-  useEffect(() => {
-    if (!window.App.overlay) return
-    void window.App.overlay.setIgnoreMouseEvents(toolRunning)
-  }, [toolRunning])
-}
 
 export function OverlayScreen() {
   useEffect(() => {
@@ -34,7 +27,6 @@ export function OverlayScreen() {
   const [messages, setMessages] = useState<UiMessage[]>([])
   const [rpcState, setRpcState] = useState<'idle' | 'connecting' | 'open' | 'closed' | 'error'>('idle')
   const [sessionId, setSessionId] = useState<string | null>(null)
-  const [toolRunning, setToolRunning] = useState(false)
   const [input, setInput] = useState('')
 
   useEffect(() => {
@@ -47,7 +39,6 @@ export function OverlayScreen() {
       setMessages((s.messages ?? []) as UiMessage[])
       setRpcState(s.rpcState ?? 'idle')
       setSessionId(s.sessionId ?? null)
-      setToolRunning(s.toolRunning ?? false)
     }
     window.App.conversation.getState().then(applyState)
     const off = window.App.conversation.onState(applyState)
@@ -60,8 +51,6 @@ export function OverlayScreen() {
     setInput('')
     window.App.conversation.send(text)
   }, [input, rpcState, sessionId])
-
-  useToolPassthroughFromState(toolRunning)
 
   type ResizeEdge = 'e' | 'w' | 'n' | 's'
   const resizeRef = useRef<{
@@ -161,7 +150,7 @@ export function OverlayScreen() {
         </div>
       </div>
 
-      <div className="flex flex-1 min-h-0 flex-col p-2">
+      <div className="flex flex-1 min-h-0 flex-col p-2 pt-0">
         {hasConversation ? (
           <div className="flex min-h-0 flex-1 flex-col overflow-hidden">
             <ConversationPanel messages={messages} variant="overlay" />
@@ -172,7 +161,7 @@ export function OverlayScreen() {
           </div>
         )}
 
-        <div className="mt-2 flex gap-2">
+        <div className="mt-1 flex gap-2">
           <textarea
             rows={1}
             value={input}
