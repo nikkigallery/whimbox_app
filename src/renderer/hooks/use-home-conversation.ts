@@ -110,10 +110,8 @@ export function useHomeConversation({
             return next
           })
         }
-        if (
-          (status === 'on_tool_end' || status === 'on_tool_error') &&
-          assistantId
-        ) {
+        if (status === 'on_tool_error' && assistantId) {
+          // 工具报错时通常会结束本轮响应，提前收口避免一直 pending。
           currentAgentMessageIdRef.current = null
           setMessages((prev) =>
             prev.map((m) =>
@@ -209,7 +207,23 @@ export function useHomeConversation({
           message.id === assistantId
             ? {
                 ...message,
-                content: message.content || result?.message || '已收到回复。',
+                content:
+                  typeof result?.message === 'string' && result.message.trim()
+                    ? result.message
+                    : message.content || '已收到回复。',
+                blocks:
+                  typeof result?.message === 'string' && result.message.trim()
+                    ? (() => {
+                        const existing = message.blocks ?? []
+                        const last = existing[existing.length - 1]
+                        if (last?.type === 'text') {
+                          return existing
+                            .slice(0, -1)
+                            .concat({ type: 'text' as const, content: result.message! })
+                        }
+                        return [...existing, { type: 'text' as const, content: result.message! }]
+                      })()
+                    : message.blocks,
                 pending: false,
               }
             : message,
