@@ -113,7 +113,6 @@ export function useHomeConversation({
           })
         }
         if (status === 'on_tool_stopping' && assistantId) {
-          console.log("on_tool_stopping")
           setMessages((prev) => {
             const index = prev.findIndex((m) => m.id === assistantId)
             if (index < 0) return prev

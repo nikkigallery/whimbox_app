@@ -1,7 +1,7 @@
 import { BrowserWindow, ipcMain } from 'electron'
 
 import { RpcClient } from './rpc-client'
-import { setOverlayIgnoreMouseEvents, showOverlayOnToolStart } from '../windows/overlay'
+import { forceShowOverlay, setOverlayIgnoreMouseEvents, showOverlayOnToolStart } from '../windows/overlay'
 import log from 'electron-log/main.js'
 
 let initialized = false
@@ -27,11 +27,17 @@ export function registerRpcBridge() {
   })
   rpcClient.on('notification', (payload) => {
     broadcast('rpc:notification', payload)
+    if (payload.method === 'event.overlay.show') {
+      forceShowOverlay()
+      return
+    }
     if (payload.method === 'event.agent.status') {
       const status = (payload.params as { status?: string } | undefined)?.status
       if (status === 'on_tool_start') {
         setOverlayIgnoreMouseEvents(true)
         showOverlayOnToolStart()
+      } else if (status === 'on_tool_stopping') {
+        forceShowOverlay()
       } else if (status === 'on_tool_end' || status === 'on_tool_error') {
         setOverlayIgnoreMouseEvents(false)
       }

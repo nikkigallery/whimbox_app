@@ -2,6 +2,7 @@ import { Settings } from "lucide-react"
 import { Button } from "renderer/components/ui/button"
 import { ThemeToggle } from "renderer/components/theme-provider"
 import { ConfigFormFields } from "renderer/components/config-form-fields"
+import { KeybindInput } from "renderer/components/settings-dialog/keybind-input"
 import { useConfigForm } from "renderer/hooks/use-config-form"
 import type { IpcRpcClient } from "renderer/lib/ipc-rpc"
 import { APP_RELEASE_PAGE_URL } from "shared/constants"
@@ -24,18 +25,35 @@ function WhimboxConfigForm({ rpcClient }: { rpcClient: IpcRpcClient }) {
     handleValueChangeAndSave,
   } = useConfigForm({ section: WHIMBOX_SECTION, rpcClient })
 
+  const stopKeyItem = items.find((item) => item.key === "stop_key")
+  const otherItems = items.filter((item) => item.key !== "stop_key")
+
   if (items.length === 0 && !loading && !loadError) return null
 
   return (
-    <ConfigFormFields
-      items={items}
-      draftConfig={draftConfig}
-      onValueChange={handleValueChangeAndSave}
-      loading={loading}
-      loadError={loadError}
-      emptyMessage="暂无运行配置项"
-      itemClassName="rounded-lg border border-slate-100 bg-slate-50/50 px-3 py-2 text-sm dark:border-slate-700 dark:bg-slate-800/50"
-    />
+    <div className="space-y-3">
+      {stopKeyItem ? (
+        <div className="rounded-lg border border-slate-100 bg-slate-50/50 px-3 py-2 text-sm dark:border-slate-700 dark:bg-slate-800/50">
+          <KeybindInput
+            label={stopKeyItem.description || "停止任务快捷键"}
+            value={String(draftConfig?.stop_key?.value ?? "")}
+            onChange={(value) => handleValueChangeAndSave("stop_key", value)}
+            className="bg-transparent px-0 py-0 dark:bg-transparent"
+          />
+        </div>
+      ) : null}
+      {loading || loadError || otherItems.length > 0 ? (
+        <ConfigFormFields
+          items={otherItems}
+          draftConfig={draftConfig}
+          onValueChange={handleValueChangeAndSave}
+          loading={loading}
+          loadError={loadError}
+          emptyMessage="暂无运行配置项"
+          itemClassName="rounded-lg border border-slate-100 bg-slate-50/50 px-3 py-2 text-sm dark:border-slate-700 dark:bg-slate-800/50"
+        />
+      ) : null}
+    </div>
   )
 }
 

@@ -148,7 +148,7 @@ export function KeybindInput({ label, value, onChange, className }: KeybindInput
         className
       )}
     >
-      <span className="text-xs text-slate-600 dark:text-slate-400">{label}</span>
+      <span className="text-sm text-slate-700 dark:text-slate-100">{label}</span>
       <button
         type="button"
         onClick={startCapture}

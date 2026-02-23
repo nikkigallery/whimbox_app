@@ -95,6 +95,14 @@ export function showOverlayOnToolStart() {
   win.show()
 }
 
+/** 手动停止工具时强制显示悬浮窗，不受“手动关闭后不自动显示”策略限制。 */
+export function forceShowOverlay() {
+  const win = overlayWindowRef
+  if (!win || win.isDestroyed()) return
+  suppressAutoShowAfterManualClose = false
+  win.show()
+}
+
 export function setOverlayIgnoreMouseEvents(ignore: boolean) {
   const win = overlayWindowRef
   if (!win || win.isDestroyed()) return
