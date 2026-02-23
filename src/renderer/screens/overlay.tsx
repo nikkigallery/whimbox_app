@@ -141,20 +141,20 @@ export function OverlayScreen() {
     <div
       className={cn(
         'relative flex h-screen flex-col rounded-2xl overflow-hidden',
-        'bg-slate-900/95 dark:bg-slate-900/95 backdrop-blur-md',
-        'border border-slate-700/50 shadow-2xl',
+        'bg-slate-900/35 backdrop-blur-lg',
+        'border border-white/15 shadow-[0_12px_30px_rgba(2,6,23,0.28)]',
       )}
     >
       <div
-        className="flex items-center justify-between border-b border-slate-700/50 px-3 py-2 app-drag"
+        className="flex items-center justify-between border-b border-white/15 px-3 py-0.5 app-drag"
         style={appRegionDrag}
       >
-        <span className="text-xs font-medium text-slate-300">奇想盒</span>
+        <span className="text-sm font-medium text-white/90">奇想盒</span>
         <div className="flex items-center gap-1 app-no-drag" style={appRegionNoDrag}>
           <button
             type="button"
             onClick={handleClose}
-            className="rounded p-1.5 text-slate-400 hover:bg-slate-700/50 hover:text-white"
+            className="rounded p-1.5 text-white/75 hover:bg-white/10 hover:text-white"
           >
             <X className="size-4" />
           </button>
@@ -164,11 +164,11 @@ export function OverlayScreen() {
       <div className="flex flex-1 min-h-0 flex-col p-2">
         {hasConversation ? (
           <div className="flex min-h-0 flex-1 flex-col overflow-hidden">
-            <ConversationPanel messages={messages} />
+            <ConversationPanel messages={messages} variant="overlay" />
           </div>
         ) : (
-          <div className="flex flex-1 items-center justify-center text-slate-500 text-sm">
-            {rpcState === 'open' ? '输入消息开始对话' : 'RPC 未连接'}
+          <div className="flex flex-1 items-center justify-center text-white/60 text-sm">
+            {rpcState === 'open' ? '输入消息开始对话' : '奇想盒后端未连接'}
           </div>
         )}
 
@@ -192,9 +192,9 @@ export function OverlayScreen() {
               }
             }}
             className={cn(
-              'min-h-[36px] max-h-24 flex-1 resize-none rounded-xl',
-              'border border-slate-600 bg-slate-800/80 px-3 py-2 text-sm text-slate-200',
-              'placeholder:text-slate-500 focus:outline-none focus:ring-1 focus:ring-pink-500',
+              'min-h-[36px] max-h-24 flex-1 resize-none overflow-hidden rounded-xl',
+              'border border-white/20 bg-slate-700/35 px-3 py-2 text-sm text-white/95',
+              'placeholder:text-white/50 focus:outline-none focus:ring-1 focus:ring-pink-400',
             )}
           />
           <button
@@ -203,8 +203,8 @@ export function OverlayScreen() {
             disabled={isSendDisabled}
             className={cn(
               'flex size-9 shrink-0 items-center justify-center rounded-xl',
-              'bg-pink-500 text-white transition disabled:opacity-50 disabled:cursor-not-allowed',
-              'hover:bg-pink-600',
+              'bg-pink-400 text-white transition disabled:opacity-50 disabled:cursor-not-allowed',
+              'hover:bg-pink-500',
             )}
           >
             <Send className="size-4" />

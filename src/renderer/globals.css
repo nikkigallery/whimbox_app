@@ -156,14 +156,23 @@ body.overlay-window {
   padding: 0;
 }
 
-/* 悬浮球上方 3 条消息滚动 */
-@keyframes overlay-ticker {
-  0% {
-    transform: translateY(0);
-  }
-  100% {
-    transform: translateY(-50%);
-  }
+/* 悬浮窗滚动条：深色半透明，避免默认白色轨道突兀 */
+.overlay-window ::-webkit-scrollbar {
+  width: 8px;
+  height: 8px;
+}
+
+.overlay-window ::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+.overlay-window ::-webkit-scrollbar-thumb {
+  background: rgba(148, 163, 184, 0.45);
+  border-radius: 9999px;
+}
+
+.overlay-window ::-webkit-scrollbar-thumb:hover {
+  background: rgba(148, 163, 184, 0.6);
 }
 
 .animate-overlay-ticker {
