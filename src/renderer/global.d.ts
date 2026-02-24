@@ -35,21 +35,26 @@ declare global {
           rpcState?: 'idle' | 'connecting' | 'open' | 'closed' | 'error'
           sessionId?: string | null
           toolRunning?: boolean
+          conversationPending?: boolean
         }>
         pushState: (payload: {
           messages: unknown[]
           rpcState?: 'idle' | 'connecting' | 'open' | 'closed' | 'error'
           sessionId?: string | null
           toolRunning?: boolean
+          conversationPending?: boolean
         }) => void
         send: (text: string) => void
+        stop: () => void
         onState: (callback: (data: {
           messages: unknown[]
           rpcState?: 'idle' | 'connecting' | 'open' | 'closed' | 'error'
           sessionId?: string | null
           toolRunning?: boolean
+          conversationPending?: boolean
         }) => void) => () => void
         onRunSend: (callback: (text: string) => void) => () => void
+        onRunStop: (callback: () => void) => () => void
       }
       launcher: {
         openExternal: (url: string) => void

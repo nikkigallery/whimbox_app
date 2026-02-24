@@ -1,6 +1,6 @@
 import type { ComponentType } from "react"
 
-import { Bot, FileText, Gift, Send, Target } from "lucide-react"
+import { Bot, FileText, Gift, Send, Square, Target } from "lucide-react"
 
 import { ConversationPanel } from "renderer/components/conversation-panel"
 import type { UiMessage } from "renderer/hooks/use-home-conversation"
@@ -22,6 +22,8 @@ type HomePageProps = {
   input: string
   setInput: (v: string) => void
   handleSend: (overrideText?: string) => void
+  handleStop: () => void
+  isConversationPending: boolean
   rpcState: string
   sessionId: string | null
 }
@@ -31,12 +33,15 @@ export function HomePage({
   input,
   setInput,
   handleSend,
+  handleStop,
+  isConversationPending,
   rpcState,
   sessionId,
 }: HomePageProps) {
 
   const hasConversation = messages.length > 0
   const isSendDisabled = !input.trim() || rpcState !== "open" || !sessionId
+  const isInputDisabled = isConversationPending || rpcState !== "open" || !sessionId
 
   return (
     <div className="flex flex-1 flex-col min-h-0">
@@ -91,6 +96,7 @@ export function HomePage({
             <textarea
               rows={1}
               value={input}
+              disabled={isInputDisabled}
               placeholder={
                 rpcState === "open"
                   ? "请输入内容..."
@@ -103,6 +109,7 @@ export function HomePage({
                 target.style.height = `${target.scrollHeight}px`
               }}
               onKeyDown={(event) => {
+                if (isConversationPending) return
                 if (event.key === "Enter" && !event.shiftKey) {
                   event.preventDefault()
                   handleSend()
@@ -114,11 +121,14 @@ export function HomePage({
           <div className="flex items-center gap-3">
             <button
               type="button"
-              onClick={handleSend}
-              disabled={isSendDisabled}
-              className="flex size-9 items-center justify-center rounded-xl bg-pink-400 text-white shadow transition disabled:cursor-not-allowed disabled:opacity-50"
+              onClick={isConversationPending ? handleStop : () => handleSend()}
+              disabled={isConversationPending ? false : isSendDisabled}
+              className={cn(
+                "flex size-9 items-center justify-center rounded-xl text-white shadow transition disabled:cursor-not-allowed disabled:opacity-50",
+                isConversationPending ? "bg-rose-500 hover:bg-rose-600" : "bg-pink-400"
+              )}
             >
-              <Send className="size-4" />
+              {isConversationPending ? <Square className="size-4" /> : <Send className="size-4" />}
             </button>
           </div>
         </div>

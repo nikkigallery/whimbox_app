@@ -103,20 +103,24 @@ const API = {
         rpcState?: 'idle' | 'connecting' | 'open' | 'closed' | 'error'
         sessionId?: string | null
         toolRunning?: boolean
+        conversationPending?: boolean
       }>,
     pushState: (payload: {
       messages: unknown[]
       rpcState?: 'idle' | 'connecting' | 'open' | 'closed' | 'error'
       sessionId?: string | null
       toolRunning?: boolean
+      conversationPending?: boolean
     }) => ipcRenderer.send('conversation:push-state', payload),
     send: (text: string) => ipcRenderer.send('conversation:send', text),
+    stop: () => ipcRenderer.send('conversation:stop'),
     onState: (
       callback: (data: {
         messages: unknown[]
         rpcState?: 'idle' | 'connecting' | 'open' | 'closed' | 'error'
         sessionId?: string | null
         toolRunning?: boolean
+        conversationPending?: boolean
       }) => void,
     ) => {
       const listener = (
@@ -126,6 +130,7 @@ const API = {
           rpcState?: 'idle' | 'connecting' | 'open' | 'closed' | 'error'
           sessionId?: string | null
           toolRunning?: boolean
+          conversationPending?: boolean
         },
       ) => callback(data)
       ipcRenderer.on('conversation:state', listener)
@@ -138,6 +143,13 @@ const API = {
       ipcRenderer.on('conversation:run-send', listener)
       return () => {
         ipcRenderer.removeListener('conversation:run-send', listener)
+      }
+    },
+    onRunStop: (callback: () => void) => {
+      const listener = () => callback()
+      ipcRenderer.on('conversation:run-stop', listener)
+      return () => {
+        ipcRenderer.removeListener('conversation:run-stop', listener)
       }
     },
   },

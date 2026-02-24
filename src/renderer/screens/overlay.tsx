@@ -1,6 +1,6 @@
 import type { CSSProperties } from 'react'
 import { useCallback, useEffect, useRef, useState } from 'react'
-import { Send, X } from 'lucide-react'
+import { Send, Square, X } from 'lucide-react'
 import { ConversationPanel } from 'renderer/components/conversation-panel'
 import type { UiMessage } from 'renderer/hooks/use-home-conversation'
 import { cn } from 'renderer/lib/utils'
@@ -28,6 +28,7 @@ export function OverlayScreen() {
   const [rpcState, setRpcState] = useState<'idle' | 'connecting' | 'open' | 'closed' | 'error'>('idle')
   const [sessionId, setSessionId] = useState<string | null>(null)
   const [input, setInput] = useState('')
+  const [conversationPending, setConversationPending] = useState(false)
 
   useEffect(() => {
     const applyState = (s: {
@@ -35,10 +36,12 @@ export function OverlayScreen() {
       rpcState?: 'idle' | 'connecting' | 'open' | 'closed' | 'error'
       sessionId?: string | null
       toolRunning?: boolean
+      conversationPending?: boolean
     }) => {
       setMessages((s.messages ?? []) as UiMessage[])
       setRpcState(s.rpcState ?? 'idle')
       setSessionId(s.sessionId ?? null)
+      setConversationPending(Boolean(s.conversationPending))
     }
     window.App.conversation.getState().then(applyState)
     const off = window.App.conversation.onState(applyState)
@@ -47,10 +50,15 @@ export function OverlayScreen() {
 
   const handleSend = useCallback(() => {
     const text = input.trim()
-    if (!text || rpcState !== 'open' || !sessionId) return
+    if (!text || rpcState !== 'open' || !sessionId || conversationPending) return
     setInput('')
     window.App.conversation.send(text)
-  }, [input, rpcState, sessionId])
+  }, [conversationPending, input, rpcState, sessionId])
+
+  const handleStop = useCallback(() => {
+    if (!conversationPending) return
+    window.App.conversation.stop()
+  }, [conversationPending])
 
   type ResizeEdge = 'e' | 'w' | 'n' | 's'
   const resizeRef = useRef<{
@@ -124,6 +132,7 @@ export function OverlayScreen() {
   )
 
   const isSendDisabled = !input.trim() || rpcState !== 'open' || !sessionId
+  const isInputDisabled = conversationPending || rpcState !== 'open' || !sessionId
   const hasConversation = messages.length > 0
 
   return (
@@ -165,6 +174,7 @@ export function OverlayScreen() {
           <textarea
             rows={1}
             value={input}
+            disabled={isInputDisabled}
             placeholder={
               rpcState === 'open' ? '输入内容...' : '等待连接...'
             }
@@ -175,6 +185,7 @@ export function OverlayScreen() {
               t.style.height = `${t.scrollHeight}px`
             }}
             onKeyDown={(e) => {
+              if (conversationPending) return
               if (e.key === 'Enter' && !e.shiftKey) {
                 e.preventDefault()
                 handleSend()
@@ -188,15 +199,15 @@ export function OverlayScreen() {
           />
           <button
             type="button"
-            onClick={handleSend}
-            disabled={isSendDisabled}
+            onClick={conversationPending ? handleStop : handleSend}
+            disabled={conversationPending ? false : isSendDisabled}
             className={cn(
               'flex size-9 shrink-0 items-center justify-center rounded-xl',
-              'bg-pink-400 text-white transition disabled:opacity-50 disabled:cursor-not-allowed',
-              'hover:bg-pink-500',
+              'text-white transition disabled:opacity-50 disabled:cursor-not-allowed',
+              conversationPending ? 'bg-rose-500 hover:bg-rose-600' : 'bg-pink-400 hover:bg-pink-500',
             )}
           >
-            <Send className="size-4" />
+            {conversationPending ? <Square className="size-4" /> : <Send className="size-4" />}
           </button>
         </div>
       </div>

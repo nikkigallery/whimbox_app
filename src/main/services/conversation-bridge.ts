@@ -18,6 +18,7 @@ export type ConversationState = {
   rpcState?: 'idle' | 'connecting' | 'open' | 'closed' | 'error'
   sessionId?: string | null
   toolRunning?: boolean
+  conversationPending?: boolean
 }
 
 let mainWindowRef: BrowserWindow | null = null
@@ -43,6 +44,7 @@ export function registerConversationBridge(mainWindow: BrowserWindow) {
         rpcState: payload.rpcState,
         sessionId: payload.sessionId,
         toolRunning: payload.toolRunning,
+        conversationPending: payload.conversationPending,
       }
       sendToOverlay('conversation:state', conversationState)
     },
@@ -51,6 +53,12 @@ export function registerConversationBridge(mainWindow: BrowserWindow) {
   ipcMain.on('conversation:send', (_event, text: string) => {
     if (mainWindowRef && !mainWindowRef.isDestroyed()) {
       mainWindowRef.webContents.send('conversation:run-send', text)
+    }
+  })
+
+  ipcMain.on('conversation:stop', () => {
+    if (mainWindowRef && !mainWindowRef.isDestroyed()) {
+      mainWindowRef.webContents.send('conversation:run-stop')
     }
   })
 }

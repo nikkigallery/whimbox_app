@@ -32,6 +32,7 @@ export function useHomeConversation({
 }: UseHomeConversationOptions) {
   const [messages, setMessages] = useState<UiMessage[]>([])
   const [input, setInput] = useState('')
+  const [isConversationPending, setIsConversationPending] = useState(false)
   /** 当前由用户发消息产生的 assistant 消息 id，用于 event.agent.* / event.task.log（agent 调工具） */
   const currentAgentMessageIdRef = useRef<string | null>(null)
   /** 由 task.run 等独立任务创建的「任务日志」assistant 消息 id，用于 event.task.log */
@@ -40,6 +41,12 @@ export function useHomeConversation({
   const backgroundLogMessageIdRef = useRef<string | null>(null)
 
   // 单一 notification 监听：所有 event.agent.* / event.task.* 统一在此驱动 messages，主界面与 overlay 共用
+  useEffect(() => {
+    if (rpcState === 'open') return
+    setIsConversationPending(false)
+    currentAgentMessageIdRef.current = null
+  }, [rpcState])
+
   useEffect(() => {
     const off = rpcClient.on('notification', (notification) => {
       const method = notification.method
@@ -238,9 +245,10 @@ export function useHomeConversation({
 
   const handleSend = useCallback(async (overrideText?: string) => {
     const text = (overrideText != null && overrideText !== '' ? overrideText : input).trim()
-    if (!text || rpcState !== 'open' || !sessionId) return
+    if (!text || rpcState !== 'open' || !sessionId || isConversationPending) return
     if (overrideText == null) setInput('')
     const assistantId = createId()
+    setIsConversationPending(true)
     currentAgentMessageIdRef.current = assistantId
     setMessages((prev) => [
       ...prev,
@@ -296,8 +304,19 @@ export function useHomeConversation({
       if (currentAgentMessageIdRef.current === assistantId) {
         currentAgentMessageIdRef.current = null
       }
+      setIsConversationPending(false)
     }
-  }, [input, rpcState, sessionId, rpcClient])
+  }, [input, isConversationPending, rpcState, sessionId, rpcClient])
 
-  return { messages, input, setInput, handleSend }
+  const handleStop = useCallback(async () => {
+    if (rpcState !== 'open' || !sessionId || !isConversationPending) return
+    console.log("handleStop")
+    try {
+      await rpcClient.sendRequest('agent.stop', { session_id: sessionId })
+    } catch (error) {
+      log.warn('agent.stop failed:', error)
+    }
+  }, [isConversationPending, rpcClient, rpcState, sessionId])
+
+  return { messages, input, setInput, handleSend, handleStop, isConversationPending }
 }

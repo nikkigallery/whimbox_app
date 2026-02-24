@@ -140,7 +140,14 @@ export function MainScreen() {
     sessionId,
     rpcState,
   })
-  const { messages, input, setInput, handleSend } = homeConversation
+  const {
+    messages,
+    input,
+    setInput,
+    handleSend,
+    handleStop,
+    isConversationPending,
+  } = homeConversation
 
   useEffect(() => {
     const off = rpcClient.on('notification', (n) => {
@@ -159,8 +166,9 @@ export function MainScreen() {
       rpcState,
       sessionId,
       toolRunning,
+      conversationPending: isConversationPending,
     })
-  }, [messages, rpcState, sessionId, toolRunning])
+  }, [isConversationPending, messages, rpcState, sessionId, toolRunning])
 
   useEffect(() => {
     const off = window.App.conversation.onRunSend((text: string) => {
@@ -168,6 +176,13 @@ export function MainScreen() {
     })
     return () => off()
   }, [handleSend])
+
+  useEffect(() => {
+    const off = window.App.conversation.onRunStop(() => {
+      handleStop()
+    })
+    return () => off()
+  }, [handleStop])
 
   const applyAuthState = useCallback(
     (state: { user: { username?: string; avatar?: string; is_vip?: boolean; vip_expiry_data?: string } } | null) => {
@@ -363,6 +378,8 @@ export function MainScreen() {
             input={input}
             setInput={setInput}
             handleSend={handleSend}
+            handleStop={handleStop}
+            isConversationPending={isConversationPending}
             rpcState={rpcState}
             sessionId={sessionId}
           />
