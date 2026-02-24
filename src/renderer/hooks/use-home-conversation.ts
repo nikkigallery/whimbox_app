@@ -288,7 +288,8 @@ export function useHomeConversation({
             : message,
         ),
       )
-    } catch {
+    } catch (error) {
+      log.error('agent.send_message failed:', error)
       setMessages((prev) =>
         prev.map((message) =>
           message.id === assistantId
