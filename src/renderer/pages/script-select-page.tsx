@@ -122,6 +122,8 @@ export function ScriptSelectPage({
   const [error, setError] = useState<string>("")
   const [selectedName, setSelectedName] = useState<string | null>(null)
   const [isRunning, setIsRunning] = useState(false)
+  const [runningTaskId, setRunningTaskId] = useState<string | null>(null)
+  const [isStopping, setIsStopping] = useState(false)
 
   const [nameFilter, setNameFilter] = useState("")
   const [targetFilter, setTargetFilter] = useState("")
@@ -178,17 +180,26 @@ export function ScriptSelectPage({
 
   useEffect(() => {
     const offNotification = rpcClient.on("notification", (notification) => {
-      if (notification.method !== "event.task.progress") return
+      if (notification.method !== "event.run.status") return
       const params =
         notification.params && typeof notification.params === "object"
           ? (notification.params as Record<string, unknown>)
           : undefined
+      const source = typeof params?.source === "string" ? params.source : ""
+      if (source !== "task") return
       const toolIdValue = typeof params?.tool_id === "string" ? params.tool_id : ""
-      const detail = typeof params?.detail === "string" ? params.detail : ""
-      if (toolIdValue !== toolId) return
-      if (detail === "started") {
+      if (toolIdValue && toolIdValue !== toolId) return
+      const phase = typeof params?.phase === "string" ? params.phase : ""
+      if (phase === "started") {
+        const taskId = typeof params?.task_id === "string" ? params.task_id : null
+        if (taskId) setRunningTaskId(taskId)
+        setIsStopping(false)
         setIsRunning(true)
-      } else if (detail === "completed" || detail === "cancelled") {
+      } else if (phase === "stopping") {
+        setIsStopping(true)
+      } else if (phase === "completed" || phase === "cancelled" || phase === "error") {
+        setRunningTaskId(null)
+        setIsStopping(false)
         setIsRunning(false)
       }
     })
@@ -232,7 +243,7 @@ export function ScriptSelectPage({
       return
     }
     try {
-      await rpcClient.sendRequest("task.run", {
+      const result = await rpcClient.sendRequest<{ task_id?: string }>("task.run", {
         session_id: sessionId,
         tool_id: toolId,
         input:
@@ -240,10 +251,24 @@ export function ScriptSelectPage({
             ? { path_name: selectedName }
             : { macro_name: selectedName },
       })
+      const taskId = typeof result?.task_id === "string" ? result.task_id : null
+      if (taskId) setRunningTaskId(taskId)
+      setIsStopping(false)
       setIsRunning(true)
       toast.success("任务已启动")
     } catch {
       toast.error("启动失败，请稍后重试")
+    }
+  }
+
+  const handleStop = async () => {
+    if (!runningTaskId) return
+    try {
+      setIsStopping(true)
+      await rpcClient.sendRequest("task.stop", { task_id: runningTaskId })
+    } catch {
+      setIsStopping(false)
+      toast.error("停止失败，请稍后重试")
     }
   }
 
@@ -282,10 +307,14 @@ export function ScriptSelectPage({
           </Button>
           <Button
             className="rounded-xl bg-pink-400 text-white shadow-sm transition hover:bg-pink-500"
-            onClick={handleStart}
-            disabled={!selectedName || rpcState !== "open" || !sessionId || isRunning}
+            onClick={runningTaskId ? handleStop : handleStart}
+            disabled={
+              rpcState !== "open"
+              || !sessionId
+              || (runningTaskId ? isStopping : !selectedName || isRunning)
+            }
           >
-            {isRunning ? "任务运行中" : startLabelMap[mode]}
+            {runningTaskId ? (isStopping ? "结束中..." : "停止任务") : startLabelMap[mode]}
           </Button>
         </div>
       </div>

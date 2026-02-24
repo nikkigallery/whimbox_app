@@ -151,11 +151,12 @@ export function MainScreen() {
 
   useEffect(() => {
     const off = rpcClient.on('notification', (n) => {
-      if (n.method !== 'event.agent.status') return
-      const params = n.params as { status?: string } | undefined
-      const status = params?.status ?? ''
-      if (status === 'on_tool_start') setToolRunning(true)
-      else if (status === 'on_tool_end' || status === 'on_tool_error') setToolRunning(false)
+      if (n.method !== 'event.run.status') return
+      const params = n.params as { source?: string; phase?: string } | undefined
+      if (params?.source !== 'agent') return
+      const phase = params?.phase ?? ''
+      if (phase === 'started' || phase === 'stopping') setToolRunning(true)
+      else if (phase === 'completed' || phase === 'cancelled' || phase === 'error') setToolRunning(false)
     })
     return () => off()
   }, [rpcClient])

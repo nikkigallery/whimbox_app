@@ -18,6 +18,8 @@ export type UiMessage = {
 
 const createId = () =>
   `${Date.now()}-${Math.random().toString(16).slice(2, 10)}`
+const STANDALONE_TASK_LOG_TAIL_WINDOW_MS = 5000
+const AGENT_LOG_TAIL_WINDOW_MS = 5000
 
 export type UseHomeConversationOptions = {
   rpcClient: IpcRpcClient
@@ -33,28 +35,42 @@ export function useHomeConversation({
   const [messages, setMessages] = useState<UiMessage[]>([])
   const [input, setInput] = useState('')
   const [isConversationPending, setIsConversationPending] = useState(false)
-  /** 当前由用户发消息产生的 assistant 消息 id，用于 event.agent.* / event.task.log（agent 调工具） */
+  const [isStandaloneTaskPending, setIsStandaloneTaskPending] = useState(false)
+  /** 当前由用户发消息产生的 assistant 消息 id，用于 event.agent.message / event.run.*（agent 调工具） */
   const currentAgentMessageIdRef = useRef<string | null>(null)
-  /** 由 task.run 等独立任务创建的「任务日志」assistant 消息 id，用于 event.task.log */
+  /** agent 结束后短时间内，用于承接尾日志的消息 id */
+  const closingAgentMessageIdRef = useRef<string | null>(null)
+  const closingAgentUntilRef = useRef<number>(0)
+  /** 由 task.run 等独立任务创建的「任务日志」assistant 消息 id，用于 event.run.log */
   const pendingStandaloneTaskIdRef = useRef<string | null>(null)
-  /** 后台任务（非 task.run）日志消息 id，用于 event.task.log(type=add/update/finalize_ai_message) */
+  /** 当前运行中的独立任务 task_id（用于 task.stop） */
+  const pendingStandaloneTaskServerIdRef = useRef<string | null>(null)
+  /** 独立任务结束后短时间内，用于承接尾日志的消息 id */
+  const closingStandaloneTaskMessageIdRef = useRef<string | null>(null)
+  const closingStandaloneTaskUntilRef = useRef<number>(0)
+  /** 后台任务（非 task.run）日志消息 id，用于 event.run.log(type=add/update/finalize_ai_message) */
   const backgroundLogMessageIdRef = useRef<string | null>(null)
 
   // 单一 notification 监听：所有 event.agent.* / event.task.* 统一在此驱动 messages，主界面与 overlay 共用
   useEffect(() => {
     if (rpcState === 'open') return
     setIsConversationPending(false)
+    setIsStandaloneTaskPending(false)
     currentAgentMessageIdRef.current = null
+    closingAgentMessageIdRef.current = null
+    closingAgentUntilRef.current = 0
+    pendingStandaloneTaskIdRef.current = null
+    pendingStandaloneTaskServerIdRef.current = null
+    closingStandaloneTaskMessageIdRef.current = null
+    closingStandaloneTaskUntilRef.current = 0
   }, [rpcState])
 
   useEffect(() => {
     const off = rpcClient.on('notification', (notification) => {
       const method = notification.method
-      const isAgent =
-        method === 'event.agent.message' || method === 'event.agent.status'
-      const isTask =
-        method === 'event.task.progress' || method === 'event.task.log'
-      if (!isAgent && !isTask) return
+      const isAgentMessage = method === 'event.agent.message'
+      const isRunEvent = method === 'event.run.status' || method === 'event.run.log'
+      if (!isAgentMessage && !isRunEvent) return
 
       const params =
         notification.params && typeof notification.params === 'object'
@@ -97,71 +113,66 @@ export function useHomeConversation({
         return
       }
 
-      if (method === 'event.agent.status') {
-        const assistantId = currentAgentMessageIdRef.current
-        const status = typeof params?.status === 'string' ? params.status : ''
+      if (method === 'event.run.status') {
+        const source = typeof params?.source === 'string' ? params.source : ''
         const detailText =
           typeof params?.detail === 'string' && params.detail
             ? params.detail
             : ''
-        if (status === 'on_tool_start' && assistantId) {
-          setMessages((prev) => {
-            const index = prev.findIndex((m) => m.id === assistantId)
-            if (index < 0) return prev
-            const cur = prev[index]
-            const blocks = cur.blocks ?? []
-            const nextBlocks: AssistantBlock[] = [
-              ...blocks,
-              { type: 'log', content: '', title: detailText },
-            ]
-            const next = [...prev]
-            next[index] = { ...cur, blocks: nextBlocks, pending: true }
-            return next
-          })
-        }
-        if (status === 'on_tool_stopping' && assistantId) {
-          setMessages((prev) => {
-            const index = prev.findIndex((m) => m.id === assistantId)
-            if (index < 0) return prev
-            const cur = prev[index]
-            const blocks = cur.blocks ?? []
-            const stoppingText = '⏳ 工具结束中，请稍候...'
-            const last = blocks[blocks.length - 1]
-            let nextBlocks: AssistantBlock[]
-            if (last?.type === 'log') {
-              if (last.content.includes(stoppingText)) return prev
-              nextBlocks = blocks.slice(0, -1).concat({
-                type: 'log',
-                title: last.title,
-                content: last.content ? `${last.content}\n${stoppingText}` : stoppingText,
-              })
-            } else {
-              nextBlocks = [...blocks, { type: 'log', title: detailText, content: stoppingText }]
-            }
-            const next = [...prev]
-            next[index] = { ...cur, blocks: nextBlocks, pending: true }
-            return next
-          })
-        }
-        if (status === 'on_tool_error' && assistantId) {
-          // 工具报错时通常会结束本轮响应，提前收口避免一直 pending。
-          currentAgentMessageIdRef.current = null
-          setMessages((prev) =>
-            prev.map((m) =>
-              m.id === assistantId ? { ...m, pending: false } : m,
-            ),
-          )
-        }
-        return
-      }
+        const phase = typeof params?.phase === 'string' ? params.phase : ''
 
-      if (method === 'event.task.progress') {
-        const detail = typeof params?.detail === 'string' ? params.detail : ''
+        if (source === 'agent') {
+          const assistantId = currentAgentMessageIdRef.current
+          if (phase === 'started' && assistantId) {
+            setMessages((prev) => {
+              const index = prev.findIndex((m) => m.id === assistantId)
+              if (index < 0) return prev
+              const cur = prev[index]
+              const blocks = cur.blocks ?? []
+              const nextBlocks: AssistantBlock[] = [
+                ...blocks,
+                { type: 'log', content: '', title: detailText },
+              ]
+              const next = [...prev]
+              next[index] = { ...cur, blocks: nextBlocks, pending: true }
+              return next
+            })
+          }
+          if ((phase === 'completed' || phase === 'cancelled') && assistantId) {
+            closingAgentMessageIdRef.current = assistantId
+            closingAgentUntilRef.current = Date.now() + AGENT_LOG_TAIL_WINDOW_MS
+            currentAgentMessageIdRef.current = null
+            setMessages((prev) =>
+              prev.map((m) =>
+                m.id === assistantId ? { ...m, pending: false } : m,
+              ),
+            )
+          }
+          if (phase === 'error' && assistantId) {
+            closingAgentMessageIdRef.current = assistantId
+            closingAgentUntilRef.current = Date.now() + AGENT_LOG_TAIL_WINDOW_MS
+            currentAgentMessageIdRef.current = null
+            setMessages((prev) =>
+              prev.map((m) =>
+                m.id === assistantId ? { ...m, pending: false } : m,
+              ),
+            )
+          }
+          return
+        }
+
+        if (source !== 'task') return
+        const detail = phase
         if (detail === 'started') {
           const taskMessageId = createId()
+          const taskId = typeof params?.task_id === 'string' ? params.task_id : null
           const toolId = typeof params?.tool_id === 'string' ? params.tool_id : ''
           const title = toolId || '任务'
           pendingStandaloneTaskIdRef.current = taskMessageId
+          pendingStandaloneTaskServerIdRef.current = taskId
+          closingStandaloneTaskMessageIdRef.current = null
+          closingStandaloneTaskUntilRef.current = 0
+          setIsStandaloneTaskPending(true)
           setMessages((prev) => [
             ...prev,
             {
@@ -174,7 +185,11 @@ export function useHomeConversation({
           ])
         } else if (detail === 'completed' || detail === 'cancelled') {
           const id = pendingStandaloneTaskIdRef.current
+          setIsStandaloneTaskPending(false)
+          pendingStandaloneTaskServerIdRef.current = null
           if (id) {
+            closingStandaloneTaskMessageIdRef.current = id
+            closingStandaloneTaskUntilRef.current = Date.now() + STANDALONE_TASK_LOG_TAIL_WINDOW_MS
             pendingStandaloneTaskIdRef.current = null
             setMessages((prev) =>
               prev.map((m) =>
@@ -186,11 +201,37 @@ export function useHomeConversation({
         return
       }
 
-      if (method === 'event.task.log') {
-        const id =
-          pendingStandaloneTaskIdRef.current
-          ?? currentAgentMessageIdRef.current
-          ?? backgroundLogMessageIdRef.current
+      if (method === 'event.run.log') {
+        const source = typeof params?.source === 'string' ? params.source : ''
+        const hasClosingAgentTarget =
+          closingAgentMessageIdRef.current !== null
+          && Date.now() <= closingAgentUntilRef.current
+        const hasClosingStandaloneTarget =
+          closingStandaloneTaskMessageIdRef.current !== null
+          && Date.now() <= closingStandaloneTaskUntilRef.current
+        let id: string | null
+        if (source === 'background') {
+          id = backgroundLogMessageIdRef.current
+        } else if (source === 'agent') {
+          id =
+            currentAgentMessageIdRef.current
+            ?? (hasClosingAgentTarget ? closingAgentMessageIdRef.current : null)
+            ?? backgroundLogMessageIdRef.current
+        } else if (source === 'task') {
+          id =
+            pendingStandaloneTaskIdRef.current
+            ?? currentAgentMessageIdRef.current
+            ?? (hasClosingAgentTarget ? closingAgentMessageIdRef.current : null)
+            ?? (hasClosingStandaloneTarget ? closingStandaloneTaskMessageIdRef.current : null)
+            ?? backgroundLogMessageIdRef.current
+        } else {
+          id =
+            pendingStandaloneTaskIdRef.current
+            ?? currentAgentMessageIdRef.current
+            ?? (hasClosingAgentTarget ? closingAgentMessageIdRef.current : null)
+            ?? (hasClosingStandaloneTarget ? closingStandaloneTaskMessageIdRef.current : null)
+            ?? backgroundLogMessageIdRef.current
+        }
         const logLine =
           typeof params?.message === 'string'
             ? params.message
@@ -223,16 +264,33 @@ export function useHomeConversation({
           if (index < 0) return prev
           const cur = prev[index]
           const blocks = cur.blocks ?? []
-          const last = blocks[blocks.length - 1]
-          if (last?.type !== 'log') return prev
-          const nextBlocks = blocks.slice(0, -1).concat({
-            type: 'log',
-            content: last.content ? `${last.content}\n${logLine}` : logLine,
-            title: last.title,
-          })
+          const lastLogIndex = [...blocks]
+            .map((block, i) => ({ block, i }))
+            .reverse()
+            .find((item) => item.block.type === 'log')?.i
+          let nextBlocks: AssistantBlock[]
+          if (lastLogIndex == null) {
+            nextBlocks = [...blocks, { type: 'log', content: logLine }]
+          } else {
+            const target = blocks[lastLogIndex]
+            if (target.type !== 'log') return prev
+            nextBlocks = blocks.slice()
+            nextBlocks[lastLogIndex] = {
+              type: 'log',
+              content: target.content ? `${target.content}\n${logLine}` : logLine,
+              title: target.title,
+            }
+          }
           const next = [...prev]
           const isFinalize = logType === 'finalize_ai_message'
           next[index] = { ...cur, blocks: nextBlocks, pending: !isFinalize }
+          if (id === closingStandaloneTaskMessageIdRef.current) {
+            // 尾日志再次到达则刷新窗口，避免被并发 stop 路径切碎到“自动触发”日志。
+            closingStandaloneTaskUntilRef.current = Date.now() + STANDALONE_TASK_LOG_TAIL_WINDOW_MS
+          }
+          if (id === closingAgentMessageIdRef.current) {
+            closingAgentUntilRef.current = Date.now() + AGENT_LOG_TAIL_WINDOW_MS
+          }
           if (isFinalize && backgroundLogMessageIdRef.current === id) {
             backgroundLogMessageIdRef.current = null
           }
@@ -243,13 +301,17 @@ export function useHomeConversation({
     return () => off()
   }, [rpcClient, sessionId])
 
+  const isAnyPending = isConversationPending || isStandaloneTaskPending
+
   const handleSend = useCallback(async (overrideText?: string) => {
     const text = (overrideText != null && overrideText !== '' ? overrideText : input).trim()
-    if (!text || rpcState !== 'open' || !sessionId || isConversationPending) return
+    if (!text || rpcState !== 'open' || !sessionId || isAnyPending) return
     if (overrideText == null) setInput('')
     const assistantId = createId()
     setIsConversationPending(true)
     currentAgentMessageIdRef.current = assistantId
+    closingAgentMessageIdRef.current = null
+    closingAgentUntilRef.current = 0
     setMessages((prev) => [
       ...prev,
       { id: createId(), role: 'user', content: text },
@@ -307,17 +369,22 @@ export function useHomeConversation({
       }
       setIsConversationPending(false)
     }
-  }, [input, isConversationPending, rpcState, sessionId, rpcClient])
+  }, [input, isAnyPending, rpcState, sessionId, rpcClient])
 
   const handleStop = useCallback(async () => {
-    if (rpcState !== 'open' || !sessionId || !isConversationPending) return
-    console.log("handleStop")
+    if (rpcState !== 'open' || !sessionId || !isAnyPending) return
     try {
-      await rpcClient.sendRequest('agent.stop', { session_id: sessionId })
+      if (isConversationPending) {
+        await rpcClient.sendRequest('agent.stop', { session_id: sessionId })
+      } else if (isStandaloneTaskPending) {
+        const taskId = pendingStandaloneTaskServerIdRef.current
+        if (!taskId) return
+        await rpcClient.sendRequest('task.stop', { task_id: taskId })
+      }
     } catch (error) {
-      log.warn('agent.stop failed:', error)
+      log.warn('stop failed:', error)
     }
-  }, [isConversationPending, rpcClient, rpcState, sessionId])
+  }, [isAnyPending, isConversationPending, isStandaloneTaskPending, rpcClient, rpcState, sessionId])
 
-  return { messages, input, setInput, handleSend, handleStop, isConversationPending }
+  return { messages, input, setInput, handleSend, handleStop, isConversationPending: isAnyPending }
 }

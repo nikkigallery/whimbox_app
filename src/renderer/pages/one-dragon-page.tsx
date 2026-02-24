@@ -15,6 +15,8 @@ type OneDragonPageProps = {
 
 export function OneDragonPage({ rpcClient, sessionId, rpcState }: OneDragonPageProps) {
   const [isRunning, setIsRunning] = useState(false)
+  const [runningTaskId, setRunningTaskId] = useState<string | null>(null)
+  const [isStopping, setIsStopping] = useState(false)
 
   const {
     loading,
@@ -26,17 +28,26 @@ export function OneDragonPage({ rpcClient, sessionId, rpcState }: OneDragonPageP
 
   useEffect(() => {
     const offNotification = rpcClient.on("notification", (notification) => {
-      if (notification.method !== "event.task.progress") return
+      if (notification.method !== "event.run.status") return
       const params =
         notification.params && typeof notification.params === "object"
           ? (notification.params as Record<string, unknown>)
           : undefined
+      const source = typeof params?.source === "string" ? params.source : ""
+      if (source !== "task") return
       const toolId = typeof params?.tool_id === "string" ? params.tool_id : ""
-      if (toolId !== "nikki.all_in_one") return
-      const detail = typeof params?.detail === "string" ? params.detail : ""
-      if (detail === "started") {
+      if (toolId && toolId !== "nikki.all_in_one") return
+      const phase = typeof params?.phase === "string" ? params.phase : ""
+      if (phase === "started") {
+        const taskId = typeof params?.task_id === "string" ? params.task_id : null
+        if (taskId) setRunningTaskId(taskId)
+        setIsStopping(false)
         setIsRunning(true)
-      } else if (detail === "completed" || detail === "cancelled") {
+      } else if (phase === "stopping") {
+        setIsStopping(true)
+      } else if (phase === "completed" || phase === "cancelled" || phase === "error") {
+        setRunningTaskId(null)
+        setIsStopping(false)
         setIsRunning(false)
       }
     })
@@ -48,14 +59,28 @@ export function OneDragonPage({ rpcClient, sessionId, rpcState }: OneDragonPageP
   const handleRun = async () => {
     if (!sessionId || rpcState !== "open") return
     try {
-      await rpcClient.sendRequest("task.run", {
+      const result = await rpcClient.sendRequest<{ task_id?: string }>("task.run", {
         session_id: sessionId,
         tool_id: "nikki.all_in_one",
         input: {},
       })
+      const taskId = typeof result?.task_id === "string" ? result.task_id : null
+      if (taskId) setRunningTaskId(taskId)
+      setIsStopping(false)
       setIsRunning(true)
     } catch {
       toast.error("启动失败")
+    }
+  }
+
+  const handleStop = async () => {
+    if (!runningTaskId) return
+    try {
+      setIsStopping(true)
+      await rpcClient.sendRequest("task.stop", { task_id: runningTaskId })
+    } catch {
+      setIsStopping(false)
+      toast.error("停止失败")
     }
   }
 
@@ -69,11 +94,11 @@ export function OneDragonPage({ rpcClient, sessionId, rpcState }: OneDragonPageP
         title="一条龙配置"
         actions={
           <Button
-            onClick={handleRun}
-            disabled={rpcState !== "open" || !sessionId || isRunning}
+            onClick={runningTaskId ? handleStop : handleRun}
+            disabled={rpcState !== "open" || !sessionId || (runningTaskId ? isStopping : isRunning)}
             className="rounded-xl bg-pink-400 text-white shadow-sm transition hover:bg-pink-500"
           >
-            {isRunning ? "一条龙运行中" : "开始一条龙"}
+            {runningTaskId ? (isStopping ? "结束中..." : "停止任务") : "开始一条龙"}
           </Button>
         }
       >
