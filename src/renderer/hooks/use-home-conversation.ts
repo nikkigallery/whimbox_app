@@ -40,6 +40,10 @@ export function useHomeConversation({
   const currentAgentMessageIdRef = useRef<string | null>(null)
   /** agent 每次工具调用(tool_call_id)对应的日志消息 id */
   const agentToolMessageIdsRef = useRef<Record<string, string>>({})
+  /** 当前正在运行的 agent 工具调用集合（用于决定是否缓存文本流） */
+  const activeAgentToolCallIdsRef = useRef<Set<string>>(new Set())
+  /** 工具运行期间缓存的文本流，等工具结束后再落到末尾 */
+  const bufferedAgentTextRef = useRef('')
   /** agent 结束后短时间内，用于承接尾日志的消息 id */
   const closingAgentMessageIdRef = useRef<string | null>(null)
   const closingAgentUntilRef = useRef<number>(0)
@@ -60,6 +64,8 @@ export function useHomeConversation({
     setIsStandaloneTaskPending(false)
     currentAgentMessageIdRef.current = null
     agentToolMessageIdsRef.current = {}
+    activeAgentToolCallIdsRef.current = new Set()
+    bufferedAgentTextRef.current = ''
     closingAgentMessageIdRef.current = null
     closingAgentUntilRef.current = 0
     pendingStandaloneTaskIdRef.current = null
@@ -84,11 +90,29 @@ export function useHomeConversation({
       if (targetSessionId && sessionId && targetSessionId !== sessionId) return
 
       if (method === 'event.agent.message') {
-        const assistantId = currentAgentMessageIdRef.current
-        if (!assistantId) return
         const chunk =
           (params?.message as { message?: string } | undefined)?.message ?? ''
         if (!chunk) return
+        if (activeAgentToolCallIdsRef.current.size > 0) {
+          bufferedAgentTextRef.current += chunk
+          return
+        }
+        let assistantId = currentAgentMessageIdRef.current
+        if (!assistantId) {
+          assistantId = createId()
+          currentAgentMessageIdRef.current = assistantId
+          setMessages((prev) => [
+            ...prev,
+            {
+              id: assistantId!,
+              role: 'assistant',
+              content: chunk,
+              pending: true,
+              blocks: [{ type: 'text', content: chunk }],
+            },
+          ])
+          return
+        }
         setMessages((prev) => {
           const index = prev.findIndex((m) => m.id === assistantId)
           if (index < 0) return prev
@@ -132,6 +156,9 @@ export function useHomeConversation({
           if (phase === 'started') {
             const toolMessageId = createId()
             if (toolCallId) {
+              activeAgentToolCallIdsRef.current.add(toolCallId)
+            }
+            if (toolCallId) {
               agentToolMessageIdsRef.current = {
                 ...agentToolMessageIdsRef.current,
                 [toolCallId]: toolMessageId,
@@ -150,6 +177,9 @@ export function useHomeConversation({
           }
           if (phase === 'completed' || phase === 'cancelled') {
             const toolMessageId = toolCallId ? agentToolMessageIdsRef.current[toolCallId] : null
+            if (toolCallId) {
+              activeAgentToolCallIdsRef.current.delete(toolCallId)
+            }
             if (toolMessageId) {
               closingAgentMessageIdRef.current = toolMessageId
               closingAgentUntilRef.current = Date.now() + AGENT_LOG_TAIL_WINDOW_MS
@@ -159,9 +189,28 @@ export function useHomeConversation({
                 ),
               )
             }
+            if (activeAgentToolCallIdsRef.current.size === 0 && bufferedAgentTextRef.current) {
+              const text = bufferedAgentTextRef.current
+              bufferedAgentTextRef.current = ''
+              const textMsgId = createId()
+              currentAgentMessageIdRef.current = textMsgId
+              setMessages((prev) => [
+                ...prev,
+                {
+                  id: textMsgId,
+                  role: 'assistant',
+                  content: text,
+                  pending: true,
+                  blocks: [{ type: 'text', content: text }],
+                },
+              ])
+            }
           }
           if (phase === 'error') {
             const toolMessageId = toolCallId ? agentToolMessageIdsRef.current[toolCallId] : null
+            if (toolCallId) {
+              activeAgentToolCallIdsRef.current.delete(toolCallId)
+            }
             if (toolMessageId) {
               closingAgentMessageIdRef.current = toolMessageId
               closingAgentUntilRef.current = Date.now() + AGENT_LOG_TAIL_WINDOW_MS
@@ -170,6 +219,22 @@ export function useHomeConversation({
                   m.id === toolMessageId ? { ...m, pending: false } : m,
                 ),
               )
+            }
+            if (activeAgentToolCallIdsRef.current.size === 0 && bufferedAgentTextRef.current) {
+              const text = bufferedAgentTextRef.current
+              bufferedAgentTextRef.current = ''
+              const textMsgId = createId()
+              currentAgentMessageIdRef.current = textMsgId
+              setMessages((prev) => [
+                ...prev,
+                {
+                  id: textMsgId,
+                  role: 'assistant',
+                  content: text,
+                  pending: true,
+                  blocks: [{ type: 'text', content: text }],
+                },
+              ])
             }
           }
           return
@@ -327,16 +392,16 @@ export function useHomeConversation({
     const text = (overrideText != null && overrideText !== '' ? overrideText : input).trim()
     if (!text || rpcState !== 'open' || !sessionId || isAnyPending) return
     if (overrideText == null) setInput('')
-    const assistantId = createId()
     setIsConversationPending(true)
-    currentAgentMessageIdRef.current = assistantId
+    currentAgentMessageIdRef.current = null
     agentToolMessageIdsRef.current = {}
+    activeAgentToolCallIdsRef.current = new Set()
+    bufferedAgentTextRef.current = ''
     closingAgentMessageIdRef.current = null
     closingAgentUntilRef.current = 0
     setMessages((prev) => [
       ...prev,
       { id: createId(), role: 'user', content: text },
-      { id: assistantId, role: 'assistant', content: '', pending: true },
     ])
     try {
       const result = await rpcClient.sendStreamingRequest<{ message?: string }>(
@@ -344,50 +409,76 @@ export function useHomeConversation({
         { session_id: sessionId, message: text },
         () => {},
       )
-      setMessages((prev) =>
-        prev.map((message) =>
-          message.id === assistantId
-            ? {
-                ...message,
-                content:
-                  typeof result?.message === 'string' && result.message.trim()
-                    ? result.message
-                    : message.content || '已收到回复。',
-                blocks:
-                  typeof result?.message === 'string' && result.message.trim()
-                    ? (() => {
-                        const existing = message.blocks ?? []
-                        const last = existing[existing.length - 1]
-                        if (last?.type === 'text') {
-                          return existing
-                            .slice(0, -1)
-                            .concat({ type: 'text' as const, content: result.message! })
-                        }
-                        return [...existing, { type: 'text' as const, content: result.message! }]
-                      })()
-                    : message.blocks,
-                pending: false,
-              }
-            : message,
-        ),
-      )
+      if (bufferedAgentTextRef.current) {
+        const textChunk = bufferedAgentTextRef.current
+        bufferedAgentTextRef.current = ''
+        const msgId = createId()
+        currentAgentMessageIdRef.current = msgId
+        setMessages((prev) => [
+          ...prev,
+          {
+            id: msgId,
+            role: 'assistant',
+            content: textChunk,
+            pending: true,
+            blocks: [{ type: 'text', content: textChunk }],
+          },
+        ])
+      }
+      const fallbackText =
+        typeof result?.message === 'string' && result.message.trim()
+          ? result.message.trim()
+          : ''
+      if (!currentAgentMessageIdRef.current && fallbackText) {
+        const msgId = createId()
+        currentAgentMessageIdRef.current = msgId
+        setMessages((prev) => [
+          ...prev,
+          {
+            id: msgId,
+            role: 'assistant',
+            content: fallbackText,
+            pending: true,
+            blocks: [{ type: 'text', content: fallbackText }],
+          },
+        ])
+      }
     } catch (error) {
       log.error('agent.send_message failed:', error)
-      setMessages((prev) =>
-        prev.map((message) =>
-          message.id === assistantId
-            ? {
-                ...message,
-                content: message.content || '发送失败，请稍后重试。',
-                pending: false,
-              }
-            : message,
-        ),
-      )
-    } finally {
-      if (currentAgentMessageIdRef.current === assistantId) {
-        currentAgentMessageIdRef.current = null
+      if (bufferedAgentTextRef.current) {
+        const textChunk = bufferedAgentTextRef.current
+        bufferedAgentTextRef.current = ''
+        const msgId = createId()
+        currentAgentMessageIdRef.current = msgId
+        setMessages((prev) => [
+          ...prev,
+          {
+            id: msgId,
+            role: 'assistant',
+            content: textChunk,
+            pending: false,
+            blocks: [{ type: 'text', content: textChunk }],
+          },
+        ])
+      } else {
+        const msgId = createId()
+        setMessages((prev) => [
+          ...prev,
+          { id: msgId, role: 'assistant', content: '发送失败，请稍后重试。', pending: false },
+        ])
       }
+    } finally {
+      const textMessageId = currentAgentMessageIdRef.current
+      if (textMessageId) {
+        setMessages((prev) =>
+          prev.map((message) =>
+            message.id === textMessageId ? { ...message, pending: false } : message,
+          ),
+        )
+      }
+      activeAgentToolCallIdsRef.current = new Set()
+      bufferedAgentTextRef.current = ''
+      currentAgentMessageIdRef.current = null
       setIsConversationPending(false)
     }
   }, [input, isAnyPending, rpcState, sessionId, rpcClient])
