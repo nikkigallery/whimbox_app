@@ -33,7 +33,8 @@ export function registerRpcBridge() {
     }
     if (payload.method === 'event.run.status') {
       const params = payload.params as { source?: string; phase?: string } | undefined
-      if (params?.source !== 'agent') return
+      const source = params?.source ?? ''
+      if (source !== 'agent' && source !== 'task' && source !== 'background') return
       const phase = params?.phase ?? ''
       if (phase === 'started') {
         setOverlayIgnoreMouseEvents(true)

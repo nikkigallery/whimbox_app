@@ -57,7 +57,7 @@ export function useHomeConversation({
   /** 后台任务（非 task.run）日志消息 id，用于 event.run.log(type=add/update/finalize_ai_message) */
   const backgroundLogMessageIdRef = useRef<string | null>(null)
 
-  // 单一 notification 监听：所有 event.agent.* / event.task.* 统一在此驱动 messages，主界面与 overlay 共用
+  // 单一 notification 监听：event.agent.message + event.run.* 统一在此驱动 messages，主界面与 overlay 共用
   useEffect(() => {
     if (rpcState === 'open') return
     setIsConversationPending(false)

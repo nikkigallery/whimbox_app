@@ -19,9 +19,8 @@ type Listener<T> = (payload: T) => void
 
 const STREAM_EVENT_METHODS = [
   'event.agent.message',
-  'event.agent.status',
-  'event.task.log',
-  'event.task.progress',
+  'event.run.status',
+  'event.run.log',
 ] as const
 
 type PendingEntry = {
@@ -135,7 +134,7 @@ export class RpcClient {
   }
 
   /**
-   * 流式请求：onStreamEvent 会在收到 event.agent.message / event.agent.status / event.task.log 时立即被调用，
+   * 流式请求：onStreamEvent 会在收到 event.agent.message / event.run.status / event.run.log 时立即被调用，
    * 最后 Promise 以完整 result resolve。同一时间只应有一个流式请求。
    */
   sendStreamingRequest<T = unknown>(
