@@ -31,15 +31,17 @@ export function registerRpcBridge() {
       forceShowOverlay()
       return
     }
-    if (payload.method === 'event.agent.status') {
-      const status = (payload.params as { status?: string } | undefined)?.status
-      if (status === 'on_tool_start') {
+    if (payload.method === 'event.run.status') {
+      const params = payload.params as { source?: string; phase?: string } | undefined
+      if (params?.source !== 'agent') return
+      const phase = params?.phase ?? ''
+      if (phase === 'started') {
         setOverlayIgnoreMouseEvents(true)
         showOverlayOnToolStart()
-      } else if (status === 'on_tool_stopping') {
+      } else if (phase === 'stopping') {
         setOverlayIgnoreMouseEvents(false)
         forceShowOverlay()
-      } else if (status === 'on_tool_end' || status === 'on_tool_error') {
+      } else if (phase === 'completed' || phase === 'cancelled' || phase === 'error') {
         setOverlayIgnoreMouseEvents(false)
       }
     }
