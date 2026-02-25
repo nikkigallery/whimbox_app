@@ -1,4 +1,4 @@
-import {
+﻿import {
   ChevronDown,
   CircleDot,
   Gift,
@@ -196,9 +196,9 @@ export function MainScreen() {
         if (user.is_vip) {
           setUserVip(`自动更新：${user.vip_expiry_data ?? '未知'}`)
         } else if (user.vip_expiry_data) {
-          setUserVip('自动更新已过期')
+          setUserVip('已过期（前往续期）')
         } else {
-          setUserVip('未开通自动更新')
+          setUserVip('未开通（前往开通）')
         }
       } else {
         setUserName(null)
@@ -221,6 +221,10 @@ export function MainScreen() {
     } catch (error) {
       toast.error(error instanceof Error ? error.message : String(error))
     }
+  }, [launcherApi])
+
+  const handleOpenIntro = useCallback(() => {
+    launcherApi.openExternal('https://nikkigallery.vip/whimbox/intro')
   }, [launcherApi])
 
   const handleLogout = useCallback(() => {
@@ -555,7 +559,19 @@ export function MainScreen() {
               </SidebarGroup>
             </SidebarContent>
             <SidebarFooter>
-              <div className="rounded-xl border border-slate-200 bg-white px-3 py-3 my-3 shadow-sm dark:border-slate-700 dark:bg-slate-900">
+              <div
+                role="button"
+                tabIndex={0}
+                onClick={handleOpenIntro}
+                onKeyDown={(event) => {
+                  if (event.key === 'Enter' || event.key === ' ') {
+                    event.preventDefault()
+                    handleOpenIntro()
+                  }
+                }}
+                className="my-3 rounded-xl border border-slate-200 bg-white px-3 py-3 shadow-sm transition hover:bg-slate-50/80 focus:outline-none focus:ring-2 focus:ring-pink-300 dark:border-slate-700 dark:bg-slate-900 dark:hover:bg-slate-800 cursor-pointer"
+                title="查看会员介绍"
+              >
                 <div className="flex items-center gap-3">
                   <div className="size-9 shrink-0 overflow-hidden rounded-full bg-slate-200 dark:bg-slate-700">
                     {userAvatarUrl ? (
@@ -576,7 +592,10 @@ export function MainScreen() {
                       {userName ? (
                         <button
                           type="button"
-                          onClick={handleLogout}
+                          onClick={(event) => {
+                            event.stopPropagation()
+                            handleLogout()
+                          }}
                           className="shrink-0 rounded-full border border-slate-200 px-3 py-1 text-xs text-slate-500 hover:bg-slate-50 dark:border-slate-700 dark:text-slate-300 dark:hover:bg-slate-800"
                         >
                           退出
@@ -584,7 +603,10 @@ export function MainScreen() {
                       ) : (
                         <button
                           type="button"
-                          onClick={handleLogin}
+                          onClick={(event) => {
+                            event.stopPropagation()
+                            handleLogin()
+                          }}
                           className="shrink-0 rounded-full bg-pink-400 px-3 py-1 text-xs text-white shadow"
                         >
                           登录
@@ -619,3 +641,4 @@ export function MainScreen() {
     </>
   )
 }
+
