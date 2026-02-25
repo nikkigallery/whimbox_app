@@ -1,4 +1,5 @@
 import { useEffect, useRef } from "react"
+import { useActivate } from "react-activation"
 import type { UiMessage } from "renderer/hooks/use-home-conversation"
 import { cn } from "renderer/lib/utils"
 
@@ -14,11 +15,23 @@ export function ConversationPanel({
   const scrollRef = useRef<HTMLDivElement | null>(null)
   const isOverlay = variant === "overlay"
 
-  useEffect(() => {
+  const scrollToBottom = () => {
     const el = scrollRef.current
     if (!el) return
     el.scrollTop = el.scrollHeight
+  }
+
+  useEffect(() => {
+    scrollToBottom()
   }, [messages])
+
+  useActivate(() => {
+    // KeepAlive 恢复时先完成布局，再强制滚到最新内容
+    const raf = window.requestAnimationFrame(() => {
+      scrollToBottom()
+    })
+    return () => window.cancelAnimationFrame(raf)
+  })
 
   return (
     <div ref={scrollRef} className="min-h-0 flex-1 space-y-4 overflow-y-auto select-text">
