@@ -1,4 +1,6 @@
+import { useEffect, useRef } from "react"
 import type { ComponentType } from "react"
+import { useActivate } from "react-activation"
 
 import { Bot, FileText, Gift, Send, Square, Target } from "lucide-react"
 
@@ -38,10 +40,26 @@ export function HomePage({
   rpcState,
   sessionId,
 }: HomePageProps) {
+  const textareaRef = useRef<HTMLTextAreaElement | null>(null)
 
   const hasConversation = messages.length > 0
   const isSendDisabled = !input.trim() || rpcState !== "open" || !sessionId
   const isInputDisabled = isConversationPending || rpcState !== "open" || !sessionId
+
+  useEffect(() => {
+    if (!isConversationPending && rpcState === "open" && sessionId) {
+      textareaRef.current?.focus()
+    }
+  }, [isConversationPending, rpcState, sessionId])
+
+  useActivate(() => {
+    const raf = window.requestAnimationFrame(() => {
+      if (!isInputDisabled) {
+        textareaRef.current?.focus()
+      }
+    })
+    return () => window.cancelAnimationFrame(raf)
+  })
 
   return (
     <div className="flex flex-1 flex-col min-h-0">
@@ -94,6 +112,7 @@ export function HomePage({
         <div className="flex items-end gap-4 rounded-2xl border border-slate-100 bg-white px-4 py-3 shadow-sm dark:border-slate-800 dark:bg-slate-900">
           <div className="flex-1">
             <textarea
+              ref={textareaRef}
               rows={1}
               value={input}
               disabled={isInputDisabled}
@@ -121,6 +140,10 @@ export function HomePage({
           <div className="flex items-center gap-3">
             <button
               type="button"
+              onMouseDown={(event) => {
+                // 避免点击按钮时把焦点从输入框抢走。
+                event.preventDefault()
+              }}
               onClick={isConversationPending ? handleStop : () => handleSend()}
               disabled={isConversationPending ? false : isSendDisabled}
               className={cn(
