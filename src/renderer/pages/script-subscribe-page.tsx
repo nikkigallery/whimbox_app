@@ -203,7 +203,9 @@ export function ScriptSubscribePage({
       const msg = err instanceof Error ? err.message : ""
       if (msg.includes("403") || msg.includes("自动更新")) {
         toast.error("请开通自动更新")
-      } else {
+      } else if(msg.includes("401")){
+        toast.error("请先登录")
+      }else {
         toast.error("操作失败，请稍后重试")
       }
     } finally {

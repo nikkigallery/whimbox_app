@@ -43,7 +43,7 @@ export function AutoTriggerPage({ rpcClient }: AutoTriggerPageProps) {
       })
       .catch(() => {
         if (!active) return
-        toast.error("读取后台任务状态失败")
+        toast.error("读取自动触发状态失败")
       })
       .finally(() => {
         if (!active) return

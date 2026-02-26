@@ -13,12 +13,6 @@ type QuickAction = {
   title: string
 }
 
-const quickActions: QuickAction[] = [
-  { icon: FileText, title: "请帮我执行下日常任务-一条龙" },
-  { icon: Bot, title: "待定1" },
-  { icon: Target, title: "待定2" },
-]
-
 type HomePageProps = {
   messages: UiMessage[]
   input: string
@@ -81,22 +75,6 @@ export function HomePage({
               <h1 className="text-xl font-semibold text-slate-700 dark:text-slate-100">
                 今天需要我帮你做点什么吗？
               </h1>
-            </div>
-
-            <div className="grid w-full max-w-2xl grid-cols-1 gap-4 md:grid-cols-3">
-              {quickActions.map((action) => (
-                <div
-                  key={action.title}
-                  className="flex items-center gap-3 rounded-2xl border border-slate-100 bg-white px-4 py-4 shadow-sm dark:border-slate-800 dark:bg-slate-900"
-                >
-                  <div className="flex size-10 items-center justify-center rounded-xl bg-pink-50 text-pink-400 dark:bg-pink-500/15 dark:text-pink-300">
-                    <action.icon className="size-5" />
-                  </div>
-                  <span className="text-sm text-slate-500 dark:text-slate-300">
-                    {action.title}
-                  </span>
-                </div>
-              ))}
             </div>
           </>
         ) : null}
