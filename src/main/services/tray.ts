@@ -1,12 +1,14 @@
-import { app, nativeImage, Tray, type BrowserWindow } from 'electron'
+import { app, Menu, nativeImage, Tray, type BrowserWindow } from 'electron'
 import { join } from 'node:path'
 
 let tray: Tray | null = null
 
 function getTrayIconPath(): string {
-  const appPath = app.getAppPath()
-  const icoPath = join(appPath, 'src/resources/build/icons/icon.ico')
-  return icoPath
+  if (app.isPackaged) {
+    return join(process.resourcesPath, 'assets', 'tray', 'icon.ico')
+  }
+
+  return join(app.getAppPath(), 'src', 'resources', 'build', 'icons', 'icon.ico')
 }
 
 export function createTray(mainWindow: BrowserWindow) {
@@ -22,6 +24,24 @@ export function createTray(mainWindow: BrowserWindow) {
   }
 
   tray.setToolTip(app.name || '奇想盒')
+  tray.setContextMenu(
+    Menu.buildFromTemplate([
+      {
+        label: '显示奇想盒',
+        click: () => {
+          if (mainWindow.isDestroyed()) return
+          mainWindow.show()
+          mainWindow.focus()
+        },
+      },
+      {
+        label: '关闭奇想盒',
+        click: () => {
+          app.quit()
+        },
+      },
+    ])
+  )
 
   tray.on('click', () => {
     if (mainWindow.isDestroyed()) return

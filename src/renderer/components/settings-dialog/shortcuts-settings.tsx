@@ -22,7 +22,7 @@ export const content: SettingContent = {
       return (
         <div className="space-y-3">
           <p className="text-sm text-slate-500 dark:text-slate-400">
-            奇想盒后端未连接，暂时无法配置快捷键
+            奇想盒后端未连接，暂时无法设置键位
           </p>
         </div>
       )
@@ -50,7 +50,7 @@ function ShortcutsForm({ rpcClient }: { rpcClient: IpcRpcClient }) {
       })
       .catch(() => {
         if (!active) return
-        setLoadError("读取快捷键配置失败")
+        setLoadError("读取键位设置失败")
       })
       .finally(() => {
         if (!active) return
@@ -105,7 +105,7 @@ function ShortcutsForm({ rpcClient }: { rpcClient: IpcRpcClient }) {
 
   if (!config || Object.keys(config).length === 0) {
     return (
-      <p className="text-sm text-slate-500 dark:text-slate-400">暂无快捷键配置</p>
+      <p className="text-sm text-slate-500 dark:text-slate-400">暂无键位设置</p>
     )
   }
 

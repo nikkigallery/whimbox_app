@@ -89,7 +89,7 @@ export class RpcClient {
     ws.onerror = (event) => {
       // console.warn('[rpc] connect: error', event)
       this.setState('error')
-      this.emit('error', { message: 'RPC connection error' })
+      // this.emit('error', { message: 'RPC connection error' })
       this.scheduleReconnect()
     }
     ws.onmessage = (event) => {
