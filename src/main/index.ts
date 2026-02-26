@@ -18,6 +18,25 @@ import { MainWindow } from './windows/main'
 import { OverlayWindow } from './windows/overlay'
 import { SplashWindow } from './windows/splash'
 
+if (process.platform === 'win32') {
+  app.commandLine.appendSwitch('no-sandbox')
+  app.commandLine.appendSwitch('disable-gpu-sandbox')
+  app.commandLine.appendSwitch('disable-features', 'RendererCodeIntegrity')
+}
+
+let primaryWindow: BrowserWindow | null = null
+
+app.on('second-instance', () => {
+  const targetWindow =
+    (primaryWindow && !primaryWindow.isDestroyed() ? primaryWindow : BrowserWindow.getAllWindows()[0]) ??
+    null
+
+  if (!targetWindow) return
+  if (targetWindow.isMinimized()) targetWindow.restore()
+  if (!targetWindow.isVisible()) targetWindow.show()
+  targetWindow.focus()
+})
+
 function forwardPythonProgressTo(splashWindow: BrowserWindow) {
   const send = (stage: string, message: string) => {
     if (!splashWindow.isDestroyed() && splashWindow.webContents) {
@@ -171,6 +190,7 @@ makeAppWithSingleInstanceLock(async () => {
   splashWindow.close()
 
   const window = await makeAppSetup(MainWindow)
+  primaryWindow = window
   const overlayWindow = await OverlayWindow()
   void overlayWindow
 
@@ -205,6 +225,7 @@ makeAppWithSingleInstanceLock(async () => {
 })
 
 app.on('before-quit', () => {
+  primaryWindow = null
   destroyTray()
   stopAuthServer()
   stopRpcBridge()
