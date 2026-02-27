@@ -50,7 +50,7 @@ function ShortcutsForm({ rpcClient }: { rpcClient: IpcRpcClient }) {
       })
       .catch(() => {
         if (!active) return
-        setLoadError("读取键位设置失败")
+        setLoadError("奇想盒未安装，读取键位设置失败")
       })
       .finally(() => {
         if (!active) return

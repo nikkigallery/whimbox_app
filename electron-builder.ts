@@ -60,7 +60,7 @@ export default {
     shortcutName: '奇想盒',
     language: '2052',
     runAfterFinish: true,
-    deleteAppDataOnUninstall: false,
+    deleteAppDataOnUninstall: true,
     displayLanguageSelector: false,
     uninstallDisplayName: '奇想盒',
     include: 'installer.nsh', // 自定义安装脚本，用于保护用户数据文件夹
