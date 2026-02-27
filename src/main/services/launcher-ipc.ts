@@ -204,7 +204,7 @@ export function registerLauncherIpc(window: BrowserWindow) {
   )
 
   ipcMain.handle('launcher:download-and-install-whl', async (_, url: string, md5?: string) =>
-    runWhlInstallWithProgress(window, '更新后端', {
+    runWhlInstallWithProgress(window, '更新中', {
       initialMessage: '准备下载…',
       withDownload: true,
       work: () => backendManager.downloadAndInstallWhl(url, md5),
@@ -219,7 +219,7 @@ export function registerLauncherIpc(window: BrowserWindow) {
     if (!data?.url) {
       throw new Error('未获取到更新地址')
     }
-    return runWhlInstallWithProgress(window, '更新后端', {
+    return runWhlInstallWithProgress(window, '更新中', {
       initialMessage: '准备下载…',
       withDownload: true,
       work: () => backendManager.downloadAndInstallWhl(data.url, data.md5),

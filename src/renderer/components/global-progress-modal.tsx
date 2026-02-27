@@ -59,7 +59,7 @@ export function GlobalProgressModal({ state, onClose, onRestartAndInstall }: Glo
           </div>
 
           {message && status !== 'error' && (
-            <p className="min-w-0 break-words line-clamp-2 text-sm text-slate-600 dark:text-slate-300" title={message}>
+            <p className="min-w-0 break-all line-clamp-2 text-sm text-slate-600 dark:text-slate-300" title={message}>
               {message}
             </p>
           )}

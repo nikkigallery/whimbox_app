@@ -120,7 +120,7 @@ export function useUnifiedUpdate({
         tryFinishUnifiedCheckRef.current()
       }
       if (electronUpdateInModalRef.current) {
-        const title = '更新应用'
+        const title = '更新中'
         if (state.status === 'checking' || state.status === 'available' || state.status === 'downloading') {
           const progress =
             state.status === 'downloading' &&
@@ -240,7 +240,7 @@ export function useUnifiedUpdate({
   const handleManualAppUpdate = useCallback(async () => {
     const path = await launcherApi.selectWhlFile()
     if (!path) return
-    setTaskProgressState({ status: 'running', title: '安装后端', message: '正在安装…' })
+    setTaskProgressState({ status: 'running', title: '更新中', message: '正在安装…' })
     try {
       await launcherApi.installWhl(path)
       const status = await launcherApi.getBackendStatus()
@@ -248,7 +248,7 @@ export function useUnifiedUpdate({
     } catch (err) {
       setTaskProgressState({
         status: 'error',
-        title: '安装后端',
+        title: '更新中',
         error: err instanceof Error ? err.message : String(err),
       })
     }
@@ -258,7 +258,7 @@ export function useUnifiedUpdate({
     const result = lastUnifiedCheckResultRef.current
     if (!result) return
     if (result.hasBackend) {
-      setTaskProgressState({ status: 'running', title: '更新后端', message: '正在下载安装…' })
+      setTaskProgressState({ status: 'running', title: '更新中', message: '正在下载安装…' })
       try {
         await launcherApi.downloadAndInstallLatestWhl()
         const status = await launcherApi.getBackendStatus()
@@ -266,7 +266,7 @@ export function useUnifiedUpdate({
       } catch (err) {
         setTaskProgressState({
           status: 'error',
-          title: '更新后端',
+          title: '更新中',
           error: err instanceof Error ? err.message : String(err),
         })
         return
@@ -278,7 +278,7 @@ export function useUnifiedUpdate({
       electronUpdateInModalRef.current = true
       setTaskProgressState({
         status: 'running',
-        title: '更新应用',
+        title: '更新中',
         message: status === 'available' ? updateState.message : '正在更新应用…',
       })
       if (status === 'installing') {
@@ -290,7 +290,7 @@ export function useUnifiedUpdate({
           electronUpdateInModalRef.current = false
           setTaskProgressState({
             status: 'error',
-            title: '更新应用',
+            title: '更新中',
             error: err instanceof Error ? err.message : String(err),
           })
         }
