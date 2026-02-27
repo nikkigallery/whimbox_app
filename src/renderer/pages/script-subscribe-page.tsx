@@ -113,11 +113,14 @@ type ScriptSubscribePageProps = {
   onOpenExternal?: (url: string) => void
   /** 订阅/取消订阅/同步脚本后刷新后端脚本列表（调用 script.refresh） */
   onRefreshBackendScripts?: () => void | Promise<void>
+  /** 登录态变更版本号（用于 keepalive 页面触发刷新） */
+  authStateVersion?: number
 }
 
 export function ScriptSubscribePage({
   onOpenExternal,
   onRefreshBackendScripts,
+  authStateVersion,
 }: ScriptSubscribePageProps) {
   const [searchParams, setSearchParams] = useState<SearchParams>(defaultSearchParams)
   const [tableData, setTableData] = useState<ScriptListItem[]>([])
@@ -166,6 +169,11 @@ export function ScriptSubscribePage({
     fetchScripts()
   }, [fetchScripts])
 
+  useEffect(() => {
+    if (!authStateVersion) return
+    fetchScripts()
+  }, [authStateVersion, fetchScripts])
+
   const handlePageChange = (page: number) => {
     setSearchParams((p) => ({ ...p, page }))
   }
@@ -183,7 +191,7 @@ export function ScriptSubscribePage({
       if (detailScript?.id === row.id) {
         setDetailScript({ ...detailScript, is_subscribed: res.is_subscribed })
       }
-      toast.success(res.message ?? (res.is_subscribed ? "订阅成功" : "取消订阅成功"))
+      // toast.success(res.message ?? (res.is_subscribed ? "订阅成功" : "取消订阅成功"))
       if (res.is_subscribed && res.md5) {
         try {
           await window.App.launcher.downloadScript({ name: row.name, md5: res.md5 })
@@ -253,7 +261,6 @@ export function ScriptSubscribePage({
                   onChange={(e) =>
                     setSearchParams((p) => ({ ...p, target: e.target.value }))
                   }
-                  placeholder="脚本目标"
                   className="w-40"
                 />
               </label>
@@ -279,7 +286,6 @@ export function ScriptSubscribePage({
                   onChange={(e) =>
                     setSearchParams((p) => ({ ...p, uploader_name: e.target.value }))
                   }
-                  placeholder="作者名称"
                   className="w-40"
                 />
               </label>

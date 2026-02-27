@@ -93,7 +93,7 @@ export const content: SettingContent = {
     return (
       <div className="space-y-3">
         <p className="text-sm text-slate-500 dark:text-slate-400">
-          奇想盒后端未连接，暂时无法配置
+          奇想盒未安装，暂时无法配置
         </p>
       </div>
     )

@@ -102,6 +102,8 @@ export function MainScreen() {
   const [userName, setUserName] = useState<string | null>(null)
   const [userVip, setUserVip] = useState<string>('未登录')
   const [userAvatarUrl, setUserAvatarUrl] = useState<string | null>(null)
+  const [authStateVersion, setAuthStateVersion] = useState(0)
+  const [backendReloadVersion, setBackendReloadVersion] = useState(0)
   const [isProcessing, setIsProcessing] = useState(false)
   const [taskProgressState, setTaskProgressState] = useState<TaskProgressState>({ status: 'idle' })
   const [toolRunning, setToolRunning] = useState(false)
@@ -291,7 +293,12 @@ export function MainScreen() {
   }, [launcherApi])
 
   useEffect(() => {
+    let prevState = rpcState
     const offState = rpcClient.on('state', ({ state }) => {
+      if (state === 'open' && prevState !== 'open') {
+        setBackendReloadVersion((v) => v + 1)
+      }
+      prevState = state
       setRpcState(state)
       if (state !== 'open') {
         setSessionId(null)
@@ -301,7 +308,13 @@ export function MainScreen() {
       toast.error(payload.message || 'RPC 连接异常')
     })
     // 挂载后主动拉取一次当前状态，避免 RPC 在 starting 阶段已 open 而主界面未收到广播
-    void rpcClient.getStateAsync().then(setRpcState)
+    void rpcClient.getStateAsync().then((state) => {
+      if (state === 'open' && prevState !== 'open') {
+        setBackendReloadVersion((v) => v + 1)
+      }
+      prevState = state
+      setRpcState(state)
+    })
     return () => {
       offState()
       offError()
@@ -334,6 +347,7 @@ export function MainScreen() {
 
   useEffect(() => {
     launcherApi.onAuthState((data) => {
+      setAuthStateVersion((v) => v + 1)
       applyAuthState(data)
       if (data?.user?.is_vip) {
         syncSubscribedScripts()
@@ -359,9 +373,16 @@ export function MainScreen() {
   const getPageContent = (pageId: string) => {
     switch (pageId) {
       case 'one-dragon':
-        return <OneDragonPage rpcClient={rpcClient} sessionId={sessionId} rpcState={rpcState} />
+        return (
+          <OneDragonPage
+            rpcClient={rpcClient}
+            sessionId={sessionId}
+            rpcState={rpcState}
+            backendReloadVersion={backendReloadVersion}
+          />
+        )
       case 'auto-trigger':
-        return <AutoTriggerPage rpcClient={rpcClient} />
+        return <AutoTriggerPage rpcClient={rpcClient} backendReloadVersion={backendReloadVersion} />
       case 'auto-navigate':
         return <AutoNavigatePage rpcClient={rpcClient} sessionId={sessionId} rpcState={rpcState} />
       case 'auto-macro':
@@ -373,6 +394,7 @@ export function MainScreen() {
           <ScriptSubscribePage
             onOpenExternal={launcherApi.openExternal}
             onRefreshBackendScripts={refreshBackendScripts}
+            authStateVersion={authStateVersion}
           />
         )
       case 'home':
@@ -423,10 +445,10 @@ export function MainScreen() {
             type="button"
             onClick={() => window.App?.overlay?.show?.()}
             className="flex items-center gap-2 rounded-full border border-slate-200 bg-white/80 px-3 py-1 text-xs text-slate-500 shadow-sm transition hover:bg-slate-50 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-300 dark:hover:bg-slate-700"
-            title="悬浮窗关闭后，点击可重新显示悬浮窗"
+            title="小窗关闭后，点击可重新显示"
           >
             <CircleDot className="size-3" />
-            悬浮窗
+            小窗
           </button>
           <SettingsDialog
             displayVersion={displayVersion}

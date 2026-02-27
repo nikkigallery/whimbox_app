@@ -147,7 +147,7 @@ export function OverlayScreen() {
         className="flex items-center justify-between border-b border-white/15 px-3 py-0.5 app-drag"
         style={appRegionDrag}
       >
-        <span className="text-sm font-medium text-white/90">奇想盒</span>
+        <span className="text-sm font-medium text-white/90">奇想盒-小窗</span>
         <div className="flex items-center gap-1 app-no-drag" style={appRegionNoDrag}>
           <button
             type="button"
@@ -166,7 +166,7 @@ export function OverlayScreen() {
           </div>
         ) : (
           <div className="flex flex-1 items-center justify-center text-white/60 text-sm">
-            {rpcState === 'open' ? '输入消息开始对话' : '奇想盒后端未连接'}
+            {rpcState === 'open' ? '输入消息开始对话' : '奇想盒未安装'}
           </div>
         )}
 
@@ -176,7 +176,7 @@ export function OverlayScreen() {
             value={input}
             disabled={isInputDisabled}
             placeholder={
-              rpcState === 'open' ? '输入内容...' : '等待连接...'
+              rpcState === 'open' ? '输入内容...' : '奇想盒未安装'
             }
             onChange={(e) => {
               const t = e.currentTarget

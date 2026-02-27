@@ -141,7 +141,7 @@
   -webkit-app-region: no-drag;
 }
 
-/* 悬浮窗：透明背景，仅内容区半透明；禁止出现滚动条 */
+/* 小窗：透明背景，仅内容区半透明；禁止出现滚动条 */
 .overlay-window,
 .overlay-window html,
 .overlay-window body {
@@ -156,7 +156,7 @@ body.overlay-window {
   padding: 0;
 }
 
-/* 悬浮窗滚动条：深色半透明，避免默认白色轨道突兀 */
+/* 小窗滚动条：深色半透明，避免默认白色轨道突兀 */
 .overlay-window ::-webkit-scrollbar {
   width: 8px;
   height: 8px;

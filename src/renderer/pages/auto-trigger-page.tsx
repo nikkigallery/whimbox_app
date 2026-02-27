@@ -21,9 +21,13 @@ const FEATURE_ITEMS = [
 
 type AutoTriggerPageProps = {
   rpcClient: IpcRpcClient
+  backendReloadVersion?: number
 }
 
-export function AutoTriggerPage({ rpcClient }: AutoTriggerPageProps) {
+export function AutoTriggerPage({
+  rpcClient,
+  backendReloadVersion,
+}: AutoTriggerPageProps) {
 
   const [loading, setLoading] = useState(true)
   const [savingKey, setSavingKey] = useState<string | null>(null)
@@ -52,7 +56,7 @@ export function AutoTriggerPage({ rpcClient }: AutoTriggerPageProps) {
     return () => {
       active = false
     }
-  }, [rpcClient])
+  }, [rpcClient, backendReloadVersion])
 
   const toggleFeature = async (featureKey: string) => {
     const current = state.features[featureKey] ?? false
@@ -68,7 +72,7 @@ export function AutoTriggerPage({ rpcClient }: AutoTriggerPageProps) {
         { feature: featureKey, enabled: nextValue },
       )
       setState(nextState)
-      toast.success(nextValue ? "成功开启" : "成功关闭")
+      // toast.success(nextValue ? "成功开启" : "成功关闭")
     } catch {
       setState((prev) => ({
         ...prev,

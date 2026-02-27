@@ -87,9 +87,9 @@ async function runWhlInstallWithProgress(
     const result = await work()
     sendTaskProgress(win, { status: 'success', title, message: '安装完成' })
     try {
-      sendTaskProgress(win, { status: 'running', title, message: '正在重启奇想盒后台…' })
+      sendTaskProgress(win, { status: 'running', title, message: '正在重启奇想盒…' })
       await backendManager.launchBackend()
-      sendTaskProgress(win, { status: 'running', title, message: '奇想盒后台启动中…' })
+      sendTaskProgress(win, { status: 'running', title, message: '奇想盒启动中…' })
       reconnectRpcNow()
       const connected = await waitForRpcConnected(30_000)
       if (connected) {
@@ -98,8 +98,8 @@ async function runWhlInstallWithProgress(
         sendTaskProgress(win, { status: 'error', title, error: '连接超时，重启奇想盒试试？' })
       }
     } catch (restartErr) {
-      console.error('更新后重启后台失败:', restartErr)
-      sendTaskProgress(win, { status: 'error', title, error: '重启后台失败' })
+      console.error('更新后重启失败:', restartErr)
+      sendTaskProgress(win, { status: 'error', title, error: '重启失败，请手动重启试试' })
     }
     return result
   } catch (err) {
@@ -120,12 +120,12 @@ async function runWhlInstallWithProgress(
  * 用于「保存并应用」等场景。
  */
 async function runRestartBackend(win: BrowserWindow, title: string): Promise<void> {
-  sendTaskProgress(win, { status: 'running', title, message: '正在重启奇想盒后台…' })
+  sendTaskProgress(win, { status: 'running', title, message: '正在重启奇想盒…' })
   try {
     await backendManager.stopBackend()
     await waitFor(5000)
     await backendManager.launchBackend()
-    sendTaskProgress(win, { status: 'running', title, message: '奇想盒后台启动中…' })
+    sendTaskProgress(win, { status: 'running', title, message: '奇想盒启动中…' })
     reconnectRpcNow()
     const connected = await waitForRpcConnected(30_000)
     if (connected) {
@@ -134,7 +134,7 @@ async function runRestartBackend(win: BrowserWindow, title: string): Promise<voi
       sendTaskProgress(win, { status: 'error', title, error: '连接超时，重启奇想盒试试？' })
     }
   } catch (err) {
-    console.error('重启后台失败:', err)
+    console.error('重启失败:', err)
     const message = err instanceof Error ? err.message : String(err)
     sendTaskProgress(win, { status: 'error', title, error: message })
     throw err
@@ -196,7 +196,7 @@ export function registerLauncherIpc(window: BrowserWindow) {
   })
 
   ipcMain.handle('launcher:install-whl', async (_, wheelPath: string) =>
-    runWhlInstallWithProgress(window, '安装后端', {
+    runWhlInstallWithProgress(window, '更新中', {
       initialMessage: '正在安装…',
       withDownload: false,
       work: () => backendManager.installWhl(wheelPath, false),
@@ -230,7 +230,7 @@ export function registerLauncherIpc(window: BrowserWindow) {
   ipcMain.handle('launcher:launch-backend', () => backendManager.launchBackend())
   ipcMain.handle('launcher:stop-backend', () => backendManager.stopBackend())
   ipcMain.handle('launcher:restart-backend', async (_, title?: string) =>
-    runRestartBackend(window, title ?? '重启后台'),
+    runRestartBackend(window, title ?? '重启奇想盒'),
   )
   ipcMain.handle('launcher:get-app-version', () => app.getVersion())
   ipcMain.handle('launcher:get-announcements', () => getAnnouncements())

@@ -87,7 +87,7 @@ export function getOverlayWindow() {
   return overlayWindowRef
 }
 
-/** 工具启动时自动显示悬浮窗；若用户手动关闭过则不自动显示。 */
+/** 工具启动时自动显示小窗；若用户手动关闭过则不自动显示。 */
 export function showOverlayOnToolStart() {
   const win = overlayWindowRef
   if (!win || win.isDestroyed()) return
@@ -95,7 +95,7 @@ export function showOverlayOnToolStart() {
   win.show()
 }
 
-/** 手动停止工具时强制显示悬浮窗，不受“手动关闭后不自动显示”策略限制。 */
+/** 手动停止工具时强制显示小窗，不受“手动关闭后不自动显示”策略限制。 */
 export function forceShowOverlay() {
   const win = overlayWindowRef
   if (!win || win.isDestroyed()) return
@@ -120,20 +120,20 @@ export async function OverlayWindow() {
   })
 
   const workArea = screen.getPrimaryDisplay().workArea
+  const width = overlayState.width ?? PANEL_DEFAULT_WIDTH
+  const height = overlayState.height ?? PANEL_DEFAULT_HEIGHT
   const x =
     overlayState.x !== undefined
       ? overlayState.x
-      : workArea.x + workArea.width - PANEL_DEFAULT_WIDTH - MARGIN
+      : workArea.x + MARGIN
   const y =
     overlayState.y !== undefined
       ? overlayState.y
-      : workArea.y + workArea.height * 0.65
-  const width = overlayState.width ?? PANEL_DEFAULT_WIDTH
-  const height = overlayState.height ?? PANEL_DEFAULT_HEIGHT
+      : workArea.y + workArea.height - height - MARGIN
 
   const window = createWindow({
     id: 'overlay',
-    title: '奇想盒 - 悬浮窗',
+    title: '奇想盒 - 小窗',
     x,
     y,
     width,

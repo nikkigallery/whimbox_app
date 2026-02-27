@@ -34,9 +34,11 @@ type UseConfigFormOptions = {
   /** 配置段名，如 "OneDragon"、"Agent" */
   section: string
   rpcClient: IpcRpcClient
+  /** 外部触发重新加载配置的版本号 */
+  reloadVersion?: number
 }
 
-export function useConfigForm({ section, rpcClient }: UseConfigFormOptions) {
+export function useConfigForm({ section, rpcClient, reloadVersion }: UseConfigFormOptions) {
   const [config, setConfig] = useState<ConfigSection | null>(null)
   const [draftConfig, setDraftConfig] = useState<ConfigSection | null>(null)
   const [configMeta, setConfigMeta] = useState<ConfigMeta | null>(null)
@@ -60,7 +62,7 @@ export function useConfigForm({ section, rpcClient }: UseConfigFormOptions) {
       })
       .catch(() => {
         if (!active) return
-        setLoadError("奇想盒后端连接异常，读取配置失败。")
+        setLoadError("奇想盒未安装，读取配置失败。")
       })
       .finally(() => {
         if (!active) return
@@ -76,7 +78,7 @@ export function useConfigForm({ section, rpcClient }: UseConfigFormOptions) {
     return () => {
       active = false
     }
-  }, [rpcClient, section])
+  }, [rpcClient, section, reloadVersion])
 
   const items = useMemo(() => {
     if (configMeta?.items?.length) {

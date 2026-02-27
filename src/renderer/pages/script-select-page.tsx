@@ -12,6 +12,13 @@ import {
   ComboboxItem,
   ComboboxList,
 } from "renderer/components/ui/combobox"
+import {
+  Dialog,
+  DialogContent,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+} from "renderer/components/ui/dialog"
 import { Input } from "renderer/components/ui/input"
 import { Spinner } from "renderer/components/ui/spinner"
 import {
@@ -124,6 +131,8 @@ export function ScriptSelectPage({
   const [isRunning, setIsRunning] = useState(false)
   const [runningTaskId, setRunningTaskId] = useState<string | null>(null)
   const [isStopping, setIsStopping] = useState(false)
+  const [deleteTargetName, setDeleteTargetName] = useState<string | null>(null)
+  const [deleting, setDeleting] = useState(false)
 
   const [nameFilter, setNameFilter] = useState("")
   const [targetFilter, setTargetFilter] = useState("")
@@ -216,20 +225,29 @@ export function ScriptSelectPage({
     setShowDefault(false)
   }
 
-  const handleDelete = async () => {
+  const handleDelete = () => {
     if (!selectedName) {
       toast.warning("请先选择一条记录")
       return
     }
+    setDeleteTargetName(selectedName)
+  }
+
+  const handleConfirmDelete = async () => {
+    if (!deleteTargetName) return
+    setDeleting(true)
     try {
       await rpcClient.sendRequest("script.delete", {
-        name: selectedName,
+        name: deleteTargetName,
         category: mode,
       })
       toast.success("删除成功")
+      setDeleteTargetName(null)
       void loadScripts()
     } catch {
       toast.error("删除失败，请稍后重试")
+    } finally {
+      setDeleting(false)
     }
   }
 
@@ -239,7 +257,7 @@ export function ScriptSelectPage({
       return
     }
     if (rpcState !== "open" || !sessionId) {
-      toast.error("奇想盒后台未启动，暂无法启动任务。")
+      toast.error("奇想盒未安装，暂无法启动任务。")
       return
     }
     try {
@@ -322,7 +340,7 @@ export function ScriptSelectPage({
       <div className="flex flex-col gap-3">
         <div className="grid grid-cols-1 gap-3 md:grid-cols-2 xl:grid-cols-4">
           <div className="space-y-1.5">
-            <span className="text-xs text-slate-500">名称</span>
+            <span className="text-xs text-slate-500">按名称筛选</span>
             <Input
               value={nameFilter}
               onChange={(event) => setNameFilter(event.target.value)}
@@ -332,7 +350,7 @@ export function ScriptSelectPage({
           {mode === "path" ? (
             <>
               <div className="space-y-1.5">
-                <span className="text-xs text-slate-500">目标素材</span>
+                <span className="text-xs text-slate-500">按素材名筛选</span>
                 <Input
                   value={targetFilter}
                   onChange={(event) => setTargetFilter(event.target.value)}
@@ -340,7 +358,7 @@ export function ScriptSelectPage({
                 />
               </div>
               <div className="space-y-1.5">
-                <span className="text-xs text-slate-500">路线类型</span>
+                <span className="text-xs text-slate-500">路线类型筛选</span>
                 <Combobox
                   items={PATH_TYPES}
                   value={PATH_TYPES.includes(typeFilter) ? typeFilter : null}
@@ -365,7 +383,7 @@ export function ScriptSelectPage({
                 </Combobox>
               </div>
               <div className="space-y-1.5">
-                <span className="text-xs text-slate-500">目标数量</span>
+                <span className="text-xs text-slate-500">数量筛选</span>
                 <Input
                   type="number"
                   min={0}
@@ -437,6 +455,24 @@ export function ScriptSelectPage({
           </div>
         )}
       </div>
+      <Dialog open={!!deleteTargetName} onOpenChange={(open) => !open && setDeleteTargetName(null)}>
+        <DialogContent className="sm:max-w-md">
+          <DialogHeader>
+            <DialogTitle>{deleteLabelMap[mode]}</DialogTitle>
+          </DialogHeader>
+          <p className="text-sm text-slate-600 dark:text-slate-300">
+            确认要删除「{deleteTargetName ?? ""}」吗？该操作无法撤销。
+          </p>
+          <DialogFooter showCloseButton={false}>
+            <Button variant="outline" onClick={() => setDeleteTargetName(null)} disabled={deleting}>
+              取消
+            </Button>
+            <Button variant="destructive" onClick={handleConfirmDelete} disabled={deleting}>
+              {deleting ? "删除中..." : "确认删除"}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </ScrollCenterLayout>
   )
 }

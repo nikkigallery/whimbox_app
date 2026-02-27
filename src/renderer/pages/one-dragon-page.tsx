@@ -11,9 +11,15 @@ type OneDragonPageProps = {
   rpcClient: IpcRpcClient
   sessionId: string | null
   rpcState: "idle" | "connecting" | "open" | "closed" | "error"
+  backendReloadVersion?: number
 }
 
-export function OneDragonPage({ rpcClient, sessionId, rpcState }: OneDragonPageProps) {
+export function OneDragonPage({
+  rpcClient,
+  sessionId,
+  rpcState,
+  backendReloadVersion,
+}: OneDragonPageProps) {
   const [isRunning, setIsRunning] = useState(false)
   const [runningTaskId, setRunningTaskId] = useState<string | null>(null)
   const [isStopping, setIsStopping] = useState(false)
@@ -24,7 +30,11 @@ export function OneDragonPage({ rpcClient, sessionId, rpcState }: OneDragonPageP
     items,
     draftConfig,
     handleValueChangeAndSave,
-  } = useConfigForm({ section: "OneDragon", rpcClient })
+  } = useConfigForm({
+    section: "OneDragon",
+    rpcClient,
+    reloadVersion: backendReloadVersion,
+  })
 
   useEffect(() => {
     const offNotification = rpcClient.on("notification", (notification) => {
