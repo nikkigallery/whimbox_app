@@ -262,7 +262,7 @@ export function useHomeConversation({
               blocks: [{ type: 'log', content: '', title }],
             },
           ])
-        } else if (detail === 'completed' || detail === 'cancelled') {
+        } else if (detail === 'completed' || detail === 'cancelled' || detail === 'error') {
           const id = pendingStandaloneTaskIdRef.current
           setIsStandaloneTaskPending(false)
           pendingStandaloneTaskServerIdRef.current = null
