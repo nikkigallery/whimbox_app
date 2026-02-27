@@ -31,7 +31,7 @@ export function isBooleanLike(value: unknown): boolean {
 }
 
 type UseConfigFormOptions = {
-  /** 配置段名，如 "Game"、"Agent" */
+  /** 配置段名，如 "OneDragon"、"Agent" */
   section: string
   rpcClient: IpcRpcClient
 }

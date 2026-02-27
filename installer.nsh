@@ -1,4 +1,4 @@
-; ==============================================================================
+﻿; ==============================================================================
 ; 自定义 NSIS 安装脚本
 ; 功能：更新时只删除应用程序文件，保留用户数据文件夹
 ; 保护的文件夹：app-data, configs, python-embedded, downloads, logs, scripts
@@ -130,4 +130,42 @@
   
   uninstall_done:
 !macroend
+
+; ------------------------------------------------------------------------------
+; 安装目录校验：仅支持纯英文路径
+; ------------------------------------------------------------------------------
+Function IsNonAsciiPath
+  Exch $0        ; path
+  Push $1        ; char length
+  Push $2        ; utf8 byte length (without null)
+
+  ; 在 Unicode NSIS 中，StrLen 返回字符数，不会因中文等非 ASCII 字符而变成 >1。
+  ; 改为比较 UTF-8 字节长度与字符长度：只要有非 ASCII，UTF-8 字节数一定更大。
+  StrLen $1 $0
+  System::Call "Kernel32::WideCharToMultiByte(i 65001, i 0, w r0, i -1, p 0, i 0, p 0, p 0) i .r2"
+  IntOp $2 $2 - 1
+
+  ${If} $2 > $1
+    StrCpy $0 1
+  ${Else}
+    StrCpy $0 0
+  ${EndIf}
+
+  Pop $2
+  Pop $1
+  Exch $0
+FunctionEnd
+
+Function .onVerifyInstDir
+  Push $INSTDIR
+  Call IsNonAsciiPath
+  Pop $0
+
+  ${If} $0 = 1
+    MessageBox MB_ICONEXCLAMATION|MB_OK \
+      "安装路径必须为纯英文路径，请重新选择。"
+    Abort
+  ${EndIf}
+FunctionEnd
+
 
