@@ -17,6 +17,7 @@ import { registerConversationBridge } from './services/conversation-bridge'
 import { MainWindow } from './windows/main'
 import { OverlayWindow } from './windows/overlay'
 import { SplashWindow } from './windows/splash'
+import log from 'electron-log/main.js'
 
 if (process.platform === 'win32') {
   app.commandLine.appendSwitch('no-sandbox')
@@ -93,6 +94,7 @@ makeAppWithSingleInstanceLock(async () => {
 
   await app.whenReady()
   configureLogFile()
+  log.info(`[startup] Whimbox App version=${app.getVersion()} mode=${ENVIRONMENT.IS_DEV ? 'dev' : 'prod'}`,)
 
   const splashWindow = await SplashWindow()
   await new Promise<void>((resolve) => {

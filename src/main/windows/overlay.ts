@@ -15,8 +15,8 @@ let overlaySaveTimer: ReturnType<typeof setTimeout> | null = null
 let suppressAutoShowAfterManualClose = false
 
 function bringOverlayToFront(win: BrowserWindow) {
-  win.setAlwaysOnTop(true, 'screen-saver')
-  win.setVisibleOnAllWorkspaces(true, { visibleOnFullScreen: true })
+  win.setAlwaysOnTop(true, 'normal')
+  // win.setVisibleOnAllWorkspaces(true, { visibleOnFullScreen: true })
   win.showInactive()
   win.moveTop()
 }
