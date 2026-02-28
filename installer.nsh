@@ -6,7 +6,20 @@
 
 !include LogicLib.nsh
 
+!define INSTALLER_FLAG_FILE "$INSTDIR\.whimbox-installer-running"
+
+!macro customInit
+  ; 仅在覆盖安装/升级场景下写入标记，供旧版本卸载程序识别
+  IfFileExists "$INSTDIR\*.*" 0 +4
+  FileOpen $0 "${INSTALLER_FLAG_FILE}" w
+  FileClose $0
+  DetailPrint "检测到安装流程，已写入保留数据标记"
+!macroend
+
 !macro customInstall
+  ; 安装完成后清理标记，避免用户后续手动卸载时误跳过确认
+  Delete "${INSTALLER_FLAG_FILE}"
+
   ; 显示安装详情
   DetailPrint ""
   DetailPrint "=========================================="
@@ -104,6 +117,11 @@
 ; 卸载时询问是否删除用户数据
 ; ------------------------------------------------------------------------------
 !macro customUnInstall
+  IfFileExists "${INSTALLER_FLAG_FILE}" 0 +4
+    DetailPrint "检测到安装程序触发的卸载，自动保留用户数据和 Python 环境"
+    Delete "${INSTALLER_FLAG_FILE}"
+    Goto keep_userdata
+
   ; 询问用户是否删除用户数据
   MessageBox MB_YESNO|MB_ICONQUESTION|MB_DEFBUTTON2 \
     "是否删除运行环境和配置？$\n$\n建议：如果是在重新安装或者更新，请选择'否'" \
