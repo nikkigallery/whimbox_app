@@ -14,6 +14,13 @@ let overlayWindowState: ReturnType<typeof windowStateKeeper> | null = null
 let overlaySaveTimer: ReturnType<typeof setTimeout> | null = null
 let suppressAutoShowAfterManualClose = false
 
+function bringOverlayToFront(win: BrowserWindow) {
+  win.setAlwaysOnTop(true, 'screen-saver')
+  win.setVisibleOnAllWorkspaces(true, { visibleOnFullScreen: true })
+  win.showInactive()
+  win.moveTop()
+}
+
 function scheduleSaveOverlayState(win: BrowserWindow) {
   if (overlaySaveTimer) clearTimeout(overlaySaveTimer)
   overlaySaveTimer = setTimeout(() => {
@@ -77,7 +84,7 @@ function registerOverlayIpc() {
     const win = overlayWindowRef
     if (!win || win.isDestroyed()) return
     suppressAutoShowAfterManualClose = false
-    win.show()
+    bringOverlayToFront(win)
   })
 }
 
@@ -92,7 +99,7 @@ export function showOverlayOnToolStart() {
   const win = overlayWindowRef
   if (!win || win.isDestroyed()) return
   if (suppressAutoShowAfterManualClose) return
-  win.show()
+  bringOverlayToFront(win)
 }
 
 /** 手动停止工具时强制显示小窗，不受“手动关闭后不自动显示”策略限制。 */
@@ -100,7 +107,7 @@ export function forceShowOverlay() {
   const win = overlayWindowRef
   if (!win || win.isDestroyed()) return
   suppressAutoShowAfterManualClose = false
-  win.show()
+  bringOverlayToFront(win)
 }
 
 export function setOverlayIgnoreMouseEvents(ignore: boolean) {

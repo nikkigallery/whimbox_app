@@ -41,7 +41,6 @@ export function registerRpcBridge() {
         showOverlayOnToolStart()
       } else if (phase === 'stopping') {
         setOverlayIgnoreMouseEvents(false)
-        forceShowOverlay()
       } else if (phase === 'completed' || phase === 'cancelled' || phase === 'error') {
         setOverlayIgnoreMouseEvents(false)
       }
