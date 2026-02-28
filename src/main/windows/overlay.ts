@@ -18,7 +18,7 @@ function bringOverlayToFront(win: BrowserWindow) {
   win.setAlwaysOnTop(true, 'normal')
   // win.setVisibleOnAllWorkspaces(true, { visibleOnFullScreen: true })
   win.showInactive()
-  win.moveTop()
+  // win.moveTop()
 }
 
 function scheduleSaveOverlayState(win: BrowserWindow) {

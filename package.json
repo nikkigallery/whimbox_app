@@ -2,7 +2,7 @@
   "displayName": "whimbox_app",
   "name": "whimbox_app",
   "description": "奇想盒",
-  "version": "2.0.2",
+  "version": "2.0.3",
   "main": "./node_modules/.dev/main/index.mjs",
   "resources": "src/resources",
   "author": {
