@@ -257,7 +257,7 @@ export function ScriptSelectPage({
       return
     }
     if (rpcState !== "open" || !sessionId) {
-      toast.error("奇想盒未安装，暂无法启动任务。")
+      toast.error("奇想盒后端异常，暂无法启动任务。")
       return
     }
     try {

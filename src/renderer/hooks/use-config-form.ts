@@ -62,7 +62,7 @@ export function useConfigForm({ section, rpcClient, reloadVersion }: UseConfigFo
       })
       .catch(() => {
         if (!active) return
-        setLoadError("奇想盒未安装，读取配置失败。")
+        setLoadError("奇想盒后端异常，读取配置失败。")
       })
       .finally(() => {
         if (!active) return

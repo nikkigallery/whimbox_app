@@ -107,6 +107,7 @@ export function MainScreen() {
   const [isProcessing, setIsProcessing] = useState(false)
   const [taskProgressState, setTaskProgressState] = useState<TaskProgressState>({ status: 'idle' })
   const [toolRunning, setToolRunning] = useState(false)
+  const [backendInstalled, setBackendInstalled] = useState<boolean | null>(null)
 
   const launcherApi = useMemo(() => window.App.launcher, [])
   const appUpdater = useMemo(() => window.App.appUpdater, [])
@@ -293,10 +294,28 @@ export function MainScreen() {
   }, [launcherApi])
 
   useEffect(() => {
+    let active = true
+    launcherApi
+      .getBackendStatus()
+      .then((status) => {
+        if (!active) return
+        setBackendInstalled(Boolean(status?.installed))
+      })
+      .catch(() => {
+        if (!active) return
+        setBackendInstalled(null)
+      })
+    return () => {
+      active = false
+    }
+  }, [launcherApi])
+
+  useEffect(() => {
     let prevState = rpcState
     const offState = rpcClient.on('state', ({ state }) => {
       if (state === 'open' && prevState !== 'open') {
         setBackendReloadVersion((v) => v + 1)
+        setBackendInstalled(true)
       }
       prevState = state
       setRpcState(state)
@@ -311,6 +330,7 @@ export function MainScreen() {
     void rpcClient.getStateAsync().then((state) => {
       if (state === 'open' && prevState !== 'open') {
         setBackendReloadVersion((v) => v + 1)
+        setBackendInstalled(true)
       }
       prevState = state
       setRpcState(state)
@@ -369,6 +389,7 @@ export function MainScreen() {
   const handleMinimizeToTray = () => window.App.windowControls.minimizeToTray()
   const handleToggleMaximize = () => window.App.windowControls.toggleMaximize()
   const handleClose = () => window.App.windowControls.close()
+  const shouldShowBackendInstallPage = backendInstalled === false
 
   const getPageContent = (pageId: string) => {
     switch (pageId) {
@@ -644,7 +665,24 @@ export function MainScreen() {
             </SidebarFooter>
           </Sidebar>
           <section className="relative flex min-h-0 flex-1 flex-col overflow-hidden">
-            {['auto-navigate', 'auto-macro', 'auto-music'].includes(activePage) ? (
+            {shouldShowBackendInstallPage ? (
+              <div className="flex min-h-0 flex-1 items-center justify-center p-8">
+                <div className="w-full max-w-xl rounded-3xl border border-slate-200 bg-white p-8 text-center shadow-sm dark:border-slate-800 dark:bg-slate-900">
+                  <div className="mx-auto flex size-16 items-center justify-center rounded-2xl bg-pink-100 text-pink-500 dark:bg-pink-500/15 dark:text-pink-300">
+                    <Gift className="size-8" />
+                  </div>
+                  <h1 className="mt-5 text-2xl font-semibold text-slate-800 dark:text-slate-100">
+                    请先更新奇想盒
+                  </h1>
+                  <p className="mt-3 text-sm text-slate-500 dark:text-slate-400">
+                    未检测到奇想盒后端，功能暂不可用。
+                  </p>
+                  <p className="mt-1 text-sm text-slate-500 dark:text-slate-400">
+                    请查看通知中的使用教程，进行更新。
+                  </p>
+                </div>
+              </div>
+            ) : ['auto-navigate', 'auto-macro', 'auto-music'].includes(activePage) ? (
               <div className="absolute inset-0 flex flex-col overflow-hidden">
                 {getPageContent(activePage)}
               </div>
@@ -663,4 +701,3 @@ export function MainScreen() {
     </>
   )
 }
-

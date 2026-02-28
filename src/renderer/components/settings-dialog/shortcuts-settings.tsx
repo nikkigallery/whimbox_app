@@ -22,7 +22,7 @@ export const content: SettingContent = {
       return (
         <div className="space-y-3">
           <p className="text-sm text-slate-500 dark:text-slate-400">
-            奇想盒未安装，暂时无法设置键位
+            奇想盒后端异常，暂时无法设置键位
           </p>
         </div>
       )
@@ -50,7 +50,7 @@ function ShortcutsForm({ rpcClient }: { rpcClient: IpcRpcClient }) {
       })
       .catch(() => {
         if (!active) return
-        setLoadError("奇想盒未安装，读取键位设置失败")
+        setLoadError("奇想盒后端异常，读取键位设置失败")
       })
       .finally(() => {
         if (!active) return

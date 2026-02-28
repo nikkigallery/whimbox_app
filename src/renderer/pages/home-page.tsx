@@ -97,7 +97,7 @@ export function HomePage({
               placeholder={
                 rpcState === "open"
                   ? "请输入内容..."
-                  : "奇想盒未安装，无法发送消息"
+                  : "奇想盒后端异常，无法发送消息"
               }
               onChange={(event) => {
                 const target = event.currentTarget

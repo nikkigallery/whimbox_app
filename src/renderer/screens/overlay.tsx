@@ -166,7 +166,7 @@ export function OverlayScreen() {
           </div>
         ) : (
           <div className="flex flex-1 items-center justify-center text-white/60 text-sm">
-            {rpcState === 'open' ? '输入消息开始对话' : '奇想盒未安装'}
+            {rpcState === 'open' ? '输入消息开始对话' : '奇想盒后端异常'}
           </div>
         )}
 
@@ -176,7 +176,7 @@ export function OverlayScreen() {
             value={input}
             disabled={isInputDisabled}
             placeholder={
-              rpcState === 'open' ? '输入内容...' : '奇想盒未安装'
+              rpcState === 'open' ? '输入内容...' : '奇想盒后端异常'
             }
             onChange={(e) => {
               const t = e.currentTarget
