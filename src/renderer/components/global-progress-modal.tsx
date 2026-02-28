@@ -28,7 +28,7 @@ export function GlobalProgressModal({ state, onClose, onRestartAndInstall }: Glo
   const visible = status !== 'idle'
   const canClose = status === 'success' || status === 'error'
   const showRestartAndInstall =
-    canClose && onRestartAndInstall && title === '更新应用' && message?.includes('重启')
+    canClose && onRestartAndInstall && message?.includes('重启并安装')
 
   return (
     <Dialog
