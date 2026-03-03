@@ -41,7 +41,7 @@ export function UpdatePromptDialog({
         <DialogHeader>
           <DialogTitle>发现新版本</DialogTitle>
           <DialogDescription>
-            发现新版本 {newVersion} 可用。
+            发现新版本可用。
           </DialogDescription>
         </DialogHeader>
         <DialogFooter showCloseButton={false}>

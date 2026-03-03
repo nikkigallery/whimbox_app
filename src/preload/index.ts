@@ -163,8 +163,8 @@ const API = {
       ipcRenderer.invoke('launcher:install-whl', wheelPath, deleteWheel),
     downloadAndInstallWhl: (url: string, md5?: string) =>
       ipcRenderer.invoke('launcher:download-and-install-whl', url, md5),
-    downloadAndInstallLatestWhl: () =>
-      ipcRenderer.invoke('launcher:download-and-install-latest-whl'),
+    downloadAndInstallLatestWhl: (skipRestart = false) =>
+      ipcRenderer.invoke('launcher:download-and-install-latest-whl', skipRestart),
     getBackendStatus: () => ipcRenderer.invoke('launcher:get-backend-status'),
     launchBackend: () => ipcRenderer.invoke('launcher:launch-backend'),
     stopBackend: () => ipcRenderer.invoke('launcher:stop-backend'),

@@ -260,7 +260,7 @@ export function useUnifiedUpdate({
     if (result.hasBackend) {
       setTaskProgressState({ status: 'running', title: '更新中', message: '正在下载安装…' })
       try {
-        await launcherApi.downloadAndInstallLatestWhl()
+        await launcherApi.downloadAndInstallLatestWhl(result.hasElectron)
         const status = await launcherApi.getBackendStatus()
         setBackendStatus(status)
       } catch (err) {

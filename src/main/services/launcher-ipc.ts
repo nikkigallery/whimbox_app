@@ -43,10 +43,11 @@ async function runWhlInstallWithProgress(
   options: {
     initialMessage: string
     withDownload: boolean
+    skipRestart?: boolean
     work: () => Promise<unknown>
   },
 ): Promise<unknown> {
-  const { initialMessage, withDownload, work } = options
+  const { initialMessage, withDownload, skipRestart = false, work } = options
   let installProgress = 0
 
   sendTaskProgress(win, {
@@ -86,6 +87,9 @@ async function runWhlInstallWithProgress(
     await waitFor(2000)
     const result = await work()
     sendTaskProgress(win, { status: 'success', title, message: '安装完成' })
+    if (skipRestart) {
+      return result
+    }
     try {
       sendTaskProgress(win, { status: 'running', title, message: '正在重启奇想盒…' })
       await backendManager.launchBackend()
@@ -211,7 +215,7 @@ export function registerLauncherIpc(window: BrowserWindow) {
     }),
   )
 
-  ipcMain.handle('launcher:download-and-install-latest-whl', async () => {
+  ipcMain.handle('launcher:download-and-install-latest-whl', async (_, skipRestart?: boolean) => {
     const data = await apiRequest<{ version: string; url: string; md5?: string }>('/whimbox/latest/backend', {
       method: 'GET',
       requireAuth: true,
@@ -222,6 +226,7 @@ export function registerLauncherIpc(window: BrowserWindow) {
     return runWhlInstallWithProgress(window, '更新中', {
       initialMessage: '准备下载…',
       withDownload: true,
+      skipRestart,
       work: () => backendManager.downloadAndInstallWhl(data.url, data.md5),
     })
   })
