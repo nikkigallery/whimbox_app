@@ -40,6 +40,7 @@ import {
 import { AutoTriggerPage } from '../pages/auto-trigger-page'
 import { HomePage } from '../pages/home-page'
 import { AutoNavigatePage } from '../pages/auto-navigate-page'
+import { OneDragonFlowPage } from '../pages/one-dragon-flow-page'
 import { OneDragonPage } from '../pages/one-dragon-page'
 import { AutoMacroPage } from '../pages/auto-macro-page'
 import { AutoMusicPage } from '../pages/auto-music-page'
@@ -74,7 +75,15 @@ type NavItem =
 
 const navItems: NavItem[] = [
   { id: 'home', label: '首页', icon: Home },
-  { id: 'one-dragon', label: '一条龙', icon: Layers },
+  {
+    id: 'one-dragon',
+    label: '一条龙',
+    icon: Layers,
+    children: [
+      { id: 'one-dragon-config', label: '一条龙配置', icon: Layers },
+      { id: 'one-dragon-flow', label: '一条龙流程', icon: Layers },
+    ],
+  },
   { id: 'auto-trigger', label: '自动触发', icon: Sparkles },
   {
     id: 'script-run',
@@ -394,8 +403,18 @@ export function MainScreen() {
   const getPageContent = (pageId: string) => {
     switch (pageId) {
       case 'one-dragon':
+      case 'one-dragon-config':
         return (
           <OneDragonPage
+            rpcClient={rpcClient}
+            sessionId={sessionId}
+            rpcState={rpcState}
+            backendReloadVersion={backendReloadVersion}
+          />
+        )
+      case 'one-dragon-flow':
+        return (
+          <OneDragonFlowPage
             rpcClient={rpcClient}
             sessionId={sessionId}
             rpcState={rpcState}
@@ -701,3 +720,4 @@ export function MainScreen() {
     </>
   )
 }
+
