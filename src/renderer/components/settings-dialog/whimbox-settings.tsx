@@ -136,7 +136,7 @@ export const content: SettingContent = {
               onClick={() => window.App?.launcher?.openExternal(APP_RELEASE_PAGE_URL)}
               disabled={isProcessing}
             >
-              手动更新前端
+              github地址
             </Button>
             <Button
               variant="secondary"
