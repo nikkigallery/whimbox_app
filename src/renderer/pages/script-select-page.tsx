@@ -32,6 +32,7 @@ import {
 import type { IpcRpcClient } from "renderer/lib/ipc-rpc"
 
 type ScriptMode = "path" | "macro" | "music"
+type ScriptAction = "run" | "record"
 
 type ScriptRow = {
   name: string
@@ -61,6 +62,16 @@ const startLabelMap: Record<ScriptMode, string> = {
   path: "开始跑图",
   macro: "运行宏",
   music: "演奏乐谱",
+}
+
+const recordToolIdMap: Partial<Record<ScriptMode, string>> = {
+  path: "nikki.record_path",
+  macro: "nikki.record_macro",
+}
+
+const recordLabelMap: Record<"path" | "macro", string> = {
+  path: "录制路线",
+  macro: "录制宏",
 }
 
 const titleMap: Record<ScriptMode, string> = {
@@ -130,6 +141,7 @@ export function ScriptSelectPage({
   const [selectedName, setSelectedName] = useState<string | null>(null)
   const [isRunning, setIsRunning] = useState(false)
   const [runningTaskId, setRunningTaskId] = useState<string | null>(null)
+  const [runningAction, setRunningAction] = useState<ScriptAction | null>(null)
   const [isStopping, setIsStopping] = useState(false)
   const [deleteTargetName, setDeleteTargetName] = useState<string | null>(null)
   const [deleting, setDeleting] = useState(false)
@@ -141,7 +153,8 @@ export function ScriptSelectPage({
   const [showDefault, setShowDefault] = useState(false)
 
   const showDefaultToggle = mode !== "music"
-  const toolId = toolIdMap[mode]
+  const runToolId = toolIdMap[mode]
+  const recordToolId = recordToolIdMap[mode] ?? null
 
   const loadScripts = async () => {
     setLoading(true)
@@ -197,17 +210,21 @@ export function ScriptSelectPage({
       const source = typeof params?.source === "string" ? params.source : ""
       if (source !== "task") return
       const toolIdValue = typeof params?.tool_id === "string" ? params.tool_id : ""
-      if (toolIdValue && toolIdValue !== toolId) return
+      const isRunTask = toolIdValue === runToolId
+      const isRecordTask = toolIdValue === recordToolId
+      if (toolIdValue && !isRunTask && !isRecordTask) return
       const phase = typeof params?.phase === "string" ? params.phase : ""
       if (phase === "started") {
         const taskId = typeof params?.task_id === "string" ? params.task_id : null
         if (taskId) setRunningTaskId(taskId)
+        setRunningAction(isRecordTask ? "record" : "run")
         setIsStopping(false)
         setIsRunning(true)
       } else if (phase === "stopping") {
         setIsStopping(true)
       } else if (phase === "completed" || phase === "cancelled" || phase === "error") {
         setRunningTaskId(null)
+        setRunningAction(null)
         setIsStopping(false)
         setIsRunning(false)
       }
@@ -215,7 +232,7 @@ export function ScriptSelectPage({
     return () => {
       offNotification()
     }
-  }, [rpcClient, toolId])
+  }, [recordToolId, rpcClient, runToolId])
 
   const handleReset = () => {
     setNameFilter("")
@@ -263,7 +280,7 @@ export function ScriptSelectPage({
     try {
       const result = await rpcClient.sendRequest<{ task_id?: string }>("task.run", {
         session_id: sessionId,
-        tool_id: toolId,
+        tool_id: runToolId,
         input:
           mode === "path"
             ? { path_name: selectedName }
@@ -271,6 +288,30 @@ export function ScriptSelectPage({
       })
       const taskId = typeof result?.task_id === "string" ? result.task_id : null
       if (taskId) setRunningTaskId(taskId)
+      setRunningAction("run")
+      setIsStopping(false)
+      setIsRunning(true)
+      toast.success("任务已启动")
+    } catch {
+      toast.error("启动失败，请稍后重试")
+    }
+  }
+
+  const handleRecord = async () => {
+    if (!recordToolId) return
+    if (rpcState !== "open" || !sessionId) {
+      toast.error("奇想盒后端异常，暂无法启动任务。")
+      return
+    }
+    try {
+      const result = await rpcClient.sendRequest<{ task_id?: string }>("task.run", {
+        session_id: sessionId,
+        tool_id: recordToolId,
+        input: {},
+      })
+      const taskId = typeof result?.task_id === "string" ? result.task_id : null
+      if (taskId) setRunningTaskId(taskId)
+      setRunningAction("record")
       setIsStopping(false)
       setIsRunning(true)
       toast.success("任务已启动")
@@ -312,6 +353,24 @@ export function ScriptSelectPage({
           </h1>
         </div>
         <div className="flex flex-wrap items-center gap-2">
+          {recordToolId && mode !== "music" ? (
+            <Button
+              variant="outline"
+              className="rounded-xl"
+              onClick={runningTaskId && runningAction === "record" ? handleStop : handleRecord}
+              disabled={
+                rpcState !== "open"
+                || !sessionId
+                || (runningTaskId
+                  ? runningAction !== "record" || isStopping
+                  : isRunning)
+              }
+            >
+              {runningTaskId && runningAction === "record"
+                ? (isStopping ? "结束中..." : "停止录制")
+                : recordLabelMap[mode]}
+            </Button>
+          ) : null}
           <Button
             variant="outline"
             className="rounded-xl text-red-500 hover:text-red-600"
@@ -329,10 +388,14 @@ export function ScriptSelectPage({
             disabled={
               rpcState !== "open"
               || !sessionId
-              || (runningTaskId ? isStopping : !selectedName || isRunning)
+              || (runningTaskId
+                ? runningAction !== "run" || isStopping
+                : !selectedName || isRunning)
             }
           >
-            {runningTaskId ? (isStopping ? "结束中..." : "停止任务") : startLabelMap[mode]}
+            {runningTaskId && runningAction === "run"
+              ? (isStopping ? "结束中..." : "停止任务")
+              : startLabelMap[mode]}
           </Button>
         </div>
       </div>
