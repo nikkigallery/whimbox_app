@@ -48,17 +48,14 @@ export function useHomeConversation({
   const [isConversationPending, setIsConversationPending] = useState(false)
   const [isStandaloneTaskPending, setIsStandaloneTaskPending] = useState(false)
   const [currentStatus, setCurrentStatus] = useState('')
-  /** 当前由用户发消息产生的 assistant 消息 id，用于 event.agent.message / event.run.*（agent 调工具） */
+  /** 当前由用户发消息产生的 assistant 消息 id，agent 的文本与工具日志都挂在这一条消息下。 */
   const currentAgentMessageIdRef = useRef<string | null>(null)
-  /** agent 每次工具调用(tool_call_id)对应的日志消息 id */
-  const agentToolMessageIdsRef = useRef<Record<string, string>>({})
+  /** agent 每次工具调用(tool_call_id)对应的日志 block 下标 */
+  const agentToolBlockIndexesRef = useRef<Record<string, number>>({})
   /** 当前正在运行的 agent 工具调用集合（用于决定是否缓存文本流） */
   const activeAgentToolCallIdsRef = useRef<Set<string>>(new Set())
   /** 工具运行期间缓存的文本流，等工具结束后再落到末尾 */
   const bufferedAgentTextRef = useRef('')
-  /** agent 结束后短时间内，用于承接尾日志的消息 id */
-  const closingAgentMessageIdRef = useRef<string | null>(null)
-  const closingAgentUntilRef = useRef<number>(0)
   /** 由 task.run 等独立任务创建的「任务日志」assistant 消息 id，用于 event.run.log */
   const pendingStandaloneTaskIdRef = useRef<string | null>(null)
   /** 当前运行中的独立任务 task_id（用于 task.stop） */
@@ -76,11 +73,9 @@ export function useHomeConversation({
     setIsStandaloneTaskPending(false)
     setCurrentStatus('')
     currentAgentMessageIdRef.current = null
-    agentToolMessageIdsRef.current = {}
+    agentToolBlockIndexesRef.current = {}
     activeAgentToolCallIdsRef.current = new Set()
     bufferedAgentTextRef.current = ''
-    closingAgentMessageIdRef.current = null
-    closingAgentUntilRef.current = 0
     pendingStandaloneTaskIdRef.current = null
     pendingStandaloneTaskServerIdRef.current = null
     closingStandaloneTaskMessageIdRef.current = null
@@ -168,84 +163,107 @@ export function useHomeConversation({
               ? params.tool_call_id
               : ''
           if (phase === 'started' && toolCallId) {
-            const toolMessageId = createId()
             activeAgentToolCallIdsRef.current.add(toolCallId)
-            agentToolMessageIdsRef.current = {
-              ...agentToolMessageIdsRef.current,
-              [toolCallId]: toolMessageId,
-            }
-            setMessages((prev) => [
-              ...prev,
-              {
-                id: toolMessageId,
-                role: 'assistant',
-                content: '',
-                pending: true,
-                blocks: [{ type: 'log', content: '', title: detailText || '工具' }],
-              },
-            ])
+            const assistantId = currentAgentMessageIdRef.current ?? createId()
+            currentAgentMessageIdRef.current = assistantId
+            setMessages((prev) => {
+              const index = prev.findIndex((m) => m.id === assistantId)
+              if (index < 0) {
+                agentToolBlockIndexesRef.current = {
+                  ...agentToolBlockIndexesRef.current,
+                  [toolCallId]: 0,
+                }
+                return [
+                  ...prev,
+                  {
+                    id: assistantId,
+                    role: 'assistant',
+                    content: '',
+                    pending: true,
+                    blocks: [{ type: 'log', content: '', title: detailText || '工具' }],
+                  },
+                ]
+              }
+              const cur = prev[index]
+              const blocks = [...(cur.blocks ?? []), { type: 'log', content: '', title: detailText || '工具' } as AssistantBlock]
+              agentToolBlockIndexesRef.current = {
+                ...agentToolBlockIndexesRef.current,
+                [toolCallId]: blocks.length - 1,
+              }
+              const next = [...prev]
+              next[index] = { ...cur, blocks, pending: true }
+              return next
+            })
           }
           if (phase === 'completed' || phase === 'cancelled') {
-            const toolMessageId = toolCallId ? agentToolMessageIdsRef.current[toolCallId] : null
             if (toolCallId) {
               activeAgentToolCallIdsRef.current.delete(toolCallId)
-            }
-            if (toolMessageId) {
-              closingAgentMessageIdRef.current = toolMessageId
-              closingAgentUntilRef.current = Date.now() + AGENT_LOG_TAIL_WINDOW_MS
-              setMessages((prev) =>
-                prev.map((m) =>
-                  m.id === toolMessageId ? { ...m, pending: false } : m,
-                ),
-              )
             }
             if (activeAgentToolCallIdsRef.current.size === 0 && bufferedAgentTextRef.current) {
               const text = bufferedAgentTextRef.current
               bufferedAgentTextRef.current = ''
-              const textMsgId = createId()
-              currentAgentMessageIdRef.current = textMsgId
-              setMessages((prev) => [
-                ...prev,
-                {
-                  id: textMsgId,
-                  role: 'assistant',
-                  content: text,
+              const assistantId = currentAgentMessageIdRef.current ?? createId()
+              currentAgentMessageIdRef.current = assistantId
+              setMessages((prev) => {
+                const index = prev.findIndex((m) => m.id === assistantId)
+                if (index < 0) {
+                  return [
+                    ...prev,
+                    {
+                      id: assistantId,
+                      role: 'assistant',
+                      content: text,
+                      pending: true,
+                      blocks: [{ type: 'text', content: text }],
+                    },
+                  ]
+                }
+                const cur = prev[index]
+                const next = [...prev]
+                next[index] = {
+                  ...cur,
+                  content: `${cur.content}${text}`,
                   pending: true,
-                  blocks: [{ type: 'text', content: text }],
-                },
-              ])
+                  blocks: [...(cur.blocks ?? []), { type: 'text', content: text }],
+                }
+                return next
+              })
             }
             if (phase === 'completed') setCurrentStatus('')
           }
           if (phase === 'error') {
-            const toolMessageId = toolCallId ? agentToolMessageIdsRef.current[toolCallId] : null
             if (toolCallId) {
               activeAgentToolCallIdsRef.current.delete(toolCallId)
-            }
-            if (toolMessageId) {
-              closingAgentMessageIdRef.current = toolMessageId
-              closingAgentUntilRef.current = Date.now() + AGENT_LOG_TAIL_WINDOW_MS
-              setMessages((prev) =>
-                prev.map((m) =>
-                  m.id === toolMessageId ? { ...m, pending: false } : m,
-                ),
-              )
             }
             if (activeAgentToolCallIdsRef.current.size === 0 && bufferedAgentTextRef.current) {
               const text = bufferedAgentTextRef.current
               bufferedAgentTextRef.current = ''
-              const textMsgId = createId()
-              currentAgentMessageIdRef.current = textMsgId
-              setMessages((prev) => [
-                ...prev,
-                {
-                  id: textMsgId,
-                  role: 'assistant',
-                  content: text,
+              const assistantId = currentAgentMessageIdRef.current ?? createId()
+              currentAgentMessageIdRef.current = assistantId
+              setMessages((prev) => {
+                const index = prev.findIndex((m) => m.id === assistantId)
+                if (index < 0) {
+                  return [
+                    ...prev,
+                    {
+                      id: assistantId,
+                      role: 'assistant',
+                      content: text,
+                      pending: true,
+                      blocks: [{ type: 'text', content: text }],
+                    },
+                  ]
+                }
+                const cur = prev[index]
+                const next = [...prev]
+                next[index] = {
+                  ...cur,
+                  content: `${cur.content}${text}`,
                   pending: true,
-                  blocks: [{ type: 'text', content: text }],
-                },
-              ])
+                  blocks: [...(cur.blocks ?? []), { type: 'text', content: text }],
+                }
+                return next
+              })
             }
             setCurrentStatus('执行失败')
           }
@@ -298,9 +316,6 @@ export function useHomeConversation({
           typeof params?.tool_call_id === 'string' && params.tool_call_id
             ? params.tool_call_id
             : ''
-        const hasClosingAgentTarget =
-          closingAgentMessageIdRef.current !== null
-          && Date.now() <= closingAgentUntilRef.current
         const hasClosingStandaloneTarget =
           closingStandaloneTaskMessageIdRef.current !== null
           && Date.now() <= closingStandaloneTaskUntilRef.current
@@ -308,24 +323,17 @@ export function useHomeConversation({
         if (source === 'background') {
           id = backgroundLogMessageIdRef.current
         } else if (source === 'agent') {
-          id =
-            (toolCallId ? agentToolMessageIdsRef.current[toolCallId] ?? null : null)
-            ?? currentAgentMessageIdRef.current
-            ?? (hasClosingAgentTarget ? closingAgentMessageIdRef.current : null)
-            ?? backgroundLogMessageIdRef.current
+          id = currentAgentMessageIdRef.current ?? backgroundLogMessageIdRef.current
         } else if (source === 'task') {
           id =
-            (toolCallId ? agentToolMessageIdsRef.current[toolCallId] ?? null : null)
-            ?? pendingStandaloneTaskIdRef.current
+            pendingStandaloneTaskIdRef.current
             ?? currentAgentMessageIdRef.current
-            ?? (hasClosingAgentTarget ? closingAgentMessageIdRef.current : null)
             ?? (hasClosingStandaloneTarget ? closingStandaloneTaskMessageIdRef.current : null)
             ?? backgroundLogMessageIdRef.current
         } else {
           id =
             pendingStandaloneTaskIdRef.current
             ?? currentAgentMessageIdRef.current
-            ?? (hasClosingAgentTarget ? closingAgentMessageIdRef.current : null)
             ?? (hasClosingStandaloneTarget ? closingStandaloneTaskMessageIdRef.current : null)
             ?? backgroundLogMessageIdRef.current
         }
@@ -361,18 +369,21 @@ export function useHomeConversation({
           if (index < 0) return prev
           const cur = prev[index]
           const blocks = cur.blocks ?? []
-          const lastLogIndex = [...blocks]
-            .map((block, i) => ({ block, i }))
-            .reverse()
-            .find((item) => item.block.type === 'log')?.i
+          const targetLogIndex =
+            source === 'agent' && toolCallId
+              ? agentToolBlockIndexesRef.current[toolCallId]
+              : [...blocks]
+                  .map((block, i) => ({ block, i }))
+                  .reverse()
+                  .find((item) => item.block.type === 'log')?.i
           let nextBlocks: AssistantBlock[]
-          if (lastLogIndex == null) {
+          if (targetLogIndex == null) {
             nextBlocks = [...blocks, { type: 'log', content: logLine }]
           } else {
-            const target = blocks[lastLogIndex]
+            const target = blocks[targetLogIndex]
             if (target.type !== 'log') return prev
             nextBlocks = blocks.slice()
-            nextBlocks[lastLogIndex] = {
+            nextBlocks[targetLogIndex] = {
               type: 'log',
               content: target.content ? `${target.content}\n${logLine}` : logLine,
               title: target.title,
@@ -384,9 +395,6 @@ export function useHomeConversation({
           if (id === closingStandaloneTaskMessageIdRef.current) {
             // 尾日志再次到达则刷新窗口，避免被并发 stop 路径切碎到“自动触发”日志。
             closingStandaloneTaskUntilRef.current = Date.now() + STANDALONE_TASK_LOG_TAIL_WINDOW_MS
-          }
-          if (id === closingAgentMessageIdRef.current) {
-            closingAgentUntilRef.current = Date.now() + AGENT_LOG_TAIL_WINDOW_MS
           }
           if (isFinalize && backgroundLogMessageIdRef.current === id) {
             backgroundLogMessageIdRef.current = null
@@ -407,11 +415,9 @@ export function useHomeConversation({
     setIsConversationPending(true)
     setCurrentStatus('思考中...')
     currentAgentMessageIdRef.current = null
-    agentToolMessageIdsRef.current = {}
+    agentToolBlockIndexesRef.current = {}
     activeAgentToolCallIdsRef.current = new Set()
     bufferedAgentTextRef.current = ''
-    closingAgentMessageIdRef.current = null
-    closingAgentUntilRef.current = 0
     setMessages((prev) => [
       ...prev,
       { id: createId(), role: 'user', content: text },
