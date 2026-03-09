@@ -36,6 +36,7 @@ declare global {
           sessionId?: string | null
           toolRunning?: boolean
           conversationPending?: boolean
+          currentStatus?: string
         }>
         pushState: (payload: {
           messages: unknown[]
@@ -43,6 +44,7 @@ declare global {
           sessionId?: string | null
           toolRunning?: boolean
           conversationPending?: boolean
+          currentStatus?: string
         }) => void
         send: (text: string) => void
         stop: () => void
@@ -52,6 +54,7 @@ declare global {
           sessionId?: string | null
           toolRunning?: boolean
           conversationPending?: boolean
+          currentStatus?: string
         }) => void) => () => void
         onRunSend: (callback: (text: string) => void) => () => void
         onRunStop: (callback: () => void) => () => void

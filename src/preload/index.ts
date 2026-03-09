@@ -104,6 +104,7 @@ const API = {
         sessionId?: string | null
         toolRunning?: boolean
         conversationPending?: boolean
+        currentStatus?: string
       }>,
     pushState: (payload: {
       messages: unknown[]
@@ -111,6 +112,7 @@ const API = {
       sessionId?: string | null
       toolRunning?: boolean
       conversationPending?: boolean
+      currentStatus?: string
     }) => ipcRenderer.send('conversation:push-state', payload),
     send: (text: string) => ipcRenderer.send('conversation:send', text),
     stop: () => ipcRenderer.send('conversation:stop'),
@@ -121,6 +123,7 @@ const API = {
         sessionId?: string | null
         toolRunning?: boolean
         conversationPending?: boolean
+        currentStatus?: string
       }) => void,
     ) => {
       const listener = (
@@ -131,6 +134,7 @@ const API = {
           sessionId?: string | null
           toolRunning?: boolean
           conversationPending?: boolean
+          currentStatus?: string
         },
       ) => callback(data)
       ipcRenderer.on('conversation:state', listener)

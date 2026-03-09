@@ -27,6 +27,17 @@ export type UseHomeConversationOptions = {
   rpcState: string
 }
 
+const formatAgentStatus = (phase: string, detail: string, rawDetail?: string) => {
+  if (phase === 'started' && detail === 'thinking') return '思考中...'
+  if (phase === 'running' && detail === 'generating') return '生成回复中...'
+  if (phase === 'started' && rawDetail) return `执行工具中：${rawDetail}`
+  if (phase === 'stopping') return '停止任务中，请稍等...'
+  if (phase === 'completed') return ''
+  if (phase === 'cancelled') return ''
+  if (phase === 'error') return ''
+  return ''
+}
+
 export function useHomeConversation({
   rpcClient,
   sessionId,
@@ -36,6 +47,7 @@ export function useHomeConversation({
   const [input, setInput] = useState('')
   const [isConversationPending, setIsConversationPending] = useState(false)
   const [isStandaloneTaskPending, setIsStandaloneTaskPending] = useState(false)
+  const [currentStatus, setCurrentStatus] = useState('')
   /** 当前由用户发消息产生的 assistant 消息 id，用于 event.agent.message / event.run.*（agent 调工具） */
   const currentAgentMessageIdRef = useRef<string | null>(null)
   /** agent 每次工具调用(tool_call_id)对应的日志消息 id */
@@ -62,6 +74,7 @@ export function useHomeConversation({
     if (rpcState === 'open') return
     setIsConversationPending(false)
     setIsStandaloneTaskPending(false)
+    setCurrentStatus('')
     currentAgentMessageIdRef.current = null
     agentToolMessageIdsRef.current = {}
     activeAgentToolCallIdsRef.current = new Set()
@@ -149,20 +162,17 @@ export function useHomeConversation({
         const phase = typeof params?.phase === 'string' ? params.phase : ''
 
         if (source === 'agent') {
+          setCurrentStatus(formatAgentStatus(phase, detailText, detailText))
           const toolCallId =
             typeof params?.tool_call_id === 'string' && params.tool_call_id
               ? params.tool_call_id
               : ''
-          if (phase === 'started') {
+          if (phase === 'started' && toolCallId) {
             const toolMessageId = createId()
-            if (toolCallId) {
-              activeAgentToolCallIdsRef.current.add(toolCallId)
-            }
-            if (toolCallId) {
-              agentToolMessageIdsRef.current = {
-                ...agentToolMessageIdsRef.current,
-                [toolCallId]: toolMessageId,
-              }
+            activeAgentToolCallIdsRef.current.add(toolCallId)
+            agentToolMessageIdsRef.current = {
+              ...agentToolMessageIdsRef.current,
+              [toolCallId]: toolMessageId,
             }
             setMessages((prev) => [
               ...prev,
@@ -205,6 +215,7 @@ export function useHomeConversation({
                 },
               ])
             }
+            if (phase === 'completed') setCurrentStatus('')
           }
           if (phase === 'error') {
             const toolMessageId = toolCallId ? agentToolMessageIdsRef.current[toolCallId] : null
@@ -236,6 +247,7 @@ export function useHomeConversation({
                 },
               ])
             }
+            setCurrentStatus('执行失败')
           }
           return
         }
@@ -393,6 +405,7 @@ export function useHomeConversation({
     if (!text || rpcState !== 'open' || !sessionId || isAnyPending) return
     if (overrideText == null) setInput('')
     setIsConversationPending(true)
+    setCurrentStatus('思考中...')
     currentAgentMessageIdRef.current = null
     agentToolMessageIdsRef.current = {}
     activeAgentToolCallIdsRef.current = new Set()
@@ -445,6 +458,7 @@ export function useHomeConversation({
       }
     } catch (error) {
       log.error('agent.send_message failed:', error)
+      setCurrentStatus('发送失败')
       if (bufferedAgentTextRef.current) {
         const textChunk = bufferedAgentTextRef.current
         bufferedAgentTextRef.current = ''
@@ -480,6 +494,7 @@ export function useHomeConversation({
       bufferedAgentTextRef.current = ''
       currentAgentMessageIdRef.current = null
       setIsConversationPending(false)
+      setCurrentStatus((prev) => (prev === '发送失败' || prev === '已停止' || prev === '执行失败' ? prev : ''))
     }
   }, [input, isAnyPending, rpcState, sessionId, rpcClient])
 
@@ -498,5 +513,13 @@ export function useHomeConversation({
     }
   }, [isAnyPending, isConversationPending, isStandaloneTaskPending, rpcClient, rpcState, sessionId])
 
-  return { messages, input, setInput, handleSend, handleStop, isConversationPending: isAnyPending }
+  return {
+    messages,
+    input,
+    setInput,
+    handleSend,
+    handleStop,
+    isConversationPending: isAnyPending,
+    currentStatus,
+  }
 }

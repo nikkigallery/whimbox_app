@@ -20,6 +20,7 @@ type HomePageProps = {
   handleSend: (overrideText?: string) => void
   handleStop: () => void
   isConversationPending: boolean
+  currentStatus: string
   rpcState: string
   sessionId: string | null
 }
@@ -31,6 +32,7 @@ export function HomePage({
   handleSend,
   handleStop,
   isConversationPending,
+  currentStatus,
   rpcState,
   sessionId,
 }: HomePageProps) {
@@ -39,6 +41,11 @@ export function HomePage({
   const hasConversation = messages.length > 0
   const isSendDisabled = !input.trim() || rpcState !== "open" || !sessionId
   const isInputDisabled = isConversationPending || rpcState !== "open" || !sessionId
+  const inputPlaceholder =
+    currentStatus ||
+    (rpcState === "open"
+      ? "请输入内容..."
+      : "奇想盒后端异常，无法发送消息")
 
   useEffect(() => {
     if (!isConversationPending && rpcState === "open" && sessionId) {
@@ -94,11 +101,7 @@ export function HomePage({
               rows={1}
               value={input}
               disabled={isInputDisabled}
-              placeholder={
-                rpcState === "open"
-                  ? "请输入内容..."
-                  : "奇想盒后端异常，无法发送消息"
-              }
+              placeholder={inputPlaceholder}
               onChange={(event) => {
                 const target = event.currentTarget
                 setInput(target.value)

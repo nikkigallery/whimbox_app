@@ -29,6 +29,7 @@ export function OverlayScreen() {
   const [sessionId, setSessionId] = useState<string | null>(null)
   const [input, setInput] = useState('')
   const [conversationPending, setConversationPending] = useState(false)
+  const [currentStatus, setCurrentStatus] = useState('')
 
   useEffect(() => {
     const applyState = (s: {
@@ -37,11 +38,13 @@ export function OverlayScreen() {
       sessionId?: string | null
       toolRunning?: boolean
       conversationPending?: boolean
+      currentStatus?: string
     }) => {
       setMessages((s.messages ?? []) as UiMessage[])
       setRpcState(s.rpcState ?? 'idle')
       setSessionId(s.sessionId ?? null)
       setConversationPending(Boolean(s.conversationPending))
+      setCurrentStatus(typeof s.currentStatus === 'string' ? s.currentStatus : '')
     }
     window.App.conversation.getState().then(applyState)
     const off = window.App.conversation.onState(applyState)
@@ -134,6 +137,7 @@ export function OverlayScreen() {
   const isSendDisabled = !input.trim() || rpcState !== 'open' || !sessionId
   const isInputDisabled = conversationPending || rpcState !== 'open' || !sessionId
   const hasConversation = messages.length > 0
+  const inputPlaceholder = currentStatus || (rpcState === 'open' ? '输入内容...' : '奇想盒后端异常')
 
   return (
     <div
@@ -175,9 +179,7 @@ export function OverlayScreen() {
             rows={1}
             value={input}
             disabled={isInputDisabled}
-            placeholder={
-              rpcState === 'open' ? '输入内容...' : '奇想盒后端异常'
-            }
+            placeholder={inputPlaceholder}
             onChange={(e) => {
               const t = e.currentTarget
               setInput(t.value)

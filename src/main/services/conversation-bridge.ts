@@ -19,6 +19,7 @@ export type ConversationState = {
   sessionId?: string | null
   toolRunning?: boolean
   conversationPending?: boolean
+  currentStatus?: string
 }
 
 let mainWindowRef: BrowserWindow | null = null
@@ -45,6 +46,7 @@ export function registerConversationBridge(mainWindow: BrowserWindow) {
         sessionId: payload.sessionId,
         toolRunning: payload.toolRunning,
         conversationPending: payload.conversationPending,
+        currentStatus: payload.currentStatus,
       }
       sendToOverlay('conversation:state', conversationState)
     },

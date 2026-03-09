@@ -159,6 +159,7 @@ export function MainScreen() {
     handleSend,
     handleStop,
     isConversationPending,
+    currentStatus,
   } = homeConversation
 
   useEffect(() => {
@@ -180,8 +181,9 @@ export function MainScreen() {
       sessionId,
       toolRunning,
       conversationPending: isConversationPending,
+      currentStatus,
     })
-  }, [isConversationPending, messages, rpcState, sessionId, toolRunning])
+  }, [currentStatus, isConversationPending, messages, rpcState, sessionId, toolRunning])
 
   useEffect(() => {
     const off = window.App.conversation.onRunSend((text: string) => {
@@ -447,6 +449,7 @@ export function MainScreen() {
             handleSend={handleSend}
             handleStop={handleStop}
             isConversationPending={isConversationPending}
+            currentStatus={currentStatus}
             rpcState={rpcState}
             sessionId={sessionId}
           />
