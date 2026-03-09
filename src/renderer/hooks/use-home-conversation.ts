@@ -370,7 +370,7 @@ export function useHomeConversation({
           const cur = prev[index]
           const blocks = cur.blocks ?? []
           const targetLogIndex =
-            source === 'agent' && toolCallId
+            toolCallId
               ? agentToolBlockIndexesRef.current[toolCallId]
               : [...blocks]
                   .map((block, i) => ({ block, i }))
