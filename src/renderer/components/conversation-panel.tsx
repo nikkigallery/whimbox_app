@@ -1,5 +1,7 @@
 import { useEffect, useRef } from "react"
 import { useActivate } from "react-activation"
+import ReactMarkdown from "react-markdown"
+import remarkGfm from "remark-gfm"
 import type { UiMessage } from "renderer/hooks/use-home-conversation"
 import { cn } from "renderer/lib/utils"
 
@@ -98,9 +100,7 @@ export function ConversationPanel({
                     </div>
                   ) : null}
                   {message.content ? (
-                    <div className="whitespace-pre-wrap">
-                      {message.content}
-                    </div>
+                    <MarkdownText content={message.content} variant={variant} />
                   ) : message.pending ? (
                     <div className="whitespace-pre-wrap">处理中...</div>
                   ) : null}
@@ -115,9 +115,11 @@ export function ConversationPanel({
                   {message.blocks && message.blocks.length > 0 ? (
                     message.blocks.map((block, i) =>
                       block.type === "text" ? (
-                        <div key={i} className="whitespace-pre-wrap">
-                          {block.content || (message.pending && i === message.blocks!.length - 1 ? "处理中..." : "")}
-                        </div>
+                        <MarkdownText
+                          key={i}
+                          content={block.content || (message.pending && i === message.blocks!.length - 1 ? "处理中..." : "")}
+                          variant={variant}
+                        />
                       ) : (
                         <div
                           key={i}
@@ -143,9 +145,10 @@ export function ConversationPanel({
                       )
                     )
                   ) : (
-                    <div className="whitespace-pre-wrap">
-                      {message.content || (message.pending ? "处理中..." : "")}
-                    </div>
+                    <MarkdownText
+                      content={message.content || (message.pending ? "处理中..." : "")}
+                      variant={variant}
+                    />
                   )}
                 </div>
               )}
@@ -153,6 +156,40 @@ export function ConversationPanel({
           )
         })
       )}
+    </div>
+  )
+}
+
+function MarkdownText({
+  content,
+  variant,
+}: {
+  content: string
+  variant: "default" | "overlay"
+}) {
+  const isOverlay = variant === "overlay"
+  return (
+    <div
+      className={cn(
+        "markdown-body break-words text-sm leading-6",
+        "[&_p]:my-0 [&_p+*]:mt-3",
+        "[&_ul]:my-3 [&_ul]:list-disc [&_ul]:pl-5",
+        "[&_ol]:my-3 [&_ol]:list-decimal [&_ol]:pl-5",
+        "[&_li]:my-1",
+        "[&_blockquote]:my-3 [&_blockquote]:border-l-2 [&_blockquote]:pl-3 [&_blockquote]:italic",
+        "[&_code]:rounded [&_code]:px-1.5 [&_code]:py-0.5 [&_code]:text-[0.92em]",
+        "[&_pre]:my-3 [&_pre]:overflow-x-auto [&_pre]:rounded-xl [&_pre]:p-3",
+        "[&_pre_code]:bg-transparent [&_pre_code]:p-0",
+        "[&_a]:underline [&_a]:underline-offset-2",
+        "[&_hr]:my-4 [&_table]:my-3 [&_table]:w-full [&_table]:border-collapse",
+        "[&_th]:border [&_th]:px-2 [&_th]:py-1 [&_th]:text-left",
+        "[&_td]:border [&_td]:px-2 [&_td]:py-1",
+        isOverlay
+          ? "[&_blockquote]:border-white/25 [&_code]:bg-white/10 [&_pre]:bg-black/25 [&_a]:text-pink-200 [&_th]:border-white/15 [&_td]:border-white/15"
+          : "[&_blockquote]:border-slate-300 dark:[&_blockquote]:border-slate-600 [&_code]:bg-slate-200 dark:[&_code]:bg-slate-800 [&_pre]:bg-slate-100 dark:[&_pre]:bg-slate-900/80 [&_a]:text-sky-700 dark:[&_a]:text-sky-300 [&_th]:border-slate-300 dark:[&_th]:border-slate-700 [&_td]:border-slate-300 dark:[&_td]:border-slate-700",
+      )}
+    >
+      <ReactMarkdown remarkPlugins={[remarkGfm]}>{content}</ReactMarkdown>
     </div>
   )
 }
