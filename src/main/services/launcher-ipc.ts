@@ -1,5 +1,5 @@
 import { app, dialog, ipcMain, nativeImage, shell, type BrowserWindow } from 'electron'
-import { readdirSync } from 'node:fs'
+import { mkdirSync, readdirSync } from 'node:fs'
 import { dirname, join } from 'node:path'
 import { spawn } from 'node:child_process'
 
@@ -35,6 +35,10 @@ function lastLine(output: string | undefined): string {
   if (!output || !output.trim()) return '正在安装…'
   const line = output.trim().split(/\r?\n/).pop()?.trim()
   return line || '正在安装…'
+}
+
+function getAgentWorkspaceDir(): string {
+  return join(process.cwd(), 'configs', 'agent_workspace')
 }
 
 /**
@@ -347,6 +351,11 @@ export function registerLauncherIpc(window: BrowserWindow) {
 
   ipcMain.handle('launcher:open-scripts-folder', () => scriptManager.openScriptsFolder())
   ipcMain.handle('launcher:open-logs-folder', () => shell.openPath(getLogsDir()))
+  ipcMain.handle('launcher:open-agent-workspace-folder', () => {
+    const workspaceDir = getAgentWorkspaceDir()
+    mkdirSync(workspaceDir, { recursive: true })
+    return shell.openPath(workspaceDir)
+  })
 
   downloader.on('progress', (progress) => {
     window.webContents.send('launcher:download-progress', progress)

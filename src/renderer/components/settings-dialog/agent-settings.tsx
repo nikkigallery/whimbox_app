@@ -39,27 +39,44 @@ function AgentConfigForm({
     const showForm = !loading && !loadError && items.length > 0
     if (showForm) {
       renderTitleActions(
-        <Button
-          variant="outline"
-          size="sm"
-          className="rounded-xl"
-          disabled={saving}
-          onClick={async () => {
-            try {
-              const saved = await handleSaveRef.current({
-                successMessage: "大模型配置已保存",
-                noChangeMessage: "暂无需要保存的修改。",
-              })
-              if (saved) {
-                await window.App.launcher.restartBackend("保存并应用")
+        <div className="flex items-center gap-2">
+          <Button
+            variant="outline"
+            size="sm"
+            className="rounded-xl"
+            disabled={saving}
+            onClick={async () => {
+              try {
+                await window.App.launcher.openAgentWorkspaceFolder()
+              } catch {
+                toast.error("打开 agent_workspace 失败，请稍后重试")
               }
-            } catch {
-              toast.error("保存或重启失败，请稍后重试")
-            }
-          }}
-        >
-          保存并应用
-        </Button>
+            }}
+          >
+            修改记忆
+          </Button>
+          <Button
+            variant="outline"
+            size="sm"
+            className="rounded-xl"
+            disabled={saving}
+            onClick={async () => {
+              try {
+                const saved = await handleSaveRef.current({
+                  successMessage: "大模型配置已保存",
+                  noChangeMessage: "暂无需要保存的修改。",
+                })
+                if (saved) {
+                  await window.App.launcher.restartBackend("保存并应用")
+                }
+              } catch {
+                toast.error("保存或重启失败，请稍后重试")
+              }
+            }}
+          >
+            保存并应用
+          </Button>
+        </div>
       )
     } else {
       renderTitleActions(null)

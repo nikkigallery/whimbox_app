@@ -219,6 +219,7 @@ const API = {
     deleteScript: (md5: string) => ipcRenderer.invoke('launcher:delete-script', md5),
     openScriptsFolder: () => ipcRenderer.invoke('launcher:open-scripts-folder'),
     openLogsFolder: () => ipcRenderer.invoke('launcher:open-logs-folder'),
+    openAgentWorkspaceFolder: () => ipcRenderer.invoke('launcher:open-agent-workspace-folder'),
     onTaskProgress: (
       callback: (data: { status: string; title?: string; message?: string; progress?: number; error?: string }) => void,
     ) => {

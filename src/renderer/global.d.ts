@@ -132,6 +132,7 @@ declare global {
         deleteScript: (md5: string) => Promise<void>
         openScriptsFolder: () => Promise<void>
         openLogsFolder: () => Promise<void>
+        openAgentWorkspaceFolder: () => Promise<string>
         onTaskProgress: (
           callback: (data: {
             status: string
