@@ -99,6 +99,7 @@ declare global {
         }>
         launchBackend: () => Promise<unknown>
         stopBackend: () => Promise<unknown>
+        runUninstaller: () => Promise<unknown>
         getAppVersion: () => Promise<string>
         getAnnouncements: () => Promise<{
           announcements: Array<{ title: string; url?: string; created_at: string }>

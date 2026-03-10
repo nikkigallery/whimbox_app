@@ -179,6 +179,7 @@ const API = {
     getBackendStatus: () => ipcRenderer.invoke('launcher:get-backend-status'),
     launchBackend: () => ipcRenderer.invoke('launcher:launch-backend'),
     stopBackend: () => ipcRenderer.invoke('launcher:stop-backend'),
+    runUninstaller: () => ipcRenderer.invoke('launcher:run-uninstaller'),
     restartBackend: (title?: string) => ipcRenderer.invoke('launcher:restart-backend', title),
     getAppVersion: () => ipcRenderer.invoke('launcher:get-app-version'),
     getAnnouncements: () => ipcRenderer.invoke('launcher:get-announcements'),

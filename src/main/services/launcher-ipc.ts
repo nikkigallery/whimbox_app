@@ -1,4 +1,7 @@
 import { app, dialog, ipcMain, nativeImage, shell, type BrowserWindow } from 'electron'
+import { readdirSync } from 'node:fs'
+import { dirname, join } from 'node:path'
+import { spawn } from 'node:child_process'
 
 import { waitFor } from 'shared/utils'
 import { backendManager } from './backend-manager'
@@ -261,6 +264,34 @@ export function registerLauncherIpc(window: BrowserWindow) {
   ipcMain.handle('launcher:get-backend-status', () => backendManager.getBackendStatus())
   ipcMain.handle('launcher:launch-backend', () => backendManager.launchBackend())
   ipcMain.handle('launcher:stop-backend', () => backendManager.stopBackend())
+  ipcMain.handle('launcher:run-uninstaller', async () => {
+    if (!app.isPackaged) {
+      throw new Error('开发环境不支持卸载')
+    }
+
+    const exeDir = dirname(app.getPath('exe'))
+    const uninstallExe = readdirSync(exeDir).find(
+      (file) => /^uninstall .*\.exe$/i.test(file),
+    )
+
+    if (!uninstallExe) {
+      throw new Error('未找到卸载程序')
+    }
+
+    const uninstallPath = join(exeDir, uninstallExe)
+    const child = spawn(uninstallPath, [], {
+      cwd: exeDir,
+      detached: true,
+      stdio: 'ignore',
+    })
+    child.unref()
+
+    setTimeout(() => {
+      app.quit()
+    }, 100)
+
+    return { success: true }
+  })
   ipcMain.handle('launcher:restart-backend', async (_, title?: string) =>
     runRestartBackend(window, title ?? '重启奇想盒'),
   )

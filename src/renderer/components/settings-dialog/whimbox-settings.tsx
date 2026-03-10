@@ -5,6 +5,7 @@ import { ConfigFormFields } from "renderer/components/config-form-fields"
 import { KeybindInput } from "renderer/components/settings-dialog/keybind-input"
 import { useConfigForm } from "renderer/hooks/use-config-form"
 import type { IpcRpcClient } from "renderer/lib/ipc-rpc"
+import { toast } from "sonner"
 import { APP_RELEASE_PAGE_URL } from "shared/constants"
 import type { SettingSection, SettingContent, SettingsDialogProps } from "./types"
 
@@ -55,6 +56,17 @@ function WhimboxConfigForm({ rpcClient }: { rpcClient: IpcRpcClient }) {
       ) : null}
     </div>
   )
+}
+
+async function handleRunUninstaller() {
+  const confirmed = window.confirm("即将启动卸载程序，当前应用会关闭。是否继续？")
+  if (!confirmed) return
+
+  try {
+    await window.App.launcher.runUninstaller()
+  } catch (error) {
+    toast.error(error instanceof Error ? error.message : "启动卸载程序失败")
+  }
 }
 
 export const content: SettingContent = {
@@ -147,6 +159,22 @@ export const content: SettingContent = {
               手动更新后端
             </Button>
           </div>
+        </div>
+      </div>
+      <div className="rounded-xl border border-slate-100 bg-white px-4 py-3 text-sm dark:border-slate-800 dark:bg-slate-900">
+        <div className="flex flex-wrap items-center justify-between gap-3">
+          <div>
+            <p className="font-semibold text-slate-700 dark:text-slate-100">卸载</p>
+            <p className="text-xs text-slate-400">启动卸载程序，卸载整个奇想盒APP</p>
+          </div>
+          <Button
+            variant="destructive"
+            size="sm"
+            disabled={isProcessing}
+            onClick={handleRunUninstaller}
+          >
+            卸载奇想盒
+          </Button>
         </div>
       </div>
       {rpcClient ? <WhimboxConfigForm rpcClient={rpcClient} /> : null}
