@@ -32,11 +32,19 @@ export function registerRpcBridge() {
       return
     }
     if (payload.method === 'event.run.status') {
-      const params = payload.params as { source?: string; phase?: string } | undefined
+      const params = payload.params as {
+        source?: string
+        phase?: string
+        tool_call_id?: string
+      } | undefined
       const source = params?.source ?? ''
       if (source !== 'agent' && source !== 'task' && source !== 'background') return
       const phase = params?.phase ?? ''
-      if (phase === 'started') {
+      const hasAgentToolCall = source === 'agent' && typeof params?.tool_call_id === 'string' && params.tool_call_id.length > 0
+      const shouldAutoShow =
+        (source === 'agent' && phase === 'started' && hasAgentToolCall)
+        || (source !== 'agent' && phase === 'started')
+      if (shouldAutoShow) {
         setOverlayIgnoreMouseEvents(true)
         showOverlayOnToolStart()
       } else if (phase === 'stopping') {
