@@ -2,10 +2,10 @@ import { useEffect, useRef } from "react"
 import type { ComponentType } from "react"
 import { useActivate } from "react-activation"
 
-import { Bot, FileText, Gift, Send, Square, Target } from "lucide-react"
+import { Gift, ImagePlus, Send, Square, X } from "lucide-react"
 
 import { ConversationPanel } from "renderer/components/conversation-panel"
-import type { UiMessage } from "renderer/hooks/use-home-conversation"
+import type { ConversationSendPayload, UiAttachment, UiMessage } from "renderer/hooks/use-home-conversation"
 import { cn } from "renderer/lib/utils"
 
 type QuickAction = {
@@ -17,7 +17,10 @@ type HomePageProps = {
   messages: UiMessage[]
   input: string
   setInput: (v: string) => void
-  handleSend: (overrideText?: string) => void
+  attachments: UiAttachment[]
+  handlePickImage: () => void
+  removeAttachment: (path: string) => void
+  handleSend: (override?: string | ConversationSendPayload) => void
   handleStop: () => void
   isConversationPending: boolean
   currentStatus: string
@@ -29,6 +32,9 @@ export function HomePage({
   messages,
   input,
   setInput,
+  attachments,
+  handlePickImage,
+  removeAttachment,
   handleSend,
   handleStop,
   isConversationPending,
@@ -39,7 +45,7 @@ export function HomePage({
   const textareaRef = useRef<HTMLTextAreaElement | null>(null)
 
   const hasConversation = messages.length > 0
-  const isSendDisabled = !input.trim() || rpcState !== "open" || !sessionId
+  const isSendDisabled = (!input.trim() && attachments.length === 0) || rpcState !== "open" || !sessionId
   const isInputDisabled = isConversationPending || rpcState !== "open" || !sessionId
   const inputPlaceholder =
     currentStatus ||
@@ -96,6 +102,35 @@ export function HomePage({
       <div className="border-t border-slate-100 bg-white px-3 pt-3 pb-6 dark:border-slate-800 dark:bg-slate-900">
         <div className="flex items-end gap-4 rounded-2xl border border-slate-100 bg-white px-4 py-3 shadow-sm dark:border-slate-800 dark:bg-slate-900">
           <div className="flex-1">
+            {attachments.length > 0 ? (
+              <div className="mb-3 flex flex-wrap gap-2">
+                {attachments.map((attachment) => (
+                  <div
+                    key={attachment.path}
+                    className="relative overflow-hidden rounded-2xl border border-slate-200 bg-slate-50 p-1 dark:border-slate-700 dark:bg-slate-800"
+                  >
+                    {attachment.previewUrl ? (
+                      <img
+                        src={attachment.previewUrl}
+                        alt="已选择图片"
+                        className="h-20 w-20 rounded-xl object-cover"
+                      />
+                    ) : (
+                      <div className="flex h-20 w-20 items-center justify-center rounded-xl bg-slate-100 text-[11px] text-slate-400 dark:bg-slate-700 dark:text-slate-300">
+                        {attachment.loading ? "加载中..." : "不可预览"}
+                      </div>
+                    )}
+                    <button
+                      type="button"
+                      onClick={() => removeAttachment(attachment.path)}
+                      className="absolute right-1 top-1 rounded-full bg-black/55 p-1 text-white"
+                    >
+                      <X className="size-3" />
+                    </button>
+                  </div>
+                ))}
+              </div>
+            ) : null}
             <textarea
               ref={textareaRef}
               rows={1}
@@ -119,6 +154,17 @@ export function HomePage({
             />
           </div>
           <div className="flex items-center gap-3">
+            <button
+              type="button"
+              onMouseDown={(event) => {
+                event.preventDefault()
+              }}
+              onClick={handlePickImage}
+              disabled={isInputDisabled}
+              className="flex size-9 items-center justify-center rounded-xl border border-slate-200 text-slate-500 transition hover:bg-slate-50 disabled:cursor-not-allowed disabled:opacity-50 dark:border-slate-700 dark:text-slate-300 dark:hover:bg-slate-800"
+            >
+              <ImagePlus className="size-4" />
+            </button>
             <button
               type="button"
               onMouseDown={(event) => {

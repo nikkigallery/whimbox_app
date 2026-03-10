@@ -9,7 +9,10 @@
       If you want restrict the sources from where you can load resources:
         <meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self'; style-src 'self' 'unsafe-inline'" />
     -->
-    <meta http-equiv="Content-Security-Policy" content="default-src 'self' *; script-src 'self' *; style-src 'self' 'unsafe-inline' *;" />
+    <meta
+      http-equiv="Content-Security-Policy"
+      content="default-src 'self' *; script-src 'self' *; style-src 'self' 'unsafe-inline' *; img-src 'self' data: file: *;"
+    />
   </head>
 
   <body>

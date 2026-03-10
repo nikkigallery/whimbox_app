@@ -28,6 +28,7 @@ declare global {
             id: string
             role: 'user' | 'assistant' | 'system'
             content: string
+            attachments?: Array<{ type: 'image_file'; path: string; previewUrl?: string }>
             pending?: boolean
             title?: string
             blocks?: Array<{ type: 'text' | 'log'; content: string; title?: string }>
@@ -46,7 +47,10 @@ declare global {
           conversationPending?: boolean
           currentStatus?: string
         }) => void
-        send: (text: string) => void
+        send: (payload: {
+          text?: string
+          attachments?: Array<{ type: 'image_file'; path: string; previewUrl?: string }>
+        }) => void
         stop: () => void
         onState: (callback: (data: {
           messages: unknown[]
@@ -56,7 +60,10 @@ declare global {
           conversationPending?: boolean
           currentStatus?: string
         }) => void) => () => void
-        onRunSend: (callback: (text: string) => void) => () => void
+        onRunSend: (callback: (payload: {
+          text?: string
+          attachments?: Array<{ type: 'image_file'; path: string; previewUrl?: string }>
+        }) => void) => () => void
         onRunStop: (callback: () => void) => () => void
       }
       launcher: {
@@ -79,6 +86,8 @@ declare global {
           message?: string
         }>
         selectWhlFile: () => Promise<string | null>
+        selectImageFile: () => Promise<string | null>
+        getImagePreview: (imagePath: string) => Promise<string | null>
         installWhl: (wheelPath: string, deleteWheel?: boolean) => Promise<unknown>
         downloadAndInstallWhl: (url: string, md5?: string) => Promise<unknown>
         getBackendStatus: () => Promise<{

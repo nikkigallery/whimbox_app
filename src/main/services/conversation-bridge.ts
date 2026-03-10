@@ -8,9 +8,15 @@ type StoredMessage = {
   id: string
   role: 'user' | 'assistant' | 'system'
   content: string
+  attachments?: Array<{ type: 'image_file'; path: string; previewUrl?: string }>
   pending?: boolean
   title?: string
   blocks?: Array<{ type: 'text' | 'log'; content: string; title?: string }>
+}
+
+type ConversationSendPayload = {
+  text?: string
+  attachments?: Array<{ type: 'image_file'; path: string; previewUrl?: string }>
 }
 
 export type ConversationState = {
@@ -52,9 +58,9 @@ export function registerConversationBridge(mainWindow: BrowserWindow) {
     },
   )
 
-  ipcMain.on('conversation:send', (_event, text: string) => {
+  ipcMain.on('conversation:send', (_event, payload: ConversationSendPayload) => {
     if (mainWindowRef && !mainWindowRef.isDestroyed()) {
-      mainWindowRef.webContents.send('conversation:run-send', text)
+      mainWindowRef.webContents.send('conversation:run-send', payload)
     }
   })
 

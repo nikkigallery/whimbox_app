@@ -85,9 +85,25 @@ export function ConversationPanel({
                       : "bg-slate-100 text-slate-700 dark:bg-slate-800 dark:text-slate-200",
                   )}
                 >
-                  <div className="whitespace-pre-wrap">
-                    {message.content || (message.pending ? "处理中..." : "")}
-                  </div>
+                  {message.attachments && message.attachments.length > 0 ? (
+                    <div className="mb-2 space-y-2">
+                      {message.attachments.map((attachment) => (
+                        <LocalImagePreview
+                          key={attachment.path}
+                          path={attachment.path}
+                          previewUrl={attachment.previewUrl}
+                          loading={attachment.loading}
+                        />
+                      ))}
+                    </div>
+                  ) : null}
+                  {message.content ? (
+                    <div className="whitespace-pre-wrap">
+                      {message.content}
+                    </div>
+                  ) : message.pending ? (
+                    <div className="whitespace-pre-wrap">处理中...</div>
+                  ) : null}
                 </div>
               ) : (
                 <div
@@ -138,5 +154,43 @@ export function ConversationPanel({
         })
       )}
     </div>
+  )
+}
+
+function LocalImagePreview({
+  path,
+  previewUrl,
+  loading,
+}: {
+  path: string
+  previewUrl?: string
+  loading?: boolean
+}) {
+  const src = previewUrl || ""
+  if (!src) {
+    return (
+      <div className="flex min-h-28 w-full items-center justify-center rounded-2xl border border-dashed border-slate-300 px-3 py-4 text-sm text-slate-500 dark:border-slate-600 dark:text-slate-300">
+        {loading ? "图片预览加载中..." : "图片附件不可预览"}
+      </div>
+    )
+  }
+  return (
+    <img
+      src={src}
+      alt="用户上传图片"
+      className="max-h-64 w-full rounded-2xl object-cover"
+      onError={(event) => {
+        const target = event.currentTarget
+        target.style.display = "none"
+        const parent = target.parentElement
+        if (parent && !parent.querySelector("[data-image-fallback='true']")) {
+          const fallback = document.createElement("div")
+          fallback.dataset.imageFallback = "true"
+          fallback.className = "rounded-2xl border border-dashed border-slate-300 px-3 py-4 text-sm text-slate-500 dark:border-slate-600 dark:text-slate-300"
+          fallback.textContent = "图片附件不可预览"
+          parent.appendChild(fallback)
+        }
+      }}
+    />
   )
 }

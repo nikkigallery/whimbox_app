@@ -1,4 +1,4 @@
-import { app, dialog, ipcMain, shell, type BrowserWindow } from 'electron'
+import { app, dialog, ipcMain, nativeImage, shell, type BrowserWindow } from 'electron'
 
 import { waitFor } from 'shared/utils'
 import { backendManager } from './backend-manager'
@@ -197,6 +197,33 @@ export function registerLauncherIpc(window: BrowserWindow) {
       return result.filePaths[0]
     }
     return null
+  })
+
+  ipcMain.handle('launcher:select-image-file', async () => {
+    const result = await dialog.showOpenDialog(window, {
+      title: '选择图片',
+      filters: [
+        { name: '图片文件', extensions: ['png', 'jpg', 'jpeg', 'webp', 'bmp', 'gif'] },
+        { name: '所有文件', extensions: ['*'] },
+      ],
+      properties: ['openFile'],
+    })
+
+    if (!result.canceled && result.filePaths.length > 0) {
+      return result.filePaths[0]
+    }
+    return null
+  })
+
+  ipcMain.handle('launcher:get-image-preview', async (_, imagePath: string) => {
+    if (!imagePath || typeof imagePath !== 'string') {
+      return null
+    }
+    const image = nativeImage.createFromPath(imagePath)
+    if (image.isEmpty()) {
+      return null
+    }
+    return image.toDataURL()
   })
 
   ipcMain.handle('launcher:install-whl', async (_, wheelPath: string) =>

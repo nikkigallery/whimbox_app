@@ -1,8 +1,8 @@
 import type { CSSProperties } from 'react'
 import { useCallback, useEffect, useRef, useState } from 'react'
-import { Send, Square, X } from 'lucide-react'
+import { ImagePlus, Send, Square, X } from 'lucide-react'
 import { ConversationPanel } from 'renderer/components/conversation-panel'
-import type { UiMessage } from 'renderer/hooks/use-home-conversation'
+import type { ConversationSendPayload, UiAttachment, UiMessage } from 'renderer/hooks/use-home-conversation'
 import { cn } from 'renderer/lib/utils'
 
 /** Electron 无边框窗口拖拽区域，TypeScript 不包含此非标准属性，需断言 */
@@ -28,6 +28,7 @@ export function OverlayScreen() {
   const [rpcState, setRpcState] = useState<'idle' | 'connecting' | 'open' | 'closed' | 'error'>('idle')
   const [sessionId, setSessionId] = useState<string | null>(null)
   const [input, setInput] = useState('')
+  const [attachments, setAttachments] = useState<UiAttachment[]>([])
   const [conversationPending, setConversationPending] = useState(false)
   const [currentStatus, setCurrentStatus] = useState('')
 
@@ -51,12 +52,34 @@ export function OverlayScreen() {
     return () => off()
   }, [])
 
+  const handlePickImage = useCallback(async () => {
+    const path = await window.App.launcher.selectImageFile()
+    if (!path) return
+    setAttachments((prev) => {
+      if (prev.some((item) => item.path === path)) return prev
+      return [...prev, { type: 'image_file', path, loading: true }]
+    })
+    const previewUrl = await window.App.launcher.getImagePreview(path)
+    setAttachments((prev) =>
+      prev.map((item) =>
+        item.path === path
+          ? { ...item, previewUrl: previewUrl ?? undefined, loading: false }
+          : item,
+      ),
+    )
+  }, [])
+
   const handleSend = useCallback(() => {
     const text = input.trim()
-    if (!text || rpcState !== 'open' || !sessionId || conversationPending) return
+    if ((!text && attachments.length === 0) || rpcState !== 'open' || !sessionId || conversationPending) return
     setInput('')
-    window.App.conversation.send(text)
-  }, [conversationPending, input, rpcState, sessionId])
+    const payload: ConversationSendPayload = {
+      text,
+      attachments,
+    }
+    setAttachments([])
+    window.App.conversation.send(payload)
+  }, [attachments, conversationPending, input, rpcState, sessionId])
 
   const handleStop = useCallback(() => {
     if (!conversationPending) return
@@ -134,7 +157,7 @@ export function OverlayScreen() {
     [],
   )
 
-  const isSendDisabled = !input.trim() || rpcState !== 'open' || !sessionId
+  const isSendDisabled = (!input.trim() && attachments.length === 0) || rpcState !== 'open' || !sessionId
   const isInputDisabled = conversationPending || rpcState !== 'open' || !sessionId
   const hasConversation = messages.length > 0
   const inputPlaceholder = currentStatus || (rpcState === 'open' ? '输入内容...' : '奇想盒后端异常')
@@ -175,30 +198,70 @@ export function OverlayScreen() {
         )}
 
         <div className="mt-1 flex gap-2">
-          <textarea
-            rows={1}
-            value={input}
+          <div className="flex-1">
+            {attachments.length > 0 ? (
+              <div className="mb-2 flex flex-wrap gap-2">
+                {attachments.map((attachment) => (
+                  <div key={attachment.path} className="relative overflow-hidden rounded-xl border border-white/15 p-1">
+                    {attachment.previewUrl ? (
+                      <img
+                        src={attachment.previewUrl}
+                        alt="已选择图片"
+                        className="h-14 w-14 rounded-lg object-cover"
+                      />
+                    ) : (
+                      <div className="flex h-14 w-14 items-center justify-center rounded-lg bg-white/10 text-[10px] text-white/60">
+                        {attachment.loading ? '加载中...' : '不可预览'}
+                      </div>
+                    )}
+                    <button
+                      type="button"
+                      onClick={() => setAttachments((prev) => prev.filter((item) => item.path !== attachment.path))}
+                      className="absolute right-1 top-1 rounded-full bg-black/55 p-0.5 text-white"
+                    >
+                      <X className="size-3" />
+                    </button>
+                  </div>
+                ))}
+              </div>
+            ) : null}
+            <textarea
+              rows={1}
+              value={input}
+              disabled={isInputDisabled}
+              placeholder={inputPlaceholder}
+              onChange={(e) => {
+                const t = e.currentTarget
+                setInput(t.value)
+                t.style.height = 'auto'
+                t.style.height = `${t.scrollHeight}px`
+              }}
+              onKeyDown={(e) => {
+                if (conversationPending) return
+                if (e.key === 'Enter' && !e.shiftKey) {
+                  e.preventDefault()
+                  handleSend()
+                }
+              }}
+              className={cn(
+                'min-h-[36px] max-h-24 w-full resize-none overflow-hidden rounded-xl',
+                'border border-white/20 bg-slate-700/35 px-3 py-2 text-sm text-white/95',
+                'placeholder:text-white/50 focus:outline-none focus:ring-1 focus:ring-pink-400',
+              )}
+            />
+          </div>
+          <button
+            type="button"
+            onClick={handlePickImage}
             disabled={isInputDisabled}
-            placeholder={inputPlaceholder}
-            onChange={(e) => {
-              const t = e.currentTarget
-              setInput(t.value)
-              t.style.height = 'auto'
-              t.style.height = `${t.scrollHeight}px`
-            }}
-            onKeyDown={(e) => {
-              if (conversationPending) return
-              if (e.key === 'Enter' && !e.shiftKey) {
-                e.preventDefault()
-                handleSend()
-              }
-            }}
             className={cn(
-              'min-h-[36px] max-h-24 flex-1 resize-none overflow-hidden rounded-xl',
-              'border border-white/20 bg-slate-700/35 px-3 py-2 text-sm text-white/95',
-              'placeholder:text-white/50 focus:outline-none focus:ring-1 focus:ring-pink-400',
+              'flex size-9 shrink-0 items-center justify-center rounded-xl',
+              'border border-white/20 text-white transition disabled:opacity-50 disabled:cursor-not-allowed',
+              'hover:bg-white/10',
             )}
-          />
+          >
+            <ImagePlus className="size-4" />
+          </button>
           <button
             type="button"
             onClick={conversationPending ? handleStop : handleSend}

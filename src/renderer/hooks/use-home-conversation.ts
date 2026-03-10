@@ -6,14 +6,32 @@ export type AssistantBlock =
   | { type: 'text'; content: string }
   | { type: 'log'; content: string; title?: string }
 
+export type UiAttachment = {
+  type: 'image_file'
+  path: string
+  previewUrl?: string
+  loading?: boolean
+}
+
+type RpcAttachment = {
+  type: 'image_file'
+  path: string
+}
+
 export type UiMessage = {
   id: string
   role: 'user' | 'assistant' | 'system'
   content: string
+  attachments?: UiAttachment[]
   pending?: boolean
   title?: string
   /** 仅 assistant：按 event 到达顺序的块，有则按块渲染，无则只渲染 content */
   blocks?: AssistantBlock[]
+}
+
+export type ConversationSendPayload = {
+  text?: string
+  attachments?: UiAttachment[]
 }
 
 const createId = () =>
@@ -38,6 +56,12 @@ const formatAgentStatus = (phase: string, detail: string, rawDetail?: string) =>
   return ''
 }
 
+const toRpcAttachments = (attachments: UiAttachment[]): RpcAttachment[] =>
+  attachments.map((item) => ({
+    type: 'image_file',
+    path: item.path,
+  }))
+
 export function useHomeConversation({
   rpcClient,
   sessionId,
@@ -45,6 +69,7 @@ export function useHomeConversation({
 }: UseHomeConversationOptions) {
   const [messages, setMessages] = useState<UiMessage[]>([])
   const [input, setInput] = useState('')
+  const [attachments, setAttachments] = useState<UiAttachment[]>([])
   const [isConversationPending, setIsConversationPending] = useState(false)
   const [isStandaloneTaskPending, setIsStandaloneTaskPending] = useState(false)
   const [currentStatus, setCurrentStatus] = useState('')
@@ -72,6 +97,7 @@ export function useHomeConversation({
     setIsConversationPending(false)
     setIsStandaloneTaskPending(false)
     setCurrentStatus('')
+    setAttachments([])
     currentAgentMessageIdRef.current = null
     agentToolBlockIndexesRef.current = {}
     activeAgentToolCallIdsRef.current = new Set()
@@ -408,10 +434,39 @@ export function useHomeConversation({
 
   const isAnyPending = isConversationPending || isStandaloneTaskPending
 
-  const handleSend = useCallback(async (overrideText?: string) => {
-    const text = (overrideText != null && overrideText !== '' ? overrideText : input).trim()
-    if (!text || rpcState !== 'open' || !sessionId || isAnyPending) return
-    if (overrideText == null) setInput('')
+  const handlePickImage = useCallback(async () => {
+    const path = await window.App.launcher.selectImageFile()
+    if (!path) return
+    setAttachments((prev) => {
+      if (prev.some((item) => item.path === path)) return prev
+      return [...prev, { type: 'image_file', path, loading: true }]
+    })
+    const previewUrl = await window.App.launcher.getImagePreview(path)
+    setAttachments((prev) =>
+      prev.map((item) =>
+        item.path === path
+          ? { ...item, previewUrl: previewUrl ?? undefined, loading: false }
+          : item,
+      ),
+    )
+  }, [])
+
+  const removeAttachment = useCallback((path: string) => {
+    setAttachments((prev) => prev.filter((item) => item.path !== path))
+  }, [])
+
+  const handleSend = useCallback(async (override?: string | ConversationSendPayload) => {
+    const payload =
+      typeof override === 'string'
+        ? { text: override }
+        : (override ?? {})
+    const text = (payload.text != null ? payload.text : input).trim()
+    const currentAttachments = payload.attachments ?? attachments
+    if ((!text && currentAttachments.length === 0) || rpcState !== 'open' || !sessionId || isAnyPending) return
+    if (override == null) {
+      setInput('')
+      setAttachments([])
+    }
     setIsConversationPending(true)
     setCurrentStatus('思考中...')
     currentAgentMessageIdRef.current = null
@@ -420,12 +475,21 @@ export function useHomeConversation({
     bufferedAgentTextRef.current = ''
     setMessages((prev) => [
       ...prev,
-      { id: createId(), role: 'user', content: text },
+      {
+        id: createId(),
+        role: 'user',
+        content: text,
+        attachments: currentAttachments,
+      },
     ])
     try {
       const result = await rpcClient.sendStreamingRequest<{ message?: string }>(
         'agent.send_message',
-        { session_id: sessionId, message: text },
+        {
+          session_id: sessionId,
+          message: text,
+          attachments: toRpcAttachments(currentAttachments),
+        },
         () => {},
       )
       if (bufferedAgentTextRef.current) {
@@ -502,7 +566,7 @@ export function useHomeConversation({
       setIsConversationPending(false)
       setCurrentStatus((prev) => (prev === '发送失败' || prev === '已停止' || prev === '执行失败' ? prev : ''))
     }
-  }, [input, isAnyPending, rpcState, sessionId, rpcClient])
+  }, [attachments, input, isAnyPending, rpcState, sessionId, rpcClient])
 
   const handleStop = useCallback(async () => {
     if (rpcState !== 'open' || !sessionId || !isAnyPending) return
@@ -523,6 +587,9 @@ export function useHomeConversation({
     messages,
     input,
     setInput,
+    attachments,
+    handlePickImage,
+    removeAttachment,
     handleSend,
     handleStop,
     isConversationPending: isAnyPending,

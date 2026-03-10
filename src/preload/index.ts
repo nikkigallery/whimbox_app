@@ -96,6 +96,7 @@ const API = {
           id: string
           role: 'user' | 'assistant' | 'system'
           content: string
+          attachments?: Array<{ type: 'image_file'; path: string; previewUrl?: string }>
           pending?: boolean
           title?: string
           blocks?: Array<{ type: 'text' | 'log'; content: string; title?: string }>
@@ -114,7 +115,8 @@ const API = {
       conversationPending?: boolean
       currentStatus?: string
     }) => ipcRenderer.send('conversation:push-state', payload),
-    send: (text: string) => ipcRenderer.send('conversation:send', text),
+    send: (payload: { text?: string; attachments?: Array<{ type: 'image_file'; path: string; previewUrl?: string }> }) =>
+      ipcRenderer.send('conversation:send', payload),
     stop: () => ipcRenderer.send('conversation:stop'),
     onState: (
       callback: (data: {
@@ -142,8 +144,11 @@ const API = {
         ipcRenderer.removeListener('conversation:state', listener)
       }
     },
-    onRunSend: (callback: (text: string) => void) => {
-      const listener = (_: Electron.IpcRendererEvent, text: string) => callback(text)
+    onRunSend: (callback: (payload: { text?: string; attachments?: Array<{ type: 'image_file'; path: string; previewUrl?: string }> }) => void) => {
+      const listener = (
+        _: Electron.IpcRendererEvent,
+        payload: { text?: string; attachments?: Array<{ type: 'image_file'; path: string; previewUrl?: string }> },
+      ) => callback(payload)
       ipcRenderer.on('conversation:run-send', listener)
       return () => {
         ipcRenderer.removeListener('conversation:run-send', listener)
@@ -163,6 +168,8 @@ const API = {
     detectPythonEnvironment: () => ipcRenderer.invoke('launcher:detect-python'),
     setupPythonEnvironment: () => ipcRenderer.invoke('launcher:setup-python'),
     selectWhlFile: () => ipcRenderer.invoke('launcher:select-whl-file'),
+    selectImageFile: () => ipcRenderer.invoke('launcher:select-image-file'),
+    getImagePreview: (imagePath: string) => ipcRenderer.invoke('launcher:get-image-preview', imagePath) as Promise<string | null>,
     installWhl: (wheelPath: string, deleteWheel = true) =>
       ipcRenderer.invoke('launcher:install-whl', wheelPath, deleteWheel),
     downloadAndInstallWhl: (url: string, md5?: string) =>

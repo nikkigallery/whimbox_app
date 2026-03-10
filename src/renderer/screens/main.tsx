@@ -47,7 +47,7 @@ import { AutoMusicPage } from '../pages/auto-music-page'
 import { ScriptSubscribePage } from '../pages/script-subscribe-page'
 import { IpcRpcClient } from 'renderer/lib/ipc-rpc'
 import { apiClient } from 'renderer/lib/api-client'
-import { useHomeConversation } from 'renderer/hooks/use-home-conversation'
+import { type ConversationSendPayload, useHomeConversation } from 'renderer/hooks/use-home-conversation'
 import { useUnifiedUpdate } from 'renderer/hooks/use-unified-update'
 import { toast } from 'sonner'
 import { Toaster } from 'renderer/components/ui/sonner'
@@ -156,6 +156,9 @@ export function MainScreen() {
     messages,
     input,
     setInput,
+    attachments,
+    handlePickImage,
+    removeAttachment,
     handleSend,
     handleStop,
     isConversationPending,
@@ -186,8 +189,8 @@ export function MainScreen() {
   }, [currentStatus, isConversationPending, messages, rpcState, sessionId, toolRunning])
 
   useEffect(() => {
-    const off = window.App.conversation.onRunSend((text: string) => {
-      handleSend(text)
+    const off = window.App.conversation.onRunSend((payload: ConversationSendPayload) => {
+      handleSend(payload)
     })
     return () => off()
   }, [handleSend])
@@ -446,6 +449,9 @@ export function MainScreen() {
             messages={messages}
             input={input}
             setInput={setInput}
+            attachments={attachments}
+            handlePickImage={handlePickImage}
+            removeAttachment={removeAttachment}
             handleSend={handleSend}
             handleStop={handleStop}
             isConversationPending={isConversationPending}
