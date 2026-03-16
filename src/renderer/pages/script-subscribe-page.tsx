@@ -56,6 +56,7 @@ const PAGE_SIZE = 20
 type SearchParams = {
   page: number
   page_size: number
+  name: string
   subscribed: boolean
   type: string
   target: string
@@ -67,6 +68,7 @@ type SearchParams = {
 const defaultSearchParams: SearchParams = {
   page: 1,
   page_size: PAGE_SIZE,
+  name: "",
   subscribed: false,
   type: "",
   target: "",
@@ -122,6 +124,7 @@ export function ScriptSubscribePage({
   onRefreshBackendScripts,
   authStateVersion,
 }: ScriptSubscribePageProps) {
+  const [searchForm, setSearchForm] = useState<SearchParams>(defaultSearchParams)
   const [searchParams, setSearchParams] = useState<SearchParams>(defaultSearchParams)
   const [tableData, setTableData] = useState<ScriptListItem[]>([])
   const [total, setTotal] = useState(0)
@@ -135,6 +138,7 @@ export function ScriptSubscribePage({
       const res = await apiClient.searchScripts({
         page: searchParams.page,
         page_size: searchParams.page_size,
+        name: searchParams.name || undefined,
         subscribed: searchParams.subscribed,
         type: searchParams.type || undefined,
         target: searchParams.target || undefined,
@@ -157,6 +161,7 @@ export function ScriptSubscribePage({
   }, [
     searchParams.page,
     searchParams.page_size,
+    searchParams.name,
     searchParams.subscribed,
     searchParams.type,
     searchParams.target,
@@ -176,6 +181,15 @@ export function ScriptSubscribePage({
 
   const handlePageChange = (page: number) => {
     setSearchParams((p) => ({ ...p, page }))
+  }
+
+  const handleSearch = () => {
+    setSearchParams({ ...searchForm, page: 1 })
+  }
+
+  const handleReset = () => {
+    setSearchForm(defaultSearchParams)
+    setSearchParams(defaultSearchParams)
   }
 
   const toggleSubscribe = async (row: ScriptListItem) => {
@@ -239,14 +253,24 @@ export function ScriptSubscribePage({
           <div className="flex flex-wrap items-end gap-4">
             <div className="flex flex-wrap items-center gap-4">
               <label className="flex items-center text-sm text-slate-600 dark:text-slate-300">
-                <span className="w-16">类型</span>
+                <span className="w-16 text-right mr-2">脚本名称</span>
+                <Input
+                  value={searchForm.name}
+                  onChange={(e) =>
+                    setSearchForm((p) => ({ ...p, name: e.target.value }))
+                  }
+                  className="w-32"
+                />
+              </label>
+              <label className="flex items-center text-sm text-slate-600 dark:text-slate-300">
+                <span className="w-16 text-right mr-2">脚本类型</span>
                 <Select
-                  value={searchParams.type || "__all__"}
+                  value={searchForm.type || "__all__"}
                   onValueChange={(v) =>
-                    setSearchParams((p) => ({ ...p, type: v === "__all__" ? "" : v }))
+                    setSearchForm((p) => ({ ...p, type: v === "__all__" ? "" : v }))
                   }
                 >
-                  <SelectTrigger className="h-9 w-40">
+                  <SelectTrigger className="h-9 w-32">
                     <SelectValue placeholder="全部类型" />
                   </SelectTrigger>
                   <SelectContent>
@@ -259,49 +283,49 @@ export function ScriptSubscribePage({
                 </Select>
               </label>
               <label className="flex items-center text-sm text-slate-600 dark:text-slate-300">
-                <span className="w-16">目标</span>
+                <span className="w-16 text-right mr-2">脚本目标</span>
                 <Input
-                  value={searchParams.target}
+                  value={searchForm.target}
                   onChange={(e) =>
-                    setSearchParams((p) => ({ ...p, target: e.target.value }))
+                    setSearchForm((p) => ({ ...p, target: e.target.value }))
                   }
-                  className="w-40"
+                  className="w-32"
                 />
               </label>
               <label className="flex items-center text-sm text-slate-600 dark:text-slate-300">
-                <span className="w-16">最小数量</span>
+                <span className="w-16 text-right mr-2">最小数量</span>
                 <Input
                   type="number"
                   min={0}
-                  value={searchParams.min_count}
+                  value={searchForm.min_count}
                   onChange={(e) =>
-                    setSearchParams((p) => ({
+                    setSearchForm((p) => ({
                       ...p,
                       min_count: Number(e.target.value) || 0,
                     }))
                   }
-                  className="w-24"
+                  className="w-32"
                 />
               </label>
               <label className="flex items-center text-sm text-slate-600 dark:text-slate-300">
-                <span className="w-16">作者</span>
+                <span className="w-16 text-right mr-2">作者</span>
                 <Input
-                  value={searchParams.uploader_name}
+                  value={searchForm.uploader_name}
                   onChange={(e) =>
-                    setSearchParams((p) => ({ ...p, uploader_name: e.target.value }))
+                    setSearchForm((p) => ({ ...p, uploader_name: e.target.value }))
                   }
-                  className="w-40"
+                  className="w-32"
                 />
               </label>
               <label className="flex items-center text-sm text-slate-600 dark:text-slate-300">
-                <span className="w-16">排序</span>
+                <span className="w-16 text-right mr-2">排序</span>
                 <Select
-                  value={searchParams.order_by}
+                  value={searchForm.order_by}
                   onValueChange={(v) =>
-                    setSearchParams((p) => ({ ...p, order_by: v }))
+                    setSearchForm((p) => ({ ...p, order_by: v }))
                   }
                 >
-                  <SelectTrigger className="h-9 w-40">
+                  <SelectTrigger className="h-9 w-32">
                     <SelectValue placeholder="排序方式" />
                   </SelectTrigger>
                   <SelectContent>
@@ -315,9 +339,9 @@ export function ScriptSubscribePage({
               </label>
               <label className="flex items-center gap-2 text-sm text-slate-600 dark:text-slate-300">
                 <Checkbox
-                  checked={searchParams.subscribed}
+                  checked={searchForm.subscribed}
                   onCheckedChange={(checked) =>
-                    setSearchParams((p) => ({ ...p, subscribed: checked === true }))
+                    setSearchForm((p) => ({ ...p, subscribed: checked === true }))
                   }
                 />
                 <span>只看我的订阅</span>
@@ -325,14 +349,14 @@ export function ScriptSubscribePage({
             </div>
             <div className="flex items-center gap-2">
               <Button
-                onClick={() => setSearchParams((p) => ({ ...p, page: 1 }))}
+                onClick={handleSearch}
                 className="bg-pink-400 hover:bg-pink-500"
               >
                 搜索
               </Button>
               <Button
                 variant="outline"
-                onClick={() => setSearchParams(defaultSearchParams)}
+                onClick={handleReset}
               >
                 重置
               </Button>

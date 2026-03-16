@@ -74,6 +74,7 @@ class APIClient {
   async searchScripts(params: {
     page?: number
     page_size?: number
+    name?: string
     subscribed?: boolean
     type?: string
     target?: string
