@@ -51,6 +51,7 @@ export default {
 
   nsis: {
     oneClick: false,
+    perMachine: false,
     allowToChangeInstallationDirectory: true,
     allowElevation: true,
     installerIcon: `${resources}/build/icons/icon.ico`,
