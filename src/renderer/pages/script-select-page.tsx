@@ -29,6 +29,7 @@ import {
   TableHeader,
   TableRow,
 } from "renderer/components/ui/table"
+import { apiClient } from "renderer/lib/api-client"
 import type { IpcRpcClient } from "renderer/lib/ipc-rpc"
 
 type ScriptMode = "path" | "macro" | "music"
@@ -41,6 +42,11 @@ type ScriptRow = {
   count?: number
   region?: string
   map?: string
+}
+
+type DeleteTarget = {
+  name: string
+  subscribedScriptId: number | null
 }
 
 type ScriptSelectPageProps = {
@@ -143,7 +149,7 @@ export function ScriptSelectPage({
   const [runningTaskId, setRunningTaskId] = useState<string | null>(null)
   const [runningAction, setRunningAction] = useState<ScriptAction | null>(null)
   const [isStopping, setIsStopping] = useState(false)
-  const [deleteTargetName, setDeleteTargetName] = useState<string | null>(null)
+  const [deleteTarget, setDeleteTarget] = useState<DeleteTarget | null>(null)
   const [deleting, setDeleting] = useState(false)
 
   const [nameFilter, setNameFilter] = useState("")
@@ -247,22 +253,48 @@ export function ScriptSelectPage({
       toast.warning("请先选择一条记录")
       return
     }
-    setDeleteTargetName(selectedName)
+    void (async () => {
+      try {
+        const scriptsMetadata = await window.App.launcher.getScriptsMetadata()
+        const metadata = scriptsMetadata?.[selectedName]
+        setDeleteTarget({
+          name: selectedName,
+          subscribedScriptId: typeof metadata?.scriptId === "number" ? metadata.scriptId : null,
+        })
+      } catch {
+        setDeleteTarget({ name: selectedName, subscribedScriptId: null })
+      }
+    })()
   }
 
   const handleConfirmDelete = async () => {
-    if (!deleteTargetName) return
+    if (!deleteTarget) return
     setDeleting(true)
     try {
+      if (deleteTarget.subscribedScriptId != null) {
+        await apiClient.subscribeScript({
+          script_id: deleteTarget.subscribedScriptId,
+          subscribe: false,
+        })
+      }
       await rpcClient.sendRequest("script.delete", {
-        name: deleteTargetName,
+        name: deleteTarget.name,
         category: mode,
       })
-      toast.success("删除成功")
-      setDeleteTargetName(null)
+      toast.success(
+        deleteTarget.subscribedScriptId != null
+          ? "已取消订阅并删除本地脚本"
+          : "删除成功",
+      )
+      setDeleteTarget(null)
       void loadScripts()
-    } catch {
-      toast.error("删除失败，请稍后重试")
+    } catch (err) {
+      const msg = err instanceof Error ? err.message : ""
+      if (msg.includes("401")) {
+        toast.error("请先登录后再取消订阅")
+      } else {
+        toast.error("删除失败，请稍后重试")
+      }
     } finally {
       setDeleting(false)
     }
@@ -518,16 +550,18 @@ export function ScriptSelectPage({
           </div>
         )}
       </div>
-      <Dialog open={!!deleteTargetName} onOpenChange={(open) => !open && setDeleteTargetName(null)}>
+      <Dialog open={!!deleteTarget} onOpenChange={(open) => !open && setDeleteTarget(null)}>
         <DialogContent className="sm:max-w-md">
           <DialogHeader>
             <DialogTitle>{deleteLabelMap[mode]}</DialogTitle>
           </DialogHeader>
           <p className="text-sm text-slate-600 dark:text-slate-300">
-            确认要删除「{deleteTargetName ?? ""}」吗？该操作无法撤销。
+            {deleteTarget?.subscribedScriptId != null
+              ? `「${deleteTarget.name}」已订阅，确认后将同时取消订阅并删除本地脚本。`
+              : `确认要删除「${deleteTarget?.name ?? ""}」吗？该操作无法撤销。`}
           </p>
           <DialogFooter showCloseButton={false}>
-            <Button variant="outline" onClick={() => setDeleteTargetName(null)} disabled={deleting}>
+            <Button variant="outline" onClick={() => setDeleteTarget(null)} disabled={deleting}>
               取消
             </Button>
             <Button variant="destructive" onClick={handleConfirmDelete} disabled={deleting}>

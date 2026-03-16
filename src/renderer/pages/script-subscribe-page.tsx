@@ -194,7 +194,11 @@ export function ScriptSubscribePage({
       // toast.success(res.message ?? (res.is_subscribed ? "订阅成功" : "取消订阅成功"))
       if (res.is_subscribed && res.md5) {
         try {
-          await window.App.launcher.downloadScript({ name: row.name, md5: res.md5 })
+          await window.App.launcher.downloadScript({
+            name: row.name,
+            md5: res.md5,
+            scriptId: row.id,
+          })
           onRefreshBackendScripts?.()
         } catch {
           toast.error("脚本下载失败，可在设置中重新同步")

@@ -20,6 +20,12 @@ export type ScriptListItem = {
   is_subscribed: boolean
 }
 
+export type SubscribedScriptItem = {
+  id: number
+  name: string
+  md5: string
+}
+
 /**
  * 业务 API 请求：仅传 endpoint 与 requireAuth，token 与 401 刷新由主进程处理。
  */
@@ -99,7 +105,7 @@ class APIClient {
     return request('/whimbox/scripts/all_subscribed', {
       method: 'GET',
       requireAuth: true,
-    }) as Promise<{ scripts: Array<{ name: string; md5: string }> }>
+    }) as Promise<{ scripts: SubscribedScriptItem[] }>
   }
 }
 

@@ -211,12 +211,16 @@ const API = {
       ipcRenderer.on('launcher:auth-state', (_, data) => callback(data))
     },
     syncSubscribedScripts: (
-      scriptsData: { scripts: Array<{ name: string; md5: string }> },
+      scriptsData: { scripts: Array<{ name: string; md5: string; id: number }> },
       options?: { emitNoChangeSuccess?: boolean },
     ) => ipcRenderer.invoke('launcher:sync-subscribed-scripts', scriptsData, options),
-    downloadScript: (item: { name: string; md5: string }) =>
+    downloadScript: (item: { name: string; md5: string; scriptId?: number }) =>
       ipcRenderer.invoke('launcher:download-script', item),
     deleteScript: (md5: string) => ipcRenderer.invoke('launcher:delete-script', md5),
+    getScriptsMetadata: () =>
+      ipcRenderer.invoke('launcher:get-scripts-metadata') as Promise<
+        Record<string, { md5: string; scriptId?: number }> | null
+      >,
     openScriptsFolder: () => ipcRenderer.invoke('launcher:open-scripts-folder'),
     openLogsFolder: () => ipcRenderer.invoke('launcher:open-logs-folder'),
     openAgentWorkspaceFolder: () => ipcRenderer.invoke('launcher:open-agent-workspace-folder'),

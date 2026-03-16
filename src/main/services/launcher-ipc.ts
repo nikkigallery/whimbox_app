@@ -322,7 +322,7 @@ export function registerLauncherIpc(window: BrowserWindow) {
     'launcher:sync-subscribed-scripts',
     async (
       _,
-      scriptsData: { scripts: Array<{ name: string; md5: string }> },
+      scriptsData: { scripts: Array<{ name: string; md5: string; id: number }> },
       options?: { emitNoChangeSuccess?: boolean },
     ) => {
       try {
@@ -335,7 +335,7 @@ export function registerLauncherIpc(window: BrowserWindow) {
     },
   )
 
-  ipcMain.handle('launcher:download-script', async (_, item: { name: string; md5: string }) => {
+  ipcMain.handle('launcher:download-script', async (_, item: { name: string; md5: string; scriptId?: number }) => {
     try {
       await scriptManager.downloadScript(item)
     } catch (err) {
@@ -348,6 +348,7 @@ export function registerLauncherIpc(window: BrowserWindow) {
   ipcMain.handle('launcher:delete-script', (_, md5: string) => {
     scriptManager.deleteScript(md5)
   })
+  ipcMain.handle('launcher:get-scripts-metadata', () => scriptManager.getScriptsMetadata())
 
   ipcMain.handle('launcher:open-scripts-folder', () => scriptManager.openScriptsFolder())
   ipcMain.handle('launcher:open-logs-folder', () => shell.openPath(getLogsDir()))

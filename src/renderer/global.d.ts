@@ -125,11 +125,12 @@ declare global {
           } | null) => void,
         ) => void
         syncSubscribedScripts: (
-          scriptsData: { scripts: Array<{ name: string; md5: string }> },
+          scriptsData: { scripts: Array<{ name: string; md5: string; id: number }> },
           options?: { emitNoChangeSuccess?: boolean },
         ) => Promise<unknown>
-        downloadScript: (item: { name: string; md5: string }) => Promise<void>
+        downloadScript: (item: { name: string; md5: string; scriptId?: number }) => Promise<void>
         deleteScript: (md5: string) => Promise<void>
+        getScriptsMetadata: () => Promise<Record<string, { md5: string; scriptId?: number }> | null>
         openScriptsFolder: () => Promise<void>
         openLogsFolder: () => Promise<void>
         openAgentWorkspaceFolder: () => Promise<string>

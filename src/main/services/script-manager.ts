@@ -2,11 +2,21 @@ import * as fs from 'node:fs'
 import * as path from 'node:path'
 import { app, shell } from 'electron'
 import { EventEmitter } from 'node:events'
-import { getScriptsIndex, setScriptsIndex } from './scripts-store'
+import {
+  getScriptsIndex,
+  getScriptsMetadata as getStoredScriptsMetadata,
+  setScriptsIndex,
+  setScriptsMetadata,
+  type ScriptLocalMetadata,
+} from './scripts-store'
 
 const SCRIPTS_BASE_URL = 'https://nikkigallery.vip/static/whimbox/scripts'
 
-export type ScriptItem = { name: string; md5: string }
+export type ScriptItem = {
+  name: string
+  md5: string
+  id: number
+}
 
 export type ScriptsData = { scripts: ScriptItem[] }
 
@@ -39,6 +49,12 @@ export class ScriptManager extends EventEmitter {
     return this.generateIndexFromScriptsDir()
   }
 
+  private getExistingMetadata(): Record<string, ScriptLocalMetadata> {
+    const stored = getStoredScriptsMetadata()
+    if (Object.keys(stored).length > 0) return stored
+    return this.generateMetadataFromScriptsDir()
+  }
+
   private isValidMD5(str: string): boolean {
     return /^[a-f0-9]{32}$/i.test(str)
   }
@@ -67,6 +83,15 @@ export class ScriptManager extends EventEmitter {
       console.error('从 scripts 目录生成索引失败:', err)
     }
     return index
+  }
+
+  private generateMetadataFromScriptsDir(): Record<string, ScriptLocalMetadata> {
+    const metadata: Record<string, ScriptLocalMetadata> = {}
+    const index = this.generateIndexFromScriptsDir()
+    for (const [name, md5] of Object.entries(index)) {
+      metadata[name] = { md5 }
+    }
+    return metadata
   }
 
   /** 全量同步订阅脚本；仅当本地脚本有变动时才 emit 进度，由 IPC 转发给渲染进程；options.emitNoChangeSuccess 为 true 时在无变更也 emit 一次成功（供手动刷新时给用户反馈） */
@@ -114,6 +139,7 @@ export class ScriptManager extends EventEmitter {
     }
 
     const newIndex: Record<string, string> = {}
+    const newMetadata: Record<string, ScriptLocalMetadata> = {}
     let successCount = 0
     let failedCount = 0
 
@@ -160,6 +186,7 @@ export class ScriptManager extends EventEmitter {
         }
 
         newIndex[scriptName] = script.md5
+        newMetadata[scriptName] = { md5: script.md5, scriptId: script.id }
         successCount++
         if (hasLocalChange) {
           this.emit('scriptDownloaded', { name: scriptName, md5: script.md5, current: i + 1, total: scripts.length })
@@ -172,6 +199,7 @@ export class ScriptManager extends EventEmitter {
     }
 
     setScriptsIndex(newIndex)
+    setScriptsMetadata(newMetadata)
 
     if (hasLocalChange) {
       this.emit('progress', {
@@ -206,9 +234,10 @@ export class ScriptManager extends EventEmitter {
   }
 
   /** 下载单个脚本（订阅后调用）；仅当本地有变动时才 emit */
-  async downloadScript(item: { name: string; md5: string }): Promise<void> {
+  async downloadScript(item: { name: string; md5: string; scriptId?: number }): Promise<void> {
     const filePath = path.join(this.scriptsDir, `${item.md5}.json`)
     const existingIndex = this.getExistingIndex()
+    const existingMetadata = this.getExistingMetadata()
     const alreadyHasFile = fs.existsSync(filePath)
     const hasLocalChange = !alreadyHasFile || existingIndex[item.name] !== item.md5
 
@@ -237,12 +266,17 @@ export class ScriptManager extends EventEmitter {
     }
 
     const nextIndex = { ...existingIndex }
+    const nextMetadata = { ...existingMetadata }
     if (nextIndex[scriptName] && nextIndex[scriptName] !== item.md5) {
       const oldPath = path.join(this.scriptsDir, `${nextIndex[scriptName]}.json`)
       if (fs.existsSync(oldPath)) fs.unlinkSync(oldPath)
     }
     nextIndex[scriptName] = item.md5
+    nextMetadata[scriptName] = item.scriptId != null
+      ? { md5: item.md5, scriptId: item.scriptId }
+      : { md5: item.md5 }
     setScriptsIndex(nextIndex)
+    setScriptsMetadata(nextMetadata)
 
     if (hasLocalChange) {
       this.emit('progress', {
@@ -262,15 +296,18 @@ export class ScriptManager extends EventEmitter {
     fs.unlinkSync(filePath)
 
     const index = this.getExistingIndex()
+    const metadata = this.getExistingMetadata()
     const entries = Object.entries(index).filter(([, v]) => v !== md5)
+    const metadataEntries = Object.entries(metadata).filter(([, v]) => v.md5 !== md5)
     setScriptsIndex(Object.fromEntries(entries))
+    setScriptsMetadata(Object.fromEntries(metadataEntries))
     this.emit('scriptUnsubscribed', { md5, fileName: `${md5}.json` })
   }
 
-  getScriptsMetadata(): Record<string, string> | null {
-    const index = getScriptsIndex()
-    if (Object.keys(index).length === 0) return null
-    return index
+  getScriptsMetadata(): Record<string, ScriptLocalMetadata> | null {
+    const metadata = this.getExistingMetadata()
+    if (Object.keys(metadata).length === 0) return null
+    return metadata
   }
 
   async openScriptsFolder(): Promise<void> {
