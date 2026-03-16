@@ -372,17 +372,17 @@ export function ScriptSubscribePage({
             </div>
           ) : (
             <>
-              <Table>
+              <Table className="table-fixed">
                 <TableHeader>
                   <TableRow>
-                    <TableHead className="min-w-20 max-w-52">脚本名称</TableHead>
-                    <TableHead className="w-10">类型</TableHead>
-                    <TableHead className="w-24">目标</TableHead>
-                    <TableHead className="w-10">数量</TableHead>
-                    <TableHead className="w-20 hidden xl:table-cell">作者</TableHead>
-                    <TableHead className="w-10">订阅数</TableHead>
-                    <TableHead className="min-w-20 max-w-52">描述</TableHead>
-                    <TableHead className="w-10 text-center">操作</TableHead>
+                    <TableHead className="w-[20%]">脚本名称</TableHead>
+                    <TableHead className="w-[10%]">类型</TableHead>
+                    <TableHead className="w-[10%]">目标</TableHead>
+                    <TableHead className="w-[8%]">数量</TableHead>
+                    <TableHead className="w-[8%] hidden xl:table-cell">作者</TableHead>
+                    <TableHead className="w-[6%]">订阅</TableHead>
+                    <TableHead className="w-[22%]">描述</TableHead>
+                    <TableHead className="w-[10%] text-center">操作</TableHead>
                   </TableRow>
                 </TableHeader>
                 <TableBody>
@@ -395,24 +395,24 @@ export function ScriptSubscribePage({
                   ) : (
                     tableData.map((row) => (
                       <TableRow key={row.id}>
-                        <TableCell className="min-w-20 max-w-52 truncate">
+                        <TableCell className="truncate">
                           {row.name}
                         </TableCell>
-                        <TableCell className="w-10">{row.type ?? "-"}</TableCell>
-                        <TableCell className="w-24 truncate">
+                        <TableCell>{row.type ?? "-"}</TableCell>
+                        <TableCell className="truncate">
                           {row.target ?? "-"}
                         </TableCell>
-                        <TableCell className="w-10">{row.count ?? "-"}</TableCell>
-                        <TableCell className="w-20 truncate hidden xl:table-cell">
+                        <TableCell>{row.count ?? "-"}</TableCell>
+                        <TableCell className="hidden truncate xl:table-cell">
                           {row.uploader_name ?? "-"}
                         </TableCell>
-                        <TableCell className="w-10">
+                        <TableCell>
                           <SubscribeCountBadge value={row.subscribe_count} />
                         </TableCell>
-                        <TableCell className="min-w-20 max-w-52 truncate text-slate-500">
+                        <TableCell className="truncate text-slate-500">
                           {row.description || "暂无描述"}
                         </TableCell>
-                        <TableCell className="w-10 text-center">
+                        <TableCell className="text-center">
                           <div className="flex justify-end">
                             <Button
                               variant="ghost"
