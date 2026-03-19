@@ -15,7 +15,7 @@ import { registerRpcBridge, stopRpcBridge, waitForRpcConnected } from './service
 import { createTray, destroyTray } from './services/tray'
 import { registerConversationBridge } from './services/conversation-bridge'
 import { MainWindow } from './windows/main'
-import { OverlayWindow } from './windows/overlay'
+import { OverlayWindow, persistOverlayState } from './windows/overlay'
 import { SplashWindow } from './windows/splash'
 import log from 'electron-log/main.js'
 
@@ -227,6 +227,7 @@ makeAppWithSingleInstanceLock(async () => {
 })
 
 app.on('before-quit', () => {
+  persistOverlayState()
   primaryWindow = null
   destroyTray()
   stopAuthServer()

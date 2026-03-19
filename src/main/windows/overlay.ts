@@ -1,6 +1,7 @@
 import { join } from 'node:path'
 
 import { BrowserWindow, ipcMain, screen } from 'electron'
+import log from 'electron-log/main.js'
 import windowStateKeeper from 'electron-window-state'
 
 import { createWindow } from 'lib/electron-app/factories/windows/create'
@@ -21,14 +22,32 @@ function bringOverlayToFront(win: BrowserWindow) {
   // win.moveTop()
 }
 
+function logOverlayStateSaved(win: BrowserWindow, reason: string) {
+  const { x, y, width, height } = win.getBounds()
+  log.info(`[overlay] state saved reason=${reason} x=${x} y=${y} width=${width} height=${height}`)
+}
+
 function scheduleSaveOverlayState(win: BrowserWindow) {
   if (overlaySaveTimer) clearTimeout(overlaySaveTimer)
   overlaySaveTimer = setTimeout(() => {
     overlaySaveTimer = null
     if (overlayWindowState && win && !win.isDestroyed()) {
       overlayWindowState.saveState(win)
+      logOverlayStateSaved(win, 'debounced')
     }
   }, 300)
+}
+
+function saveOverlayStateNow(reason: string, win?: BrowserWindow | null) {
+  if (overlaySaveTimer) {
+    clearTimeout(overlaySaveTimer)
+    overlaySaveTimer = null
+  }
+  const targetWindow = win ?? overlayWindowRef
+  if (overlayWindowState && targetWindow && !targetWindow.isDestroyed()) {
+    overlayWindowState.saveState(targetWindow)
+    logOverlayStateSaved(targetWindow, reason)
+  }
 }
 
 function registerOverlayIpc() {
@@ -76,6 +95,7 @@ function registerOverlayIpc() {
   ipcMain.handle('overlay:hide', (event) => {
     const win = BrowserWindow.fromWebContents(event.sender)
     if (win && !win.isDestroyed()) {
+      saveOverlayStateNow('ipc-hide', win)
       suppressAutoShowAfterManualClose = true
       win.hide()
     }
@@ -114,6 +134,10 @@ export function setOverlayIgnoreMouseEvents(ignore: boolean) {
   const win = overlayWindowRef
   if (!win || win.isDestroyed()) return
   win.setIgnoreMouseEvents(ignore, { forward: true })
+}
+
+export function persistOverlayState() {
+  saveOverlayStateNow('before-quit')
 }
 
 /** 半透明小窗，用于展示消息和发送消息（与主窗口共享同一 RPC 会话）。 */
@@ -165,14 +189,28 @@ export async function OverlayWindow() {
   overlayWindowState = overlayState
   overlayWindowRef = window
 
+  window.on('move', () => {
+    scheduleSaveOverlayState(window)
+  })
+
+  window.on('resize', () => {
+    scheduleSaveOverlayState(window)
+  })
+
   // 关闭时只隐藏不销毁；视为手动关闭并抑制后续自动弹窗
   window.on('close', (e) => {
     e.preventDefault()
+    saveOverlayStateNow('window-close', window)
     suppressAutoShowAfterManualClose = true
     window.hide()
   })
 
   window.on('closed', () => {
+    if (overlaySaveTimer) {
+      clearTimeout(overlaySaveTimer)
+      overlaySaveTimer = null
+    }
+    overlayWindowState = null
     overlayWindowRef = null
   })
 
