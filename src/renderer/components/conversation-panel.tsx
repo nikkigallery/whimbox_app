@@ -99,6 +99,16 @@ export function ConversationPanel({
                       ))}
                     </div>
                   ) : null}
+                  {message.source ? (
+                    <div
+                      className={cn(
+                        "mb-2 text-[11px] font-medium uppercase tracking-wide",
+                        isOverlay ? "text-white/60" : "text-slate-400 dark:text-slate-500",
+                      )}
+                    >
+                      {message.source === "weixin" ? "来自微信" : message.source}
+                    </div>
+                  ) : null}
                   {message.content ? (
                     <MarkdownText content={message.content} variant={variant} />
                   ) : message.pending ? (

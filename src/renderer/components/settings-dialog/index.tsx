@@ -15,11 +15,13 @@ import type { SettingsDialogProps, SettingItem } from "./types"
 import * as whimboxSettings from "./whimbox-settings"
 import * as agentSettings from "./agent-settings"
 import * as shortcutsSettings from "./shortcuts-settings"
+import * as weixinSettings from "./weixin-settings"
 
 const settingSections = [
   whimboxSettings.section,
   agentSettings.section,
   shortcutsSettings.section,
+  weixinSettings.section,
 ]
 
 const settingsContent: Record<
@@ -49,6 +51,11 @@ const settingsContent: Record<
     title: shortcutsSettings.content.title,
     description: shortcutsSettings.content.description,
     render: shortcutsSettings.content.render,
+  },
+  weixin: {
+    title: weixinSettings.content.title,
+    description: weixinSettings.content.description,
+    render: weixinSettings.content.render,
   },
 }
 

@@ -22,6 +22,8 @@ export type UiMessage = {
   id: string
   role: 'user' | 'assistant' | 'system'
   content: string
+  source?: string
+  senderId?: string
   attachments?: UiAttachment[]
   pending?: boolean
   title?: string
@@ -111,9 +113,10 @@ export function useHomeConversation({
   useEffect(() => {
     const off = rpcClient.on('notification', (notification) => {
       const method = notification.method
+      const isExternalUserMessage = method === 'event.conversation.user_message'
       const isAgentMessage = method === 'event.agent.message'
       const isRunEvent = method === 'event.run.status' || method === 'event.run.log'
-      if (!isAgentMessage && !isRunEvent) return
+      if (!isExternalUserMessage && !isAgentMessage && !isRunEvent) return
 
       const params =
         notification.params && typeof notification.params === 'object'
@@ -122,6 +125,24 @@ export function useHomeConversation({
       const targetSessionId =
         typeof params?.session_id === 'string' ? params.session_id : null
       if (targetSessionId && sessionId && targetSessionId !== sessionId) return
+
+      if (method === 'event.conversation.user_message') {
+        const text = typeof params?.message === 'string' ? params.message : ''
+        if (!text) return
+        const source = typeof params?.channel === 'string' ? params.channel : ''
+        const senderId = typeof params?.sender_id === 'string' ? params.sender_id : ''
+        setMessages((prev) => [
+          ...prev,
+          {
+            id: createId(),
+            role: 'user',
+            content: text,
+            source,
+            senderId,
+          },
+        ])
+        return
+      }
 
       if (method === 'event.agent.message') {
         const chunk =
@@ -183,6 +204,12 @@ export function useHomeConversation({
         const phase = typeof params?.phase === 'string' ? params.phase : ''
 
         if (source === 'agent') {
+          if (phase === 'started' && detailText === 'thinking') {
+            currentAgentMessageIdRef.current = null
+            agentToolBlockIndexesRef.current = {}
+            activeAgentToolCallIdsRef.current = new Set()
+            bufferedAgentTextRef.current = ''
+          }
           setCurrentStatus(formatAgentStatus(phase, detailText, detailText))
           const toolCallId =
             typeof params?.tool_call_id === 'string' && params.tool_call_id
@@ -255,6 +282,16 @@ export function useHomeConversation({
                 return next
               })
             }
+            const completedAssistantId = currentAgentMessageIdRef.current
+            if (completedAssistantId) {
+              setMessages((prev) =>
+                prev.map((message) =>
+                  message.id === completedAssistantId ? { ...message, pending: false } : message,
+                ),
+              )
+            }
+            currentAgentMessageIdRef.current = null
+            agentToolBlockIndexesRef.current = {}
             if (phase === 'completed') setCurrentStatus('')
           }
           if (phase === 'error') {
@@ -291,6 +328,16 @@ export function useHomeConversation({
                 return next
               })
             }
+            const failedAssistantId = currentAgentMessageIdRef.current
+            if (failedAssistantId) {
+              setMessages((prev) =>
+                prev.map((message) =>
+                  message.id === failedAssistantId ? { ...message, pending: false } : message,
+                ),
+              )
+            }
+            currentAgentMessageIdRef.current = null
+            agentToolBlockIndexesRef.current = {}
             setCurrentStatus('执行失败')
           }
           return
