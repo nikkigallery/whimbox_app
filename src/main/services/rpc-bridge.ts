@@ -140,3 +140,11 @@ export function waitForRpcConnected(timeoutMs: number): Promise<boolean> {
 export function stopRpcBridge() {
   rpcClient.disconnect()
 }
+
+export function getRpcBridgeState() {
+  return rpcClient.getState()
+}
+
+export function sendRpcBridgeRequest<T = unknown>(method: string, params?: Record<string, unknown>) {
+  return rpcClient.sendRequest<T>(method, params)
+}

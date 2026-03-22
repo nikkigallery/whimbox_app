@@ -112,8 +112,9 @@ export function useHomeConversation({
     const off = rpcClient.on('notification', (notification) => {
       const method = notification.method
       const isAgentMessage = method === 'event.agent.message'
+      const isChatMessage = method === 'event.chat.message'
       const isRunEvent = method === 'event.run.status' || method === 'event.run.log'
-      if (!isAgentMessage && !isRunEvent) return
+      if (!isAgentMessage && !isChatMessage && !isRunEvent) return
 
       const params =
         notification.params && typeof notification.params === 'object'
@@ -122,6 +123,25 @@ export function useHomeConversation({
       const targetSessionId =
         typeof params?.session_id === 'string' ? params.session_id : null
       if (targetSessionId && sessionId && targetSessionId !== sessionId) return
+
+      if (method === 'event.chat.message') {
+        const payload =
+          params?.message && typeof params.message === 'object'
+            ? (params.message as Record<string, unknown>)
+            : undefined
+        const role = payload?.role === 'assistant' || payload?.role === 'system' ? payload.role : 'user'
+        const text = typeof payload?.message === 'string' ? payload.message : ''
+        if (!text) return
+        setMessages((prev) => [
+          ...prev,
+          {
+            id: typeof payload?.id === 'string' && payload.id ? payload.id : createId(),
+            role,
+            content: text,
+          },
+        ])
+        return
+      }
 
       if (method === 'event.agent.message') {
         const chunk =

@@ -14,6 +14,7 @@ import { pythonManager } from './services/python-manager'
 import { registerRpcBridge, stopRpcBridge, waitForRpcConnected } from './services/rpc-bridge'
 import { createTray, destroyTray } from './services/tray'
 import { registerConversationBridge } from './services/conversation-bridge'
+import { startCloudControl, stopCloudControl } from './services/cloud-control'
 import { MainWindow } from './windows/main'
 import { OverlayWindow, persistOverlayState } from './windows/overlay'
 import { SplashWindow } from './windows/splash'
@@ -197,6 +198,7 @@ makeAppWithSingleInstanceLock(async () => {
   void overlayWindow
 
   registerConversationBridge(window)
+  startCloudControl(window)
   createTray(window)
   ipcMain.handle('window:minimize-to-tray', () => {
     if (window && !window.isDestroyed()) {
@@ -231,6 +233,7 @@ app.on('before-quit', () => {
   primaryWindow = null
   destroyTray()
   stopAuthServer()
+  stopCloudControl()
   stopRpcBridge()
   unregisterAppUpdater()
 })

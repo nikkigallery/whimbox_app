@@ -13,6 +13,7 @@ import { clearAuth, getAuthState as getStoredAuthState, getRefreshToken } from '
 import { apiRequest, completeLogin, getAnnouncements } from './launcher-api'
 import { pythonManager } from './python-manager'
 import { getLogsDir } from './app-logger'
+import { getCloudControlState, notifyCloudAuthChanged } from './cloud-control'
 import { scriptManager } from './script-manager'
 
 type TaskProgressPayload = {
@@ -169,6 +170,8 @@ export function registerLauncherIpc(window: BrowserWindow) {
     return state ? { user: state.user } : null
   })
 
+  ipcMain.handle('launcher:get-cloud-state', () => getCloudControlState())
+
   ipcMain.handle('launcher:refresh-auth', async () => {
     const refreshToken = getRefreshToken()
     if (!refreshToken) {
@@ -177,6 +180,7 @@ export function registerLauncherIpc(window: BrowserWindow) {
     }
     try {
       await completeLogin(refreshToken, window)
+      notifyCloudAuthChanged()
     } catch {
       window.webContents.send('launcher:auth-state', null)
     }
@@ -185,6 +189,7 @@ export function registerLauncherIpc(window: BrowserWindow) {
   ipcMain.handle('launcher:logout', () => {
     clearAuth()
     window.webContents.send('launcher:auth-state', null)
+    notifyCloudAuthChanged()
   })
 
   ipcMain.handle('launcher:detect-python', () => pythonManager.detectPythonEnvironment())

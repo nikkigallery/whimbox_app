@@ -2,6 +2,7 @@ import { createServer, type Server } from 'node:http'
 import { URL } from 'node:url'
 import type { BrowserWindow } from 'electron'
 import { completeLogin } from './launcher-api'
+import { notifyCloudAuthChanged } from './cloud-control'
 
 let authServer: Server | null = null
 let authPort = 0
@@ -89,10 +90,14 @@ function handleAuthRequest(window: BrowserWindow) {
 </body>
 </html>`)
 
-    completeLogin(refreshToken, window).catch((err) => {
-      console.error('登录完成失败:', err)
-      window.webContents.send('launcher:auth-state', null)
-    })
+    completeLogin(refreshToken, window)
+      .then(() => {
+        notifyCloudAuthChanged()
+      })
+      .catch((err) => {
+        console.error('登录完成失败:', err)
+        window.webContents.send('launcher:auth-state', null)
+      })
   }
 }
 

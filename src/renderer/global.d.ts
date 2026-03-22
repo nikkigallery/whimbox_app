@@ -112,6 +112,12 @@ declare global {
         getAuthState: () => Promise<{
           user: { id: number; username: string; avatar?: string; is_vip: boolean; vip_expiry_data?: string }
         } | null>
+        getCloudState: () => Promise<{
+          status: 'idle' | 'connecting' | 'connected' | 'error'
+          deviceId: string | null
+          expiresAt: string | null
+          lastError: string | null
+        }>
         logout: () => Promise<void>
         onDownloadProgress: (callback: (data: { progress: number }) => void) => void
         onInstallProgress: (
@@ -124,6 +130,12 @@ declare global {
             user: { id: number; username: string; avatar?: string; is_vip: boolean; vip_expiry_data?: string }
           } | null) => void,
         ) => void
+        onCloudState: (callback: (data: {
+          status: 'idle' | 'connecting' | 'connected' | 'error'
+          deviceId: string | null
+          expiresAt: string | null
+          lastError: string | null
+        }) => void) => () => void
         syncSubscribedScripts: (
           scriptsData: { scripts: Array<{ name: string; md5: string; id: number }> },
           options?: { emitNoChangeSuccess?: boolean },

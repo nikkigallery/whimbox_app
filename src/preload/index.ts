@@ -37,6 +37,13 @@ type AppUpdateState = {
   total?: number
 }
 
+type CloudState = {
+  status: 'idle' | 'connecting' | 'connected' | 'error'
+  deviceId: string | null
+  expiresAt: string | null
+  lastError: string | null
+}
+
 const API = {
   sayHelloFromBridge: () => console.log('\nHello from bridgeAPI! 👋\n\n'),
   username: process.env.USER,
@@ -188,6 +195,7 @@ const API = {
       options?: { method?: string; data?: Record<string, unknown>; requireAuth?: boolean },
     ) => ipcRenderer.invoke('launcher:api-request', endpoint, options),
     getAuthState: () => ipcRenderer.invoke('launcher:get-auth-state'),
+    getCloudState: () => ipcRenderer.invoke('launcher:get-cloud-state') as Promise<CloudState>,
     refreshAuth: () => ipcRenderer.invoke('launcher:refresh-auth'),
     logout: () => ipcRenderer.invoke('launcher:logout'),
     onDownloadProgress: (callback: (data: { progress: number }) => void) => {
@@ -209,6 +217,11 @@ const API = {
       callback: (data: { user: { id: number; username: string; avatar?: string; is_vip: boolean; vip_expiry_data?: string } } | null) => void,
     ) => {
       ipcRenderer.on('launcher:auth-state', (_, data) => callback(data))
+    },
+    onCloudState: (callback: (data: CloudState) => void) => {
+      const listener = (_: Electron.IpcRendererEvent, data: CloudState) => callback(data)
+      ipcRenderer.on('launcher:cloud-state', listener)
+      return () => ipcRenderer.removeListener('launcher:cloud-state', listener)
     },
     syncSubscribedScripts: (
       scriptsData: { scripts: Array<{ name: string; md5: string; id: number }> },
