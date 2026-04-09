@@ -1,3 +1,4 @@
+import type * as React from 'react'
 import type { RpcError, RpcNotification, RpcState } from 'shared/rpc-types'
 
 declare global {
@@ -21,6 +22,49 @@ declare global {
         hide: () => Promise<void>
         show: () => Promise<void>
         addShownAsBallListener: (callback: () => void) => () => void
+      }
+      videoOverlay?: {
+        show: () => Promise<void>
+        hide: () => Promise<void>
+        getBounds: () => Promise<{ x: number; y: number; width: number; height: number }>
+        setBounds: (x: number, y: number, width: number, height: number) => Promise<void>
+        getState: () => Promise<{
+          visible: boolean
+          url: string
+          opacity: number
+          playPauseKey: string
+          seekForwardKey: string
+          seekBackwardKey: string
+        }>
+        setState: (patch: Record<string, unknown>) => Promise<{
+          visible: boolean
+          url: string
+          opacity: number
+          playPauseKey: string
+          seekForwardKey: string
+          seekBackwardKey: string
+        }>
+        navigate: (url: string) => Promise<{
+          visible: boolean
+          url: string
+          opacity: number
+          playPauseKey: string
+          seekForwardKey: string
+          seekBackwardKey: string
+        }>
+        executePlaybackCommand: (command: 'toggle_play' | 'seek_forward' | 'seek_backward') => Promise<void>
+        focusInput: () => Promise<void>
+        onState: (callback: (state: {
+          visible: boolean
+          url: string
+          opacity: number
+          playPauseKey: string
+          seekForwardKey: string
+          seekBackwardKey: string
+        }) => void) => () => void
+        onNavigate: (callback: (url: string) => void) => () => void
+        onPlaybackCommand: (callback: (command: 'toggle_play' | 'seek_forward' | 'seek_backward') => void) => () => void
+        onFocusInput: (callback: () => void) => () => void
       }
       conversation: {
         getState: () => Promise<{
@@ -166,6 +210,17 @@ declare global {
         ) => () => void
         onError: (callback: (data: { message: string; error?: unknown }) => void) => () => void
       }
+    }
+  }
+}
+
+declare namespace JSX {
+  interface IntrinsicElements {
+    webview: React.DetailedHTMLProps<React.HTMLAttributes<HTMLElement>, HTMLElement> & {
+      src?: string
+      allowpopups?: boolean | string
+      partition?: string
+      webpreferences?: string
     }
   }
 }

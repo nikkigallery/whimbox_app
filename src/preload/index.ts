@@ -89,6 +89,94 @@ const API = {
       }
     },
   },
+  videoOverlay: {
+    show: () => ipcRenderer.invoke('video-overlay:show'),
+    hide: () => ipcRenderer.invoke('video-overlay:hide'),
+    getBounds: () =>
+      ipcRenderer.invoke('video-overlay:get-bounds') as Promise<{
+        x: number
+        y: number
+        width: number
+        height: number
+      }>,
+    setBounds: (x: number, y: number, width: number, height: number) =>
+      ipcRenderer.invoke('video-overlay:set-bounds', x, y, width, height),
+    getState: () =>
+      ipcRenderer.invoke('video-overlay:get-state') as Promise<{
+        visible: boolean
+        url: string
+        opacity: number
+        playPauseKey: string
+        seekForwardKey: string
+        seekBackwardKey: string
+      }>,
+    setState: (patch: Record<string, unknown>) =>
+      ipcRenderer.invoke('video-overlay:set-state', patch) as Promise<{
+        visible: boolean
+        url: string
+        opacity: number
+        playPauseKey: string
+        seekForwardKey: string
+        seekBackwardKey: string
+      }>,
+    navigate: (url: string) =>
+      ipcRenderer.invoke('video-overlay:navigate', url),
+    executePlaybackCommand: (command: 'toggle_play' | 'seek_forward' | 'seek_backward') =>
+      ipcRenderer.invoke('video-overlay:execute-playback-command', command),
+    focusInput: () => ipcRenderer.invoke('video-overlay:focus-input'),
+    onState: (
+      callback: (state: {
+        visible: boolean
+        url: string
+        opacity: number
+        playPauseKey: string
+        seekForwardKey: string
+        seekBackwardKey: string
+      }) => void,
+    ) => {
+      const listener = (
+        _: Electron.IpcRendererEvent,
+        state: {
+          visible: boolean
+          url: string
+          opacity: number
+          playPauseKey: string
+          seekForwardKey: string
+          seekBackwardKey: string
+        },
+      ) => callback(state)
+      ipcRenderer.on('video-overlay:state', listener)
+      return () => {
+        ipcRenderer.removeListener('video-overlay:state', listener)
+      }
+    },
+    onNavigate: (callback: (url: string) => void) => {
+      const listener = (_: Electron.IpcRendererEvent, url: string) => callback(url)
+      ipcRenderer.on('video-overlay:navigate', listener)
+      return () => {
+        ipcRenderer.removeListener('video-overlay:navigate', listener)
+      }
+    },
+    onPlaybackCommand: (
+      callback: (command: 'toggle_play' | 'seek_forward' | 'seek_backward') => void,
+    ) => {
+      const listener = (
+        _: Electron.IpcRendererEvent,
+        command: 'toggle_play' | 'seek_forward' | 'seek_backward',
+      ) => callback(command)
+      ipcRenderer.on('video-overlay:playback-command', listener)
+      return () => {
+        ipcRenderer.removeListener('video-overlay:playback-command', listener)
+      }
+    },
+    onFocusInput: (callback: () => void) => {
+      const listener = () => callback()
+      ipcRenderer.on('video-overlay:focus-input', listener)
+      return () => {
+        ipcRenderer.removeListener('video-overlay:focus-input', listener)
+      }
+    },
+  },
   conversation: {
     getState: () =>
       ipcRenderer.invoke('conversation:get-state') as Promise<{

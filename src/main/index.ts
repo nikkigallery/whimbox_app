@@ -17,6 +17,7 @@ import { registerConversationBridge } from './services/conversation-bridge'
 import { MainWindow } from './windows/main'
 import { OverlayWindow, persistOverlayState } from './windows/overlay'
 import { SplashWindow } from './windows/splash'
+import { persistVideoOverlayState, unregisterVideoOverlayShortcuts } from './windows/video-overlay'
 import log from 'electron-log/main.js'
 
 if (process.platform === 'win32') {
@@ -228,6 +229,8 @@ makeAppWithSingleInstanceLock(async () => {
 
 app.on('before-quit', () => {
   persistOverlayState()
+  persistVideoOverlayState()
+  unregisterVideoOverlayShortcuts()
   primaryWindow = null
   destroyTray()
   stopAuthServer()

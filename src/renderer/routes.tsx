@@ -5,13 +5,17 @@ import { Router } from 'lib/electron-router-dom'
 import { MainScreen } from './screens/main'
 import { OverlayScreen } from './screens/overlay'
 import { StartingScreen } from './screens/starting'
+import { VideoOverlayScreen } from './screens/video-overlay'
 
 export function AppRoutes() {
   return (
     <Router
-      main={<Route element={<MainScreen />} path="/" />}
-      overlay={<Route element={<OverlayScreen />} path="/" />}
-      splash={<Route element={<StartingScreen />} path="/" />}
+      {...{
+        main: <Route element={<MainScreen />} path="/" />,
+        overlay: <Route element={<OverlayScreen />} path="/" />,
+        'video-overlay': <Route element={<VideoOverlayScreen />} path="/" />,
+        splash: <Route element={<StartingScreen />} path="/" />,
+      }}
     />
   )
 }

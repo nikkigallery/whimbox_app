@@ -86,7 +86,7 @@ export function OverlayScreen() {
     window.App.conversation.stop()
   }, [conversationPending])
 
-  type ResizeEdge = 'e' | 'w' | 'n' | 's'
+  type ResizeEdge = 'e' | 'w' | 'n' | 's' | 'se' | 'sw'
   const resizeRef = useRef<{
     edge: ResizeEdge
     startX: number
@@ -139,6 +139,14 @@ export function OverlayScreen() {
             const newH = Math.max(PANEL_MIN_HEIGHT, r.startH - dy)
             y = r.startWinY + r.startH - newH
             h = newH
+          } else if (r.edge === 'se') {
+            w = Math.max(PANEL_MIN_WIDTH, r.startW + dx)
+            h = Math.max(PANEL_MIN_HEIGHT, r.startH + dy)
+          } else if (r.edge === 'sw') {
+            const newW = Math.max(PANEL_MIN_WIDTH, r.startW - dx)
+            x = r.startWinX + r.startW - newW
+            w = newW
+            h = Math.max(PANEL_MIN_HEIGHT, r.startH + dy)
           }
           window.App.overlay.setBounds(x, y, w, h)
         }
@@ -167,7 +175,6 @@ export function OverlayScreen() {
       className={cn(
         'relative flex h-screen flex-col rounded-2xl overflow-hidden',
         'bg-slate-900/35 backdrop-blur-lg',
-        'border border-white/15 shadow-[0_12px_30px_rgba(2,6,23,0.28)]',
       )}
     >
       <div
@@ -291,6 +298,16 @@ export function OverlayScreen() {
       <div
         className="absolute left-0 right-0 bottom-0 h-2 cursor-s-resize"
         onMouseDown={handleResizeMouseDown('s')}
+        style={appRegionNoDrag}
+      />
+      <div
+        className="absolute bottom-0 left-0 z-10 size-4 cursor-sw-resize"
+        onMouseDown={handleResizeMouseDown('sw')}
+        style={appRegionNoDrag}
+      />
+      <div
+        className="absolute right-0 bottom-0 z-10 size-4 cursor-se-resize"
+        onMouseDown={handleResizeMouseDown('se')}
         style={appRegionNoDrag}
       />
       <div

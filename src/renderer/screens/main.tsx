@@ -13,6 +13,7 @@
   Rss,
   Sparkles,
   Square,
+  Tv,
   X,
 } from 'lucide-react'
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
@@ -45,6 +46,7 @@ import { OneDragonPage } from '../pages/one-dragon-page'
 import { AutoMacroPage } from '../pages/auto-macro-page'
 import { AutoMusicPage } from '../pages/auto-music-page'
 import { ScriptSubscribePage } from '../pages/script-subscribe-page'
+import { VideoOverlayPage } from '../pages/video-overlay-page'
 import { IpcRpcClient } from 'renderer/lib/ipc-rpc'
 import { apiClient } from 'renderer/lib/api-client'
 import { type ConversationSendPayload, useHomeConversation } from 'renderer/hooks/use-home-conversation'
@@ -85,6 +87,7 @@ const navItems: NavItem[] = [
     ],
   },
   { id: 'auto-trigger', label: '自动触发', icon: Sparkles },
+  { id: 'video-overlay', label: '视频小窗', icon: Tv },
   {
     id: 'script-run',
     label: '运行脚本',
@@ -428,6 +431,8 @@ export function MainScreen() {
         )
       case 'auto-trigger':
         return <AutoTriggerPage rpcClient={rpcClient} backendReloadVersion={backendReloadVersion} />
+      case 'video-overlay':
+        return <VideoOverlayPage />
       case 'auto-navigate':
         return <AutoNavigatePage rpcClient={rpcClient} sessionId={sessionId} rpcState={rpcState} />
       case 'auto-macro':
