@@ -24,6 +24,7 @@ declare global {
         addShownAsBallListener: (callback: () => void) => () => void
       }
       videoOverlay?: {
+        setIgnoreMouseEvents: (ignore: boolean) => Promise<void>
         show: () => Promise<void>
         hide: () => Promise<void>
         getBounds: () => Promise<{ x: number; y: number; width: number; height: number }>

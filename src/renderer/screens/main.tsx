@@ -497,12 +497,19 @@ export function MainScreen() {
         <div className="app-no-drag flex items-center gap-3">
           <button
             type="button"
+            onClick={() => void window.App?.videoOverlay?.show?.()}
+            className="flex items-center gap-2 rounded-full border border-slate-200 bg-white/80 px-3 py-1 text-xs text-slate-500 shadow-sm transition hover:bg-slate-50 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-300 dark:hover:bg-slate-700"
+          >
+            <Tv className="size-3" />
+            视频小窗
+          </button>
+          <button
+            type="button"
             onClick={() => window.App?.overlay?.show?.()}
             className="flex items-center gap-2 rounded-full border border-slate-200 bg-white/80 px-3 py-1 text-xs text-slate-500 shadow-sm transition hover:bg-slate-50 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-300 dark:hover:bg-slate-700"
-            title="小窗关闭后，点击可重新显示"
           >
             <CircleDot className="size-3" />
-            小窗
+            对话小窗
           </button>
           <SettingsDialog
             displayVersion={displayVersion}

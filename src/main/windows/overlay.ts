@@ -5,6 +5,7 @@ import log from 'electron-log/main.js'
 import windowStateKeeper from 'electron-window-state'
 
 import { createWindow } from 'lib/electron-app/factories/windows/create'
+import { setVideoOverlayIgnoreMouseEvents } from './video-overlay'
 
 const PANEL_DEFAULT_WIDTH = 420
 const PANEL_DEFAULT_HEIGHT = 360
@@ -53,6 +54,13 @@ function saveOverlayStateNow(reason: string, win?: BrowserWindow | null) {
 function registerOverlayIpc() {
   ipcMain.handle(
     'overlay:set-ignore-mouse-events',
+    (_event, ignore: boolean) => {
+      setOverlayIgnoreMouseEvents(ignore)
+      setVideoOverlayIgnoreMouseEvents(ignore)
+    },
+  )
+  ipcMain.handle(
+    'overlay:set-ignore-mouse-events-single',
     (event, ignore: boolean) => {
       const win = BrowserWindow.fromWebContents(event.sender)
       if (win && !win.isDestroyed()) {

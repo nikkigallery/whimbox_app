@@ -88,6 +88,12 @@ function executePlaybackCommand(command: VideoOverlayPlaybackCommand) {
   win.webContents.send('video-overlay:playback-command', command)
 }
 
+export function setVideoOverlayIgnoreMouseEvents(ignore: boolean) {
+  const win = videoOverlayWindowRef
+  if (!win || win.isDestroyed()) return
+  win.setIgnoreMouseEvents(ignore, { forward: true })
+}
+
 function registerPlaybackShortcuts() {
   if (videoOverlayShortcutsRegistered) {
     for (const accelerator of registeredAccelerators) {

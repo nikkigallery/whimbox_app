@@ -181,7 +181,7 @@ export function OverlayScreen() {
         className="flex items-center justify-between border-b border-white/15 px-3 py-0.5 app-drag"
         style={appRegionDrag}
       >
-        <span className="text-sm font-medium text-white/90">奇想盒-小窗</span>
+        <span className="text-sm font-medium text-white/90">奇想盒 - 对话小窗</span>
         <div className="flex items-center gap-1 app-no-drag" style={appRegionNoDrag}>
           <button
             type="button"

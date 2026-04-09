@@ -90,6 +90,8 @@ const API = {
     },
   },
   videoOverlay: {
+    setIgnoreMouseEvents: (ignore: boolean) =>
+      ipcRenderer.invoke('overlay:set-ignore-mouse-events', ignore),
     show: () => ipcRenderer.invoke('video-overlay:show'),
     hide: () => ipcRenderer.invoke('video-overlay:hide'),
     getBounds: () =>
