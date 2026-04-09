@@ -74,6 +74,19 @@ function buildDisableFullscreenScript() {
   return `
     (() => {
       const noop = async () => undefined;
+      const navigateInPlace = (value) => {
+        if (typeof value !== 'string') return null;
+        const url = value.trim();
+        if (!url) return null;
+        try {
+          const resolved = new URL(url, window.location.href);
+          if (resolved.protocol !== 'http:' && resolved.protocol !== 'https:') return null;
+          window.location.href = resolved.toString();
+          return window;
+        } catch {
+          return null;
+        }
+      };
       const defineNoop = (target, key) => {
         if (!target || !(key in target)) return;
         try {
@@ -91,6 +104,28 @@ function buildDisableFullscreenScript() {
       defineNoop(Element.prototype, 'msRequestFullscreen');
       defineNoop(HTMLVideoElement.prototype, 'webkitEnterFullscreen');
       defineNoop(HTMLVideoElement.prototype, 'webkitEnterFullScreen');
+
+      try {
+        Object.defineProperty(window, 'open', {
+          configurable: true,
+          writable: true,
+          value: (url) => navigateInPlace(url),
+        });
+      } catch {}
+
+      try {
+        document.addEventListener('click', (event) => {
+          const target = event.target instanceof Element
+            ? event.target.closest('a[target="_blank"], area[target="_blank"]')
+            : null;
+          if (!(target instanceof HTMLAnchorElement || target instanceof HTMLAreaElement)) return;
+          const href = target.href;
+          if (!href) return;
+          event.preventDefault();
+          event.stopPropagation();
+          navigateInPlace(href);
+        }, true);
+      } catch {}
 
       try {
         document.addEventListener('fullscreenchange', () => {
