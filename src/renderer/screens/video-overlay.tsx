@@ -70,6 +70,39 @@ function buildPlaybackScript(command: PlaybackCommand) {
   `
 }
 
+function buildDisableFullscreenScript() {
+  return `
+    (() => {
+      const noop = async () => undefined;
+      const defineNoop = (target, key) => {
+        if (!target || !(key in target)) return;
+        try {
+          Object.defineProperty(target, key, {
+            configurable: true,
+            writable: true,
+            value: noop,
+          });
+        } catch {}
+      };
+
+      defineNoop(Element.prototype, 'requestFullscreen');
+      defineNoop(Element.prototype, 'webkitRequestFullscreen');
+      defineNoop(Element.prototype, 'mozRequestFullScreen');
+      defineNoop(Element.prototype, 'msRequestFullscreen');
+      defineNoop(HTMLVideoElement.prototype, 'webkitEnterFullscreen');
+      defineNoop(HTMLVideoElement.prototype, 'webkitEnterFullScreen');
+
+      try {
+        document.addEventListener('fullscreenchange', () => {
+          if (document.fullscreenElement && document.exitFullscreen) {
+            void document.exitFullscreen().catch(() => {});
+          }
+        }, true);
+      } catch {}
+    })();
+  `
+}
+
 export function VideoOverlayScreen() {
   const webviewRef = useRef<ElectronWebviewTag | null>(null)
   const inputRef = useRef<HTMLInputElement | null>(null)
@@ -157,6 +190,10 @@ export function VideoOverlayScreen() {
     const view = webviewRef.current
     if (!view) return
 
+    const handleDomReady = () => {
+      void view.executeJavaScript(buildDisableFullscreenScript(), true).catch(() => {})
+    }
+
     const handleStart = () => {
       setLoadError('')
       setPageReady(false)
@@ -180,11 +217,13 @@ export function VideoOverlayScreen() {
       setPageReady(false)
     }
 
+    view.addEventListener('dom-ready', handleDomReady as EventListener)
     view.addEventListener('did-start-loading', handleStart as EventListener)
     view.addEventListener('did-stop-loading', handleStop as EventListener)
     view.addEventListener('did-fail-load', handleFail as EventListener)
 
     return () => {
+      view.removeEventListener('dom-ready', handleDomReady as EventListener)
       view.removeEventListener('did-start-loading', handleStart as EventListener)
       view.removeEventListener('did-stop-loading', handleStop as EventListener)
       view.removeEventListener('did-fail-load', handleFail as EventListener)

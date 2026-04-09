@@ -85,6 +85,7 @@ export function VideoOverlayPage() {
       <SettingsPageLayout
         className="flex-1 min-h-0"
         title="视频小窗"
+        description="如需让视频占满小窗，请使用“网页全屏”功能，而不是“进入全屏”功能"
         actions={
           <div className="flex items-center gap-2">
             {saving ? <span className="text-xs text-slate-400">保存中...</span> : null}
