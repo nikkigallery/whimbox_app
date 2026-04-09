@@ -64,7 +64,7 @@ function registerOverlayIpc() {
     (event, ignore: boolean) => {
       const win = BrowserWindow.fromWebContents(event.sender)
       if (win && !win.isDestroyed()) {
-        win.setIgnoreMouseEvents(ignore, { forward: true })
+        win.setIgnoreMouseEvents(ignore)
       }
     },
   )
@@ -141,7 +141,7 @@ export function forceShowOverlay() {
 export function setOverlayIgnoreMouseEvents(ignore: boolean) {
   const win = overlayWindowRef
   if (win && !win.isDestroyed()) {
-    win.setIgnoreMouseEvents(ignore, { forward: true })
+    win.setIgnoreMouseEvents(ignore)
   }
   setVideoOverlayIgnoreMouseEvents(ignore)
 }

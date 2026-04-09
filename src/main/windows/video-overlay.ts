@@ -91,7 +91,7 @@ function executePlaybackCommand(command: VideoOverlayPlaybackCommand) {
 export function setVideoOverlayIgnoreMouseEvents(ignore: boolean) {
   const win = videoOverlayWindowRef
   if (!win || win.isDestroyed()) return
-  win.setIgnoreMouseEvents(ignore, { forward: true })
+  win.setIgnoreMouseEvents(ignore)
 }
 
 function registerPlaybackShortcuts() {
