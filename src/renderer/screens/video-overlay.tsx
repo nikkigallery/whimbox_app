@@ -390,7 +390,7 @@ export function VideoOverlayScreen() {
                   </div>
                   <div>
                     <h1 className="text-base font-semibold text-white">输入视频网页地址</h1>
-                    <p className="mt-1 text-xs text-white/55">支持 B站、YouTube 和其他 http(s) 网页。</p>
+                    <p className="mt-1 text-xs text-white/55">目前仅支持B站，其他未测试。</p>
                   </div>
                 </div>
                 <div className="space-y-3">

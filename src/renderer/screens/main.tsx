@@ -87,7 +87,6 @@ const navItems: NavItem[] = [
     ],
   },
   { id: 'auto-trigger', label: '自动触发', icon: Sparkles },
-  { id: 'video-overlay', label: '视频小窗', icon: Tv },
   {
     id: 'script-run',
     label: '运行脚本',
@@ -99,6 +98,7 @@ const navItems: NavItem[] = [
     ],
   },
   { id: 'script-subscribe', label: '订阅脚本', icon: Rss },
+  { id: 'video-overlay', label: '视频小窗', icon: Tv },
 ]
 
 export function MainScreen() {
