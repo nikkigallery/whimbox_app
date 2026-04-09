@@ -140,8 +140,10 @@ export function forceShowOverlay() {
 
 export function setOverlayIgnoreMouseEvents(ignore: boolean) {
   const win = overlayWindowRef
-  if (!win || win.isDestroyed()) return
-  win.setIgnoreMouseEvents(ignore, { forward: true })
+  if (win && !win.isDestroyed()) {
+    win.setIgnoreMouseEvents(ignore, { forward: true })
+  }
+  setVideoOverlayIgnoreMouseEvents(ignore)
 }
 
 export function persistOverlayState() {
