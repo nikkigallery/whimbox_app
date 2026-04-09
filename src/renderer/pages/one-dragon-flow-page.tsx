@@ -1,4 +1,20 @@
-﻿import { useEffect, useState } from "react"
+import { useEffect, useMemo, useState } from "react"
+import type { CSSProperties } from "react"
+import {
+  closestCenter,
+  DndContext,
+  type DragEndEvent,
+  PointerSensor,
+  useSensor,
+  useSensors,
+} from "@dnd-kit/core"
+import {
+  SortableContext,
+  arrayMove,
+  useSortable,
+  verticalListSortingStrategy,
+} from "@dnd-kit/sortable"
+import { GripVertical } from "lucide-react"
 import { toast } from "sonner"
 
 import { ScrollCenterLayout } from "renderer/components/scroll-center-layout"
@@ -22,8 +38,10 @@ import {
 } from "renderer/components/ui/select"
 import { Spinner } from "renderer/components/ui/spinner"
 import type { IpcRpcClient } from "renderer/lib/ipc-rpc"
+import { cn } from "renderer/lib/utils"
 
 type CustomStepType = "path" | "macro" | "close_game"
+type StepSection = "pre" | "post"
 
 type DefaultStepItem = {
   key: string
@@ -40,6 +58,8 @@ type CustomStepItem = {
 
 type OneDragonFlowResponse = {
   default_steps?: DefaultStepItem[]
+  pre_custom_steps?: CustomStepItem[]
+  post_custom_steps?: CustomStepItem[]
   custom_steps?: CustomStepItem[]
 }
 
@@ -54,11 +74,44 @@ type OneDragonFlowPageProps = {
   backendReloadVersion?: number
 }
 
+type SortableCustomStepRowProps = {
+  step: CustomStepItem
+  pathScripts: string[]
+  macroScripts: string[]
+  onToggle: (enabled: boolean) => void
+  onChangeType: (type: CustomStepType) => void
+  onLocalScriptNameChange: (scriptName: string) => void
+  onCommitScriptName: (scriptName: string) => void
+  onRemove: () => void
+}
+
+type CustomStepSectionProps = {
+  title: string
+  description: string
+  steps: CustomStepItem[]
+  loading: boolean
+  loadError: string
+  pathScripts: string[]
+  macroScripts: string[]
+  sensors: ReturnType<typeof useSensors>
+  onAdd: () => void
+  onSelectAll: () => void
+  onSelectNone: () => void
+  onDragEnd: (event: DragEndEvent) => void
+  onToggle: (id: string, enabled: boolean) => void
+  onChangeType: (id: string, type: CustomStepType) => void
+  onLocalScriptNameChange: (id: string, scriptName: string) => void
+  onCommitScriptName: (id: string, scriptName: string) => void
+  onRemove: (id: string) => void
+}
+
 const TYPE_LABELS: Record<CustomStepType, string> = {
   path: "执行跑图脚本",
   macro: "执行宏脚本",
   close_game: "关闭游戏",
 }
+
+const typeOptions: CustomStepType[] = ["path", "macro", "close_game"]
 
 const normalizeScripts = (payload: unknown): string[] => {
   if (!payload) return []
@@ -104,6 +157,236 @@ const createStepId = () =>
   globalThis.crypto?.randomUUID?.()
   ?? `step_${Date.now()}_${Math.random().toString(16).slice(2)}`
 
+const transformToStyle = (transform: { x: number; y: number; scaleX: number; scaleY: number } | null) => {
+  if (!transform) return undefined
+  return `translate3d(${transform.x}px, ${transform.y}px, 0) scaleX(${transform.scaleX}) scaleY(${transform.scaleY})`
+}
+
+function SortableCustomStepRow({
+  step,
+  pathScripts,
+  macroScripts,
+  onToggle,
+  onChangeType,
+  onLocalScriptNameChange,
+  onCommitScriptName,
+  onRemove,
+}: SortableCustomStepRowProps) {
+  const {
+    attributes,
+    listeners,
+    setNodeRef,
+    transform,
+    transition,
+    isDragging,
+  } = useSortable({ id: step.id })
+
+  const style: CSSProperties = {
+    transform: transformToStyle(transform),
+    transition,
+  }
+
+  const scriptOptions = step.type === "path" ? pathScripts : macroScripts
+
+  return (
+    <div
+      ref={setNodeRef}
+      style={style}
+      className={cn(
+        "flex flex-wrap items-center gap-3 rounded-xl border border-slate-100 bg-slate-50 px-3 py-3 dark:border-slate-800 dark:bg-slate-950/40",
+        isDragging && "border-pink-300 shadow-lg ring-2 ring-pink-200/70 dark:border-pink-700 dark:ring-pink-900/60",
+      )}
+    >
+      <Button
+        type="button"
+        variant="ghost"
+        size="icon-sm"
+        className="cursor-grab rounded-xl text-slate-400 hover:text-slate-600 active:cursor-grabbing dark:text-slate-500 dark:hover:text-slate-200"
+        aria-label="拖拽排序"
+        {...attributes}
+        {...listeners}
+      >
+        <GripVertical className="size-4" />
+      </Button>
+
+      <Select
+        value={step.type}
+        onValueChange={(value) => onChangeType(value as CustomStepType)}
+      >
+        <SelectTrigger className="w-[10rem] rounded-xl">
+          <SelectValue placeholder="选择步骤类型" />
+        </SelectTrigger>
+        <SelectContent>
+          {typeOptions.map((type) => (
+            <SelectItem key={type} value={type}>
+              {TYPE_LABELS[type]}
+            </SelectItem>
+          ))}
+        </SelectContent>
+      </Select>
+
+      <div className="min-w-[16rem] flex-1">
+        <Combobox
+          items={scriptOptions}
+          value={scriptOptions.includes(step.script_name) ? step.script_name : null}
+          inputValue={step.script_name}
+          onValueChange={(nextValue) =>
+            onCommitScriptName(nextValue ? String(nextValue) : "")
+          }
+          onInputValueChange={(nextValue) => {
+            if (step.type === "close_game") return
+            onLocalScriptNameChange(nextValue)
+          }}
+        >
+          <ComboboxInput
+            className="w-full"
+            disabled={step.type === "close_game"}
+            placeholder={step.type === "close_game"
+              ? "关闭游戏无需脚本"
+              : step.type === "path"
+                ? "请输入跑图脚本名"
+                : "请输入宏脚本名"}
+            onBlur={(event) => {
+              if (step.type === "close_game") return
+              onCommitScriptName(event.target.value)
+            }}
+          />
+          <ComboboxContent>
+            <ComboboxList>
+              {(option, optionIndex) => (
+                <ComboboxItem
+                  key={`${String(option)}-${optionIndex}`}
+                  value={option}
+                >
+                  {String(option)}
+                </ComboboxItem>
+              )}
+            </ComboboxList>
+            <ComboboxEmpty>没有匹配项</ComboboxEmpty>
+          </ComboboxContent>
+        </Combobox>
+      </div>
+
+      <label className="flex items-center gap-2 text-xs text-slate-500">
+        <Checkbox
+          checked={step.enabled}
+          onCheckedChange={(checked) => onToggle(Boolean(checked))}
+          className="data-[state=checked]:bg-pink-400 data-[state=checked]:border-pink-400 data-[state=checked]:text-white"
+        />
+        启用
+      </label>
+
+      <Button
+        type="button"
+        variant="outline"
+        className="rounded-xl text-red-500 hover:text-red-600"
+        onClick={onRemove}
+      >
+        删除
+      </Button>
+    </div>
+  )
+}
+
+function CustomStepSection({
+  title,
+  description,
+  steps,
+  loading,
+  loadError,
+  pathScripts,
+  macroScripts,
+  sensors,
+  onAdd,
+  onSelectAll,
+  onSelectNone,
+  onDragEnd,
+  onToggle,
+  onChangeType,
+  onLocalScriptNameChange,
+  onCommitScriptName,
+  onRemove,
+}: CustomStepSectionProps) {
+  const ids = useMemo(() => steps.map((step) => step.id), [steps])
+
+  return (
+    <section className="rounded-2xl border border-slate-100 bg-white p-4 shadow-sm dark:border-slate-800 dark:bg-slate-900">
+      <div className="flex flex-wrap items-center justify-between gap-3">
+        <div>
+          <h2 className="text-base font-semibold text-slate-800 dark:text-slate-100">{title}</h2>
+          <p className="mt-1 text-xs text-slate-400">{description}</p>
+        </div>
+        <div className="flex flex-wrap items-center gap-2">
+          <Button
+            type="button"
+            variant="outline"
+            className="rounded-xl"
+            onClick={onSelectAll}
+            disabled={loading || !!loadError || steps.length === 0}
+          >
+            全选
+          </Button>
+          <Button
+            type="button"
+            variant="outline"
+            className="rounded-xl"
+            onClick={onSelectNone}
+            disabled={loading || !!loadError || steps.length === 0}
+          >
+            全不选
+          </Button>
+          <Button
+            type="button"
+            variant="outline"
+            className="rounded-xl"
+            onClick={onAdd}
+            disabled={loading || !!loadError}
+          >
+            新增步骤
+          </Button>
+        </div>
+      </div>
+
+      <div className="mt-4">
+        {loading ? (
+          <div className="flex items-center gap-2 text-sm text-slate-400">
+            <Spinner className="size-4" />
+            正在读取{title}...
+          </div>
+        ) : loadError ? (
+          <div className="text-sm text-slate-400">请先恢复后端连接后再编辑{title}。</div>
+        ) : steps.length === 0 ? (
+          <div className="text-sm text-slate-400">暂无{title}</div>
+        ) : (
+          <DndContext
+            sensors={sensors}
+            collisionDetection={closestCenter}
+            onDragEnd={onDragEnd}
+          >
+            <SortableContext items={ids} strategy={verticalListSortingStrategy}>
+              <div className="space-y-2">
+                {steps.map((step) => (
+                  <SortableCustomStepRow
+                    key={step.id}
+                    step={step}
+                    pathScripts={pathScripts}
+                    macroScripts={macroScripts}
+                    onToggle={(enabled) => onToggle(step.id, enabled)}
+                    onChangeType={(type) => onChangeType(step.id, type)}
+                    onLocalScriptNameChange={(scriptName) => onLocalScriptNameChange(step.id, scriptName)}
+                    onCommitScriptName={(scriptName) => onCommitScriptName(step.id, scriptName)}
+                    onRemove={() => onRemove(step.id)}
+                  />
+                ))}
+              </div>
+            </SortableContext>
+          </DndContext>
+        )}
+      </div>
+    </section>
+  )
+}
+
 export function OneDragonFlowPage({
   rpcClient,
   sessionId,
@@ -114,12 +397,19 @@ export function OneDragonFlowPage({
   const [saving, setSaving] = useState(false)
   const [loadError, setLoadError] = useState("")
   const [defaultSteps, setDefaultSteps] = useState<DefaultStepItem[]>([])
-  const [customSteps, setCustomSteps] = useState<CustomStepItem[]>([])
+  const [preCustomSteps, setPreCustomSteps] = useState<CustomStepItem[]>([])
+  const [postCustomSteps, setPostCustomSteps] = useState<CustomStepItem[]>([])
   const [pathScripts, setPathScripts] = useState<string[]>([])
   const [macroScripts, setMacroScripts] = useState<string[]>([])
   const [isRunning, setIsRunning] = useState(false)
   const [runningTaskId, setRunningTaskId] = useState<string | null>(null)
   const [isStopping, setIsStopping] = useState(false)
+
+  const sensors = useSensors(
+    useSensor(PointerSensor, {
+      activationConstraint: { distance: 8 },
+    }),
+  )
 
   const loadFlow = async () => {
     setLoading(true)
@@ -131,13 +421,17 @@ export function OneDragonFlowPage({
         rpcClient.sendRequest<unknown>("script.query_macro", { show_default: true }),
       ])
       setDefaultSteps(Array.isArray(flowResult?.default_steps) ? flowResult.default_steps : [])
-      setCustomSteps(normalizeCustomSteps(flowResult?.custom_steps))
+      setPreCustomSteps(normalizeCustomSteps(flowResult?.pre_custom_steps))
+      setPostCustomSteps(
+        normalizeCustomSteps(flowResult?.post_custom_steps ?? flowResult?.custom_steps),
+      )
       setPathScripts(normalizeScripts(pathResult))
       setMacroScripts(normalizeScripts(macroResult))
     } catch {
       setLoadError("奇想盒后端异常，读取流程配置失败。")
       setDefaultSteps([])
-      setCustomSteps([])
+      setPreCustomSteps([])
+      setPostCustomSteps([])
       setPathScripts([])
       setMacroScripts([])
     } finally {
@@ -179,17 +473,24 @@ export function OneDragonFlowPage({
     }
   }, [rpcClient])
 
-  const persistFlow = async (nextDefaultSteps: DefaultStepItem[], nextCustomSteps: CustomStepItem[]) => {
+  const persistFlow = async (
+    nextDefaultSteps: DefaultStepItem[],
+    nextPreCustomSteps: CustomStepItem[],
+    nextPostCustomSteps: CustomStepItem[],
+  ) => {
     setDefaultSteps(nextDefaultSteps)
-    setCustomSteps(nextCustomSteps)
+    setPreCustomSteps(nextPreCustomSteps)
+    setPostCustomSteps(nextPostCustomSteps)
     setSaving(true)
     try {
       const result = await rpcClient.sendRequest<OneDragonFlowResponse>("one_dragon.flow.update", {
         default_steps: Object.fromEntries(nextDefaultSteps.map((item) => [item.key, item.enabled])),
-        custom_steps: nextCustomSteps,
+        pre_custom_steps: nextPreCustomSteps,
+        post_custom_steps: nextPostCustomSteps,
       })
       setDefaultSteps(Array.isArray(result?.default_steps) ? result.default_steps : nextDefaultSteps)
-      setCustomSteps(normalizeCustomSteps(result?.custom_steps ?? nextCustomSteps))
+      setPreCustomSteps(normalizeCustomSteps(result?.pre_custom_steps ?? nextPreCustomSteps))
+      setPostCustomSteps(normalizeCustomSteps(result?.post_custom_steps ?? nextPostCustomSteps))
     } catch {
       toast.error("保存失败，请稍后重试")
       void loadFlow()
@@ -198,16 +499,37 @@ export function OneDragonFlowPage({
     }
   }
 
+  const persistSectionSteps = (section: StepSection, nextSteps: CustomStepItem[]) => {
+    if (section === "pre") {
+      void persistFlow(defaultSteps, nextSteps, postCustomSteps)
+      return
+    }
+    void persistFlow(defaultSteps, preCustomSteps, nextSteps)
+  }
+
+  const updateCustomStepLocal = (
+    section: StepSection,
+    id: string,
+    updater: (item: CustomStepItem) => CustomStepItem,
+  ) => {
+    if (section === "pre") {
+      setPreCustomSteps((prev) => prev.map((item) => (item.id === id ? updater(item) : item)))
+      return
+    }
+    setPostCustomSteps((prev) => prev.map((item) => (item.id === id ? updater(item) : item)))
+  }
+
   const handleToggleDefaultStep = (key: string, enabled: boolean) => {
     const nextDefaultSteps = defaultSteps.map((item) =>
       item.key === key ? { ...item, enabled } : item,
     )
-    void persistFlow(nextDefaultSteps, customSteps)
+    void persistFlow(nextDefaultSteps, preCustomSteps, postCustomSteps)
   }
 
-  const handleAddCustomStep = () => {
-    const nextCustomSteps = [
-      ...customSteps,
+  const handleAddCustomStep = (section: StepSection) => {
+    const currentSteps = section === "pre" ? preCustomSteps : postCustomSteps
+    const nextSteps = [
+      ...currentSteps,
       {
         id: createStepId(),
         enabled: true,
@@ -215,43 +537,62 @@ export function OneDragonFlowPage({
         script_name: "",
       },
     ]
-    void persistFlow(defaultSteps, nextCustomSteps)
+    persistSectionSteps(section, nextSteps)
   }
 
-  const handleRemoveCustomStep = (id: string) => {
-    const nextCustomSteps = customSteps.filter((item) => item.id !== id)
-    void persistFlow(defaultSteps, nextCustomSteps)
+  const handleRemoveCustomStep = (section: StepSection, id: string) => {
+    const currentSteps = section === "pre" ? preCustomSteps : postCustomSteps
+    const nextSteps = currentSteps.filter((item) => item.id !== id)
+    persistSectionSteps(section, nextSteps)
   }
 
-  const updateCustomStepLocal = (id: string, updater: (item: CustomStepItem) => CustomStepItem) => {
-    setCustomSteps((prev) => prev.map((item) => (item.id === id ? updater(item) : item)))
-  }
-
-  const persistCustomSteps = (nextCustomSteps: CustomStepItem[]) => {
-    void persistFlow(defaultSteps, nextCustomSteps)
-  }
-
-  const handleToggleCustomStep = (id: string, enabled: boolean) => {
-    const nextCustomSteps = customSteps.map((item) =>
+  const handleToggleCustomStep = (section: StepSection, id: string, enabled: boolean) => {
+    const currentSteps = section === "pre" ? preCustomSteps : postCustomSteps
+    const nextSteps = currentSteps.map((item) =>
       item.id === id ? { ...item, enabled } : item,
     )
-    persistCustomSteps(nextCustomSteps)
+    persistSectionSteps(section, nextSteps)
   }
 
-  const handleChangeCustomStepType = (id: string, type: CustomStepType) => {
-    const nextCustomSteps = customSteps.map((item) =>
+  const handleChangeCustomStepType = (section: StepSection, id: string, type: CustomStepType) => {
+    const currentSteps = section === "pre" ? preCustomSteps : postCustomSteps
+    const nextSteps = currentSteps.map((item) =>
       item.id === id
         ? { ...item, type, script_name: type === "close_game" ? "" : item.script_name }
         : item,
     )
-    persistCustomSteps(nextCustomSteps)
+    persistSectionSteps(section, nextSteps)
   }
 
-  const handleCommitScriptName = (id: string, scriptName: string) => {
-    const nextCustomSteps = customSteps.map((item) =>
+  const handleCommitScriptName = (section: StepSection, id: string, scriptName: string) => {
+    const currentSteps = section === "pre" ? preCustomSteps : postCustomSteps
+    const nextSteps = currentSteps.map((item) =>
       item.id === id ? { ...item, script_name: scriptName.trim() } : item,
     )
-    persistCustomSteps(nextCustomSteps)
+    persistSectionSteps(section, nextSteps)
+  }
+
+  const handleSelectAll = (section: StepSection) => {
+    const currentSteps = section === "pre" ? preCustomSteps : postCustomSteps
+    const nextSteps = currentSteps.map((item) => ({ ...item, enabled: true }))
+    persistSectionSteps(section, nextSteps)
+  }
+
+  const handleSelectNone = (section: StepSection) => {
+    const currentSteps = section === "pre" ? preCustomSteps : postCustomSteps
+    const nextSteps = currentSteps.map((item) => ({ ...item, enabled: false }))
+    persistSectionSteps(section, nextSteps)
+  }
+
+  const handleDragEnd = (section: StepSection, event: DragEndEvent) => {
+    const { active, over } = event
+    if (!over || active.id === over.id) return
+    const currentSteps = section === "pre" ? preCustomSteps : postCustomSteps
+    const oldIndex = currentSteps.findIndex((step) => step.id === String(active.id))
+    const newIndex = currentSteps.findIndex((step) => step.id === String(over.id))
+    if (oldIndex < 0 || newIndex < 0) return
+    const nextSteps = arrayMove(currentSteps, oldIndex, newIndex)
+    persistSectionSteps(section, nextSteps)
   }
 
   const handleRun = async () => {
@@ -348,120 +689,49 @@ export function OneDragonFlowPage({
           </div>
         </section>
 
-        <section className="rounded-2xl border border-slate-100 bg-white p-4 shadow-sm dark:border-slate-800 dark:bg-slate-900">
-          <div className="flex flex-wrap items-center justify-between gap-3">
-            <div>
-              <h2 className="text-base font-semibold text-slate-800 dark:text-slate-100">自定义步骤</h2>
-              <p className="mt-1 text-xs text-slate-400">按顺序在默认步骤结束后依次执行。</p>
-            </div>
-            <Button variant="outline" className="rounded-xl" onClick={handleAddCustomStep} disabled={loading || !!loadError}>
-              新增步骤
-            </Button>
-          </div>
+        <CustomStepSection
+          title="前置步骤"
+          description="按顺序在默认步骤开始前依次执行。"
+          steps={preCustomSteps}
+          loading={loading}
+          loadError={loadError}
+          pathScripts={pathScripts}
+          macroScripts={macroScripts}
+          sensors={sensors}
+          onAdd={() => handleAddCustomStep("pre")}
+          onSelectAll={() => handleSelectAll("pre")}
+          onSelectNone={() => handleSelectNone("pre")}
+          onDragEnd={(event) => handleDragEnd("pre", event)}
+          onToggle={(id, enabled) => handleToggleCustomStep("pre", id, enabled)}
+          onChangeType={(id, type) => handleChangeCustomStepType("pre", id, type)}
+          onLocalScriptNameChange={(id, scriptName) =>
+            updateCustomStepLocal("pre", id, (item) => ({ ...item, script_name: scriptName }))
+          }
+          onCommitScriptName={(id, scriptName) => handleCommitScriptName("pre", id, scriptName)}
+          onRemove={(id) => handleRemoveCustomStep("pre", id)}
+        />
 
-          <div className="mt-4">
-            {loading ? (
-              <div className="flex items-center gap-2 text-sm text-slate-400">
-                <Spinner className="size-4" />
-                正在读取自定义步骤...
-              </div>
-            ) : loadError ? (
-              <div className="text-sm text-slate-400">请先恢复后端连接后再编辑自定义步骤。</div>
-            ) : customSteps.length === 0 ? (
-              <div className="text-sm text-slate-400">暂无自定义步骤</div>
-            ) : (
-              <div className="space-y-2">
-                {customSteps.map((step) => {
-                  const scriptOptions = step.type === "path" ? pathScripts : macroScripts
-                  return (
-                    <div
-                      key={step.id}
-                      className="flex flex-wrap items-center gap-3 rounded-xl border border-slate-100 bg-slate-50 px-3 py-3 dark:border-slate-800 dark:bg-slate-950/40"
-                    >
-                      <Select
-                        value={step.type}
-                        onValueChange={(value) => handleChangeCustomStepType(step.id, value as CustomStepType)}
-                      >
-                        <SelectTrigger className="w-[10rem] rounded-xl">
-                          <SelectValue placeholder="选择步骤类型" />
-                        </SelectTrigger>
-                        <SelectContent>
-                          {(["path", "macro", "close_game"] as CustomStepType[]).map((type) => (
-                            <SelectItem key={type} value={type}>
-                              {TYPE_LABELS[type]}
-                            </SelectItem>
-                          ))}
-                        </SelectContent>
-                      </Select>
-
-                      <div className="min-w-[16rem] flex-1">
-                        <Combobox
-                          items={scriptOptions}
-                          value={scriptOptions.includes(step.script_name) ? step.script_name : null}
-                          inputValue={step.script_name}
-                          onValueChange={(nextValue) =>
-                            handleCommitScriptName(step.id, nextValue ? String(nextValue) : "")
-                          }
-                          onInputValueChange={(nextValue) => {
-                            if (step.type === "close_game") return
-                            updateCustomStepLocal(step.id, (item) => ({
-                              ...item,
-                              script_name: nextValue,
-                            }))
-                          }}
-                        >
-                          <ComboboxInput
-                            className="w-full"
-                            disabled={step.type === "close_game"}
-                            placeholder={step.type === "close_game"
-                              ? "关闭游戏无需脚本"
-                              : step.type === "path"
-                                ? "请输入跑图脚本名"
-                                : "请输入宏脚本名"}
-                            onBlur={(event) => {
-                              if (step.type === "close_game") return
-                              handleCommitScriptName(step.id, event.target.value)
-                            }}
-                          />
-                          <ComboboxContent>
-                            <ComboboxList>
-                              {(option, optionIndex) => (
-                                <ComboboxItem
-                                  key={`${String(option)}-${optionIndex}`}
-                                  value={option}
-                                >
-                                  {String(option)}
-                                </ComboboxItem>
-                              )}
-                            </ComboboxList>
-                            <ComboboxEmpty>没有匹配项</ComboboxEmpty>
-                          </ComboboxContent>
-                        </Combobox>
-                      </div>
-
-                      <label className="flex items-center gap-2 text-xs text-slate-500">
-                        <Checkbox
-                          checked={step.enabled}
-                          onCheckedChange={(checked) => handleToggleCustomStep(step.id, Boolean(checked))}
-                          className="data-[state=checked]:bg-pink-400 data-[state=checked]:border-pink-400 data-[state=checked]:text-white"
-                        />
-                        启用
-                      </label>
-
-                      <Button
-                        variant="outline"
-                        className="rounded-xl text-red-500 hover:text-red-600"
-                        onClick={() => handleRemoveCustomStep(step.id)}
-                      >
-                        删除
-                      </Button>
-                    </div>
-                  )
-                })}
-              </div>
-            )}
-          </div>
-        </section>
+        <CustomStepSection
+          title="后置步骤"
+          description="按顺序在默认步骤结束后依次执行。"
+          steps={postCustomSteps}
+          loading={loading}
+          loadError={loadError}
+          pathScripts={pathScripts}
+          macroScripts={macroScripts}
+          sensors={sensors}
+          onAdd={() => handleAddCustomStep("post")}
+          onSelectAll={() => handleSelectAll("post")}
+          onSelectNone={() => handleSelectNone("post")}
+          onDragEnd={(event) => handleDragEnd("post", event)}
+          onToggle={(id, enabled) => handleToggleCustomStep("post", id, enabled)}
+          onChangeType={(id, type) => handleChangeCustomStepType("post", id, type)}
+          onLocalScriptNameChange={(id, scriptName) =>
+            updateCustomStepLocal("post", id, (item) => ({ ...item, script_name: scriptName }))
+          }
+          onCommitScriptName={(id, scriptName) => handleCommitScriptName("post", id, scriptName)}
+          onRemove={(id) => handleRemoveCustomStep("post", id)}
+        />
       </SettingsPageLayout>
     </ScrollCenterLayout>
   )
