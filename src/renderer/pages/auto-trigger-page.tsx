@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from "react"
+import { useEffect, useState } from "react"
 import { toast } from "sonner"
 
 import { ScrollCenterLayout } from "renderer/components/scroll-center-layout"
@@ -9,15 +9,15 @@ import type { IpcRpcClient } from "renderer/lib/ipc-rpc"
 type BackgroundState = {
   running: boolean
   features: Record<string, boolean>
+  feature_items?: BackgroundFeatureItem[]
 }
 
-const FEATURE_ITEMS = [
-  { key: "auto_fishing", label: "自动钓鱼" },
-  { key: "auto_dialogue", label: "自动对话" },
-  { key: "auto_pickup", label: "自动采集" },
-  { key: "auto_clear", label: "自动清洁跳过" },
-  { key: "auto_flourish", label: "自动芳间巡游（按鼠标右键启停）" },
-]
+type BackgroundFeatureItem = {
+  key: string
+  label?: string
+  description?: string
+  type?: string
+}
 
 type AutoTriggerPageProps = {
   rpcClient: IpcRpcClient
@@ -84,10 +84,6 @@ export function AutoTriggerPage({
     }
   }
 
-  const featureRows = useMemo(() => {
-    return FEATURE_ITEMS
-  }, [])
-
   return (
     <ScrollCenterLayout innerClassName="flex flex-col gap-4 px-10 py-8">
       <div className="flex flex-wrap items-center justify-between gap-3">
@@ -109,15 +105,16 @@ export function AutoTriggerPage({
           </div>
         ) : (
           <div className="grid grid-cols-1 gap-3 md:grid-cols-2">
-            {featureRows.map((item) => {
+            {(state.feature_items ?? []).map((item) => {
               const checked = state.features[item.key] ?? false
               const isSaving = savingKey === item.key
+              const label = item.label || item.description || item.key
               return (
                 <label
                   key={item.key}
                   className="flex items-center justify-between gap-3 rounded-xl border border-slate-100 bg-slate-50 px-4 py-3 text-sm text-slate-700 transition hover:border-pink-200 dark:border-slate-800 dark:bg-slate-950/40 dark:text-slate-100"
                 >
-                  <span className="flex-1">{item.label}</span>
+                  <span className="flex-1">{label}</span>
                   <span className="flex items-center gap-2">
                     {isSaving ? (
                       <Spinner className="size-4 text-pink-400" />
