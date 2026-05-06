@@ -88,10 +88,10 @@ function executePlaybackCommand(command: VideoOverlayPlaybackCommand) {
   win.webContents.send('video-overlay:playback-command', command)
 }
 
-export function setVideoOverlayIgnoreMouseEvents(ignore: boolean) {
+export function setVideoOverlayIgnoreMouseEvents(ignore: boolean, options?: { forward?: boolean }) {
   const win = videoOverlayWindowRef
   if (!win || win.isDestroyed()) return
-  win.setIgnoreMouseEvents(ignore)
+  win.setIgnoreMouseEvents(ignore, options)
 }
 
 function registerPlaybackShortcuts() {
@@ -134,6 +134,13 @@ function registerVideoOverlayIpc() {
     }
     return win.getBounds()
   })
+
+  ipcMain.handle(
+    'video-overlay:set-ignore-mouse-events',
+    (_event, ignore: boolean, options?: { forward?: boolean }) => {
+      setVideoOverlayIgnoreMouseEvents(ignore, options)
+    },
+  )
 
   ipcMain.handle('video-overlay:set-bounds', (_event, x: number, y: number, width: number, height: number) => {
     const win = videoOverlayWindowRef

@@ -1,6 +1,6 @@
 import type { CSSProperties, MouseEvent as ReactMouseEvent } from 'react'
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
-import { ExternalLink, RotateCcw, Tv, X } from 'lucide-react'
+import { ExternalLink, Lock, RotateCcw, Tv, Unlock, X } from 'lucide-react'
 
 import { Button } from 'renderer/components/ui/button'
 import { Input } from 'renderer/components/ui/input'
@@ -141,6 +141,8 @@ function buildDisableFullscreenScript() {
 export function VideoOverlayScreen() {
   const webviewRef = useRef<ElectronWebviewTag | null>(null)
   const inputRef = useRef<HTMLInputElement | null>(null)
+  const unlockButtonRef = useRef<HTMLButtonElement | null>(null)
+  const pointerPassthroughRef = useRef(false)
   const resizeRef = useRef<{
     edge: ResizeEdge
     startX: number
@@ -162,9 +164,9 @@ export function VideoOverlayScreen() {
   const [currentUrl, setCurrentUrl] = useState('')
   const [pageTitle, setPageTitle] = useState('视频小窗')
   const [editing, setEditing] = useState(true)
-  const [hovered, setHovered] = useState(false)
   const [loadError, setLoadError] = useState('')
   const [pageReady, setPageReady] = useState(false)
+  const [locked, setLocked] = useState(false)
 
   useEffect(() => {
     document.documentElement.classList.add('overlay-window')
@@ -265,6 +267,42 @@ export function VideoOverlayScreen() {
     }
   }, [currentUrl, editing])
 
+  const setVideoOverlayPointerPassthrough = useCallback((ignore: boolean) => {
+    if (pointerPassthroughRef.current === ignore) return
+    pointerPassthroughRef.current = ignore
+    void window.App.videoOverlay?.setIgnoreMouseEvents(ignore, { forward: true })
+  }, [])
+
+  useEffect(() => {
+    if (!locked) {
+      setVideoOverlayPointerPassthrough(false)
+      return
+    }
+
+    setVideoOverlayPointerPassthrough(true)
+
+    const handleMouseMove = (event: MouseEvent) => {
+      const rect = unlockButtonRef.current?.getBoundingClientRect()
+      if (!rect) {
+        setVideoOverlayPointerPassthrough(true)
+        return
+      }
+      const inUnlockHotspot =
+        event.clientX >= rect.left &&
+        event.clientX <= rect.right &&
+        event.clientY >= rect.top &&
+        event.clientY <= rect.bottom
+
+      setVideoOverlayPointerPassthrough(!inUnlockHotspot)
+    }
+
+    window.addEventListener('mousemove', handleMouseMove)
+    return () => {
+      window.removeEventListener('mousemove', handleMouseMove)
+      setVideoOverlayPointerPassthrough(false)
+    }
+  }, [locked, setVideoOverlayPointerPassthrough])
+
   const handleSubmit = useCallback(async () => {
     const api = window.App.videoOverlay
     if (!api) return
@@ -286,6 +324,7 @@ export function VideoOverlayScreen() {
   }, [draftUrl])
 
   const handleClose = useCallback(() => {
+    setLocked(false)
     void window.App.videoOverlay?.hide()
   }, [])
 
@@ -383,14 +422,10 @@ export function VideoOverlayScreen() {
     return '视频小窗'
   }, [currentUrl, pageTitle])
 
-  const titleBarVisible = hovered || editing
+  const titleBarVisible = !locked
 
   return (
-    <div
-      className="relative h-screen w-screen"
-      onMouseEnter={() => setHovered(true)}
-      onMouseLeave={() => setHovered(false)}
-    >
+    <div className="relative h-screen w-screen">
       <div className="relative flex h-full w-full flex-col overflow-hidden rounded-2xl bg-slate-950/72">
         <div
           className={cn(
@@ -439,6 +474,18 @@ export function VideoOverlayScreen() {
               </Button>
             </>
           ) : null}
+          {currentUrl && !editing ? (
+            <Button
+              type="button"
+              variant="ghost"
+              size="icon-sm"
+              className="rounded-lg text-white/80 hover:bg-white/10 hover:text-white"
+              onClick={() => setLocked(true)}
+              title="锁定窗口"
+            >
+              <Lock className="size-4" />
+            </Button>
+          ) : null}
           <Button
             type="button"
             variant="ghost"
@@ -451,8 +498,30 @@ export function VideoOverlayScreen() {
         </div>
         </div>
 
+        {locked ? (
+          <Button
+            ref={unlockButtonRef}
+            type="button"
+            variant="ghost"
+            size="icon-sm"
+            className="absolute right-3 top-3 z-30 rounded-lg border border-white/10 bg-slate-950/70 text-white/80 shadow-lg hover:bg-white/10 hover:text-white"
+            style={appRegionNoDrag}
+            onClick={(event) => {
+              event.preventDefault()
+              event.stopPropagation()
+              setLocked(false)
+            }}
+            title="解锁视频小窗"
+          >
+            <Unlock className="size-4" />
+          </Button>
+        ) : null}
+
         <div
-          className="relative flex h-full w-full flex-1 flex-col overflow-hidden min-h-0"
+          className={cn(
+            'relative flex h-full w-full flex-1 flex-col overflow-hidden min-h-0',
+            locked && 'pointer-events-none',
+          )}
           style={{ paddingTop: titleBarVisible ? TITLE_BAR_HEIGHT : 0 }}
         >
           {editing ? (
@@ -539,31 +608,35 @@ export function VideoOverlayScreen() {
           )}
         </div>
 
-        <div
-          className="absolute bottom-0 left-0 right-0 h-2 cursor-s-resize"
-          onMouseDown={handleResizeMouseDown('s')}
-          style={appRegionNoDrag}
-        />
-        <div
-          className="absolute bottom-0 left-0 z-10 size-4 cursor-sw-resize"
-          onMouseDown={handleResizeMouseDown('sw')}
-          style={appRegionNoDrag}
-        />
-        <div
-          className="absolute right-0 bottom-0 z-10 size-4 cursor-se-resize"
-          onMouseDown={handleResizeMouseDown('se')}
-          style={appRegionNoDrag}
-        />
-        <div
-          className="absolute bottom-0 right-0 top-0 w-2 cursor-e-resize"
-          onMouseDown={handleResizeMouseDown('e')}
-          style={appRegionNoDrag}
-        />
-        <div
-          className="absolute bottom-0 left-0 top-0 w-2 cursor-w-resize"
-          onMouseDown={handleResizeMouseDown('w')}
-          style={appRegionNoDrag}
-        />
+        {!locked ? (
+          <>
+            <div
+              className="absolute bottom-0 left-0 right-0 h-2 cursor-s-resize"
+              onMouseDown={handleResizeMouseDown('s')}
+              style={appRegionNoDrag}
+            />
+            <div
+              className="absolute bottom-0 left-0 z-10 size-4 cursor-sw-resize"
+              onMouseDown={handleResizeMouseDown('sw')}
+              style={appRegionNoDrag}
+            />
+            <div
+              className="absolute right-0 bottom-0 z-10 size-4 cursor-se-resize"
+              onMouseDown={handleResizeMouseDown('se')}
+              style={appRegionNoDrag}
+            />
+            <div
+              className="absolute bottom-0 right-0 top-0 w-2 cursor-e-resize"
+              onMouseDown={handleResizeMouseDown('e')}
+              style={appRegionNoDrag}
+            />
+            <div
+              className="absolute bottom-0 left-0 top-0 w-2 cursor-w-resize"
+              onMouseDown={handleResizeMouseDown('w')}
+              style={appRegionNoDrag}
+            />
+          </>
+        ) : null}
       </div>
     </div>
   )
