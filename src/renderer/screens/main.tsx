@@ -643,17 +643,26 @@ export function MainScreen() {
             </SidebarContent>
             <SidebarFooter>
               <div
-                role="button"
-                tabIndex={0}
-                onClick={handleOpenIntro}
-                onKeyDown={(event) => {
-                  if (event.key === 'Enter' || event.key === ' ') {
-                    event.preventDefault()
-                    handleOpenIntro()
-                  }
-                }}
-                className="my-3 rounded-xl border border-slate-200 bg-white px-3 py-3 shadow-sm transition hover:bg-slate-50/80 focus:outline-none focus:ring-2 focus:ring-pink-300 dark:border-slate-700 dark:bg-slate-900 dark:hover:bg-slate-800 cursor-pointer"
-                title="查看会员介绍"
+                role={userName ? 'button' : undefined}
+                tabIndex={userName ? 0 : undefined}
+                onClick={userName ? handleOpenIntro : undefined}
+                onKeyDown={
+                  userName
+                    ? (event) => {
+                        if (event.key === 'Enter' || event.key === ' ') {
+                          event.preventDefault()
+                          handleOpenIntro()
+                        }
+                      }
+                    : undefined
+                }
+                className={cn(
+                  'my-3 rounded-xl border border-slate-200 bg-white px-3 py-3 shadow-sm transition dark:border-slate-700 dark:bg-slate-900',
+                  userName
+                    ? 'cursor-pointer hover:bg-slate-50/80 focus:outline-none focus:ring-2 focus:ring-pink-300 dark:hover:bg-slate-800'
+                    : 'cursor-default',
+                )}
+                title={userName ? '查看会员介绍' : undefined}
               >
                 <div className="flex items-center gap-3">
                   <div className="size-9 shrink-0 overflow-hidden rounded-full bg-slate-200 dark:bg-slate-700">
@@ -679,7 +688,7 @@ export function MainScreen() {
                             event.stopPropagation()
                             handleLogout()
                           }}
-                          className="shrink-0 rounded-full border border-slate-200 px-3 py-1 text-xs text-slate-500 hover:bg-slate-50 dark:border-slate-700 dark:text-slate-300 dark:hover:bg-slate-800"
+                          className="shrink-0 cursor-pointer rounded-full border border-slate-200 px-3 py-1 text-xs text-slate-500 hover:bg-slate-50 dark:border-slate-700 dark:text-slate-300 dark:hover:bg-slate-800"
                         >
                           退出
                         </button>
@@ -690,7 +699,7 @@ export function MainScreen() {
                             event.stopPropagation()
                             handleLogin()
                           }}
-                          className="shrink-0 rounded-full bg-pink-400 px-3 py-1 text-xs text-white shadow"
+                          className="shrink-0 cursor-pointer rounded-full bg-pink-400 px-3 py-1 text-xs text-white shadow"
                         >
                           登录
                         </button>
