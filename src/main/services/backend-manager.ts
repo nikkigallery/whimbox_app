@@ -86,6 +86,15 @@ export class BackendManager extends EventEmitter {
   }
 
   getBackendStatus() {
+    if (process.platform === 'darwin') {
+      return {
+        installed: true,
+        version: '1.0.0',
+        installedAt: Date.now(),
+        packageName: 'whimbox',
+        entryPoint: 'whimbox',
+      }
+    }
     return this.backendStatus
   }
 
@@ -139,6 +148,43 @@ export class BackendManager extends EventEmitter {
   }
 
   async launchBackend() {
+    if (process.platform === 'darwin') {
+      const proc = spawn(
+        pythonManager.embeddedPythonPath,
+        ['-s', '-m', 'whimbox.main'],
+        {
+          windowsHide: true,
+          cwd: '/Users/Mercury/Downloads/Whimbox',
+          env: pythonManager.env,
+        },
+      )
+      this.backendProcess = proc
+
+      proc.stderr.on('data', (data: Buffer) => {
+        const text = data.toString('utf-8').trim()
+        if (text) log.scope('backend-stderr').info(text)
+      })
+
+      proc.on('error', (error) => {
+        log.scope('backend-error').error(error.message)
+      })
+
+      proc.on('close', (code) => {
+        this.backendProcess = null
+        log.scope('backend-close').info(`backend process closed with code: ${code}`)
+        this.emit('launch-backend-end', { message: code != null ? String(code) : 'null' })
+      })
+
+      this.backendStatus = {
+        installed: true,
+        version: '1.0.0',
+        installedAt: Date.now(),
+        packageName: 'whimbox',
+        entryPoint: 'whimbox',
+      }
+      return { success: true }
+    }
+
     if (!this.backendStatus.installed || !this.backendStatus.entryPoint) {
       throw new Error('后端未安装')
     }
