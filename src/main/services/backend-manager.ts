@@ -9,6 +9,7 @@ import log from 'electron-log/main.js'
 
 import { downloader } from './downloader'
 import { pythonManager } from './python-manager'
+import { getPythonEnvironmentService } from './platform/pythonEnvironmentServiceFactory'
 
 import path from 'node:path'
 
@@ -44,6 +45,18 @@ export class BackendManager extends EventEmitter {
   }
 
   private loadBackendStatus(): BackendStatus {
+    // Let the platform service override first (e.g. macOS pre-installed venv)
+    const platformOverride = getPythonEnvironmentService().getInitialBackendStatus()
+    if (platformOverride) {
+      return {
+        installed: platformOverride.installed,
+        version: platformOverride.version ?? null,
+        installedAt: platformOverride.installedAt ?? null,
+        packageName: platformOverride.packageName ?? null,
+        entryPoint: platformOverride.entryPoint ?? null,
+      }
+    }
+
     try {
       const stored = backendStatusStore.get(BACKEND_STATUS_KEY)
       if (stored && typeof stored === 'object' && 'installed' in stored) {

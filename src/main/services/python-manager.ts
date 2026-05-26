@@ -6,6 +6,7 @@ import { request as httpRequest } from 'node:http'
 import { request as httpsRequest } from 'node:https'
 import { dirname, join } from 'node:path'
 import { EventEmitter } from 'node:events'
+import { getPythonEnvironmentService } from './platform/pythonEnvironmentServiceFactory'
 
 type PythonEnvInfo = {
   installed: boolean
@@ -38,19 +39,13 @@ export class PythonManager extends EventEmitter {
 
   constructor() {
     super()
+    const platformSvc = getPythonEnvironmentService()
     const appDir = app.isPackaged ? dirname(process.execPath) : app.getAppPath()
-    this.embeddedPythonDir = join(appDir, 'python-embedded')
-    this.embeddedPythonPath = join(this.embeddedPythonDir, 'python.exe')
-    this.embeddedPythonScriptsDir = join(this.embeddedPythonDir, 'Scripts')
-    this.env = {
-      ...process.env,
-      PYTHONNOUSERSITE: '1',
-      PYTHONPATH: '',
-      PATH: `${this.embeddedPythonDir};${this.embeddedPythonScriptsDir};${process.env.PATH ?? ''}`,
-      PYTHONHOME: this.embeddedPythonDir,
-      PYTHONUNBUFFERED: '1',
-      PYTHONIOENCODING: 'utf-8',
-    }
+    const paths = platformSvc.resolvePaths(appDir)
+    this.embeddedPythonDir = paths.pythonDir
+    this.embeddedPythonPath = paths.pythonPath
+    this.embeddedPythonScriptsDir = paths.scriptsDir
+    this.env = platformSvc.buildEnv(paths)
   }
 
   async detectPythonEnvironment(): Promise<PythonEnvInfo> {
@@ -77,6 +72,14 @@ export class PythonManager extends EventEmitter {
 
   async setupEmbeddedPython(): Promise<PythonEnvInfo> {
     try {
+      // Allow the platform service to short-circuit (e.g. macOS pre-installed venv)
+      const platformSvc = getPythonEnvironmentService()
+      const fastResult = await platformSvc.tryFastSetup(this.embeddedPythonPath)
+      if (fastResult) {
+        this.emit('setup-complete', { message: '检测到已有内置 Python 环境' })
+        return fastResult
+      }
+
       const pythonExists = existsSync(this.embeddedPythonPath)
       if (!pythonExists) {
         this.emit('setup-start', { message: '正在设置内置 Python 环境...' })
