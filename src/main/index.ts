@@ -119,7 +119,7 @@ makeAppWithSingleInstanceLock(async () => {
     })
 
     const backendStatus = backendManager.getBackendStatus()
-    const skipLaunchInDev = ENVIRONMENT.IS_DEV
+    const skipLaunchInDev = false; // Force launch in DEV
     if (skipLaunchInDev && !splashWindow.isDestroyed() && splashWindow.webContents) {
       splashWindow.webContents.send('splash:python-progress', {
         stage: 'ensure-done',

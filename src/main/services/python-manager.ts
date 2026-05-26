@@ -39,17 +39,32 @@ export class PythonManager extends EventEmitter {
   constructor() {
     super()
     const appDir = app.isPackaged ? dirname(process.execPath) : app.getAppPath()
-    this.embeddedPythonDir = join(appDir, 'python-embedded')
-    this.embeddedPythonPath = join(this.embeddedPythonDir, 'python.exe')
-    this.embeddedPythonScriptsDir = join(this.embeddedPythonDir, 'Scripts')
-    this.env = {
-      ...process.env,
-      PYTHONNOUSERSITE: '1',
-      PYTHONPATH: '',
-      PATH: `${this.embeddedPythonDir};${this.embeddedPythonScriptsDir};${process.env.PATH ?? ''}`,
-      PYTHONHOME: this.embeddedPythonDir,
-      PYTHONUNBUFFERED: '1',
-      PYTHONIOENCODING: 'utf-8',
+    if (process.platform === 'darwin') {
+      this.embeddedPythonDir = '/Users/Mercury/Downloads/Whimbox/.venv'
+      this.embeddedPythonPath = join(this.embeddedPythonDir, 'bin', 'python')
+      this.embeddedPythonScriptsDir = join(this.embeddedPythonDir, 'bin')
+      this.env = {
+        ...process.env,
+        PYTHONNOUSERSITE: '1',
+        PYTHONPATH: '/Users/Mercury/Downloads/Whimbox',
+        PATH: `${this.embeddedPythonDir}:${this.embeddedPythonScriptsDir}:${process.env.PATH ?? ''}`,
+        PYTHONHOME: '',
+        PYTHONUNBUFFERED: '1',
+        PYTHONIOENCODING: 'utf-8',
+      }
+    } else {
+      this.embeddedPythonDir = join(appDir, 'python-embedded')
+      this.embeddedPythonPath = join(this.embeddedPythonDir, 'python.exe')
+      this.embeddedPythonScriptsDir = join(this.embeddedPythonDir, 'Scripts')
+      this.env = {
+        ...process.env,
+        PYTHONNOUSERSITE: '1',
+        PYTHONPATH: '',
+        PATH: `${this.embeddedPythonDir};${this.embeddedPythonScriptsDir};${process.env.PATH ?? ''}`,
+        PYTHONHOME: this.embeddedPythonDir,
+        PYTHONUNBUFFERED: '1',
+        PYTHONIOENCODING: 'utf-8',
+      }
     }
   }
 
@@ -77,6 +92,17 @@ export class PythonManager extends EventEmitter {
 
   async setupEmbeddedPython(): Promise<PythonEnvInfo> {
     try {
+      if (process.platform === 'darwin') {
+        const versionInfo = await this.getPythonVersion(this.embeddedPythonPath)
+        return {
+          installed: true,
+          command: this.embeddedPythonPath,
+          version: versionInfo.version,
+          path: this.embeddedPythonPath,
+          pipAvailable: true,
+        }
+      }
+
       const pythonExists = existsSync(this.embeddedPythonPath)
       if (!pythonExists) {
         this.emit('setup-start', { message: '正在设置内置 Python 环境...' })

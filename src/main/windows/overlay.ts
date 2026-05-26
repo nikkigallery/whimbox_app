@@ -160,7 +160,8 @@ export async function OverlayWindow() {
     fullScreen: false,
   })
 
-  const workArea = screen.getPrimaryDisplay().workArea
+  const activeDisplay = screen.getDisplayNearestPoint(screen.getCursorScreenPoint())
+  const workArea = activeDisplay.workArea
   const width = overlayState.width ?? PANEL_DEFAULT_WIDTH
   const height = overlayState.height ?? PANEL_DEFAULT_HEIGHT
   const x =
@@ -196,6 +197,16 @@ export async function OverlayWindow() {
   })
 
   overlayState.manage(window)
+  
+  // Enforce spawn on active display if saved state put it on a different monitor
+  const currentDisplay = screen.getDisplayMatching(window.getBounds())
+  if (currentDisplay.id !== activeDisplay.id) {
+    window.setPosition(
+      activeDisplay.workArea.x + MARGIN,
+      activeDisplay.workArea.y + activeDisplay.workArea.height - window.getBounds().height - MARGIN
+    )
+  }
+  
   overlayWindowState = overlayState
   overlayWindowRef = window
 
