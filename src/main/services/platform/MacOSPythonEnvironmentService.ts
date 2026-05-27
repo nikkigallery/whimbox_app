@@ -3,16 +3,14 @@ import type { IPythonEnvironmentService, PythonEnvInfo, PythonEnvPaths, BackendS
 
 /**
  * macOS Python environment service.
- * Uses a local virtualenv (`Whimbox/.venv`) for development and packages the
- * backend as a pre-installed venv in production.
+ * Uses the bundled `python-embedded` directory, mirroring the Windows
+ * distribution model (embedded Python + pip install wheel at runtime).
  */
 export class MacOSPythonEnvironmentService implements IPythonEnvironmentService {
   resolvePaths(appDir: string): PythonEnvPaths {
-    // In production the venv sits alongside the app bundle.
-    // In development it lives in the sibling Whimbox project directory.
-    const pythonDir = join(appDir, '.venv')
+    const pythonDir = join(appDir, 'python-embedded')
     const scriptsDir = join(pythonDir, 'bin')
-    const pythonPath = join(scriptsDir, 'python')
+    const pythonPath = join(scriptsDir, 'python3')
     return { pythonPath, pythonDir, scriptsDir, pathSeparator: ':' }
   }
 
