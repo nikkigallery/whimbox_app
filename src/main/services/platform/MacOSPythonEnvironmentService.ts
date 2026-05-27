@@ -17,15 +17,16 @@ export class MacOSPythonEnvironmentService implements IPythonEnvironmentService 
   }
 
   buildEnv(paths: PythonEnvPaths): NodeJS.ProcessEnv {
-    return {
+    const env = {
       ...process.env,
       PYTHONNOUSERSITE: '1',
       PYTHONPATH: '',
       PATH: `${paths.pythonDir}${paths.pathSeparator}${paths.scriptsDir}${paths.pathSeparator}${process.env.PATH ?? ''}`,
-      PYTHONHOME: '',  // Not set on macOS to avoid conflicts with system Python
       PYTHONUNBUFFERED: '1',
       PYTHONIOENCODING: 'utf-8',
     }
+    delete env.PYTHONHOME
+    return env
   }
 
   getInitialBackendStatus(): BackendStatus {
