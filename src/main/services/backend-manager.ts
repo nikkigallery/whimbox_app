@@ -13,6 +13,9 @@ import { getPythonEnvironmentService } from './platform/pythonEnvironmentService
 
 import path from 'node:path'
 
+// NOTE: This local BackendStatus allows nullable fields (from persisted store).
+// The platform interface's BackendStatus (IPythonEnvironmentService) uses non-nullable
+// fields since it only returns fully-populated overrides. Keep both in sync if fields change.
 type BackendStatus = {
   installed: boolean
   version: string | null
