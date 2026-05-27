@@ -29,25 +29,13 @@ export class MacOSPythonEnvironmentService implements IPythonEnvironmentService 
     return env
   }
 
-  getInitialBackendStatus(): BackendStatus {
-    // On macOS the backend (whimbox) is pre-installed in the venv.
-    return {
-      installed: true,
-      version: '0.0.0',
-      installedAt: Date.now(),
-      packageName: 'whimbox',
-      entryPoint: 'whimbox',
-    }
+  getInitialBackendStatus(): BackendStatus | null {
+    // TODO: implement macOS-specific backend status detection when macOS support lands
+    return null
   }
 
-  async tryFastSetup(pythonPath: string): Promise<PythonEnvInfo> {
-    // On macOS, skip the Windows extraction flow and just verify the interpreter.
-    return {
-      installed: true,
-      command: pythonPath,
-      version: 'system',
-      path: pythonPath,
-      pipAvailable: true,
-    }
+  async tryFastSetup(_pythonPath: string): Promise<PythonEnvInfo | null> {
+    // TODO: implement macOS-specific fast setup when macOS support lands
+    return null
   }
 }
