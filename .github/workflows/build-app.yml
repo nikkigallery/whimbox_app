@@ -13,32 +13,33 @@ jobs:
   build-python-embedded:
     runs-on: windows-latest
     steps:
-      - name: Download Python embeddable
+      - name: Cache Python embedded
+        id: cache-python
+        uses: actions/cache@v4
+        with:
+          path: Python312.zip
+          key: python-embedded-win-${{ env.PYTHON_VERSION }}
+
+      - name: Build Python embedded
+        if: steps.cache-python.outputs.cache-hit != 'true'
         shell: pwsh
         run: |
+          # Download official embeddable
           $url = "https://www.python.org/ftp/python/${{ env.PYTHON_VERSION }}/python-${{ env.PYTHON_VERSION }}-embed-amd64.zip"
           Invoke-WebRequest -Uri $url -OutFile python-embed.zip
-
-      - name: Extract and configure embedded Python
-        shell: pwsh
-        run: |
           Expand-Archive python-embed.zip -DestinationPath python-embedded
-          # Enable site-packages by uncommenting import site in ._pth file
+
+          # Enable site-packages
           $pthFile = Get-ChildItem python-embedded -Filter "python*._pth"
           (Get-Content $pthFile.FullName) -replace '#import site', 'import site' | Set-Content $pthFile.FullName
-          # Add Lib directory for standard library
           New-Item -ItemType Directory -Path python-embedded/Lib/site-packages -Force
 
-      - name: Install pip into embedded Python
-        shell: pwsh
-        run: |
+          # Install pip, setuptools, wheel
           Invoke-WebRequest -Uri "https://bootstrap.pypa.io/get-pip.py" -OutFile get-pip.py
           ./python-embedded/python.exe get-pip.py --no-warn-script-location
           ./python-embedded/python.exe -m pip install setuptools wheel --no-warn-script-location
 
-      - name: Package as Python312.zip
-        shell: pwsh
-        run: |
+          # Package
           Compress-Archive -Path python-embedded/* -DestinationPath Python312.zip
 
       - name: Upload artifact
