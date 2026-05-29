@@ -1,4 +1,6 @@
 import type { IMonitorService } from '../../interfaces/IMonitorService'
+import { MacOSMonitorService } from './MacOSMonitorService'
+import { WindowsMonitorService } from './WindowsMonitorService'
 
 let _instance: IMonitorService | null = null
 
@@ -10,13 +12,11 @@ export function getMonitorService(): IMonitorService {
   if (_instance) return _instance
 
   if (process.platform === 'darwin') {
-    const { MacOSMonitorService } = require('./MacOSMonitorService')
     _instance = new MacOSMonitorService()
   } else {
     // Windows (and any other future platform) defaults to primary display
-    const { WindowsMonitorService } = require('./WindowsMonitorService')
     _instance = new WindowsMonitorService()
   }
 
-  return _instance!
+  return _instance
 }

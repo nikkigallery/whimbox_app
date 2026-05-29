@@ -15,7 +15,7 @@ export class MacOSPythonEnvironmentService implements IPythonEnvironmentService 
   }
 
   buildEnv(paths: PythonEnvPaths): NodeJS.ProcessEnv {
-    const env = {
+    const env: NodeJS.ProcessEnv = {
       ...process.env,
       PYTHONNOUSERSITE: '1',
       PYTHONPATH: '',
