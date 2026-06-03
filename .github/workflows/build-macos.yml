@@ -84,7 +84,7 @@ jobs:
         with:
           name: whimbox-app-mac-arm64-zip
           path: |
-            dist/**/*.zip
+            dist/*/*.zip
             !dist/**/*.blockmap
 
       - name: Upload to release
