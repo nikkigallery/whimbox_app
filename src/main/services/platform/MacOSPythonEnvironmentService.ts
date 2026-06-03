@@ -1,4 +1,4 @@
-import { join } from 'node:path'
+import { join, dirname } from 'node:path'
 import type { IPythonEnvironmentService, PythonEnvInfo, PythonEnvPaths, BackendStatus } from '../../interfaces/IPythonEnvironmentService'
 
 import { app } from 'electron'
@@ -9,11 +9,14 @@ import { app } from 'electron'
  */
 export class MacOSPythonEnvironmentService implements IPythonEnvironmentService {
   resolvePaths(appDir: string): PythonEnvPaths {
-    const resourceBase = app.isPackaged ? process.resourcesPath : app.getAppPath()
-    const pythonDir = join(resourceBase, 'assets', 'python-embedded-mac')
-    const scriptsDir = join(pythonDir, 'bin')
-    const pythonPath = join(scriptsDir, 'python3')
-    return { pythonPath, pythonDir, scriptsDir, pathSeparator: ':' }
+    const isPackaged = app.isPackaged
+    // In production, the pyinstaller binary is in Contents/MacOS/whimbox_backend
+    const pythonDir = isPackaged 
+      ? dirname(app.getPath('exe')) 
+      : join(app.getAppPath(), 'assets')
+    
+    const pythonPath = join(pythonDir, 'whimbox_backend')
+    return { pythonPath, pythonDir, scriptsDir: pythonDir, pathSeparator: ':' }
   }
 
   buildEnv(paths: PythonEnvPaths): NodeJS.ProcessEnv {
@@ -29,11 +32,24 @@ export class MacOSPythonEnvironmentService implements IPythonEnvironmentService 
   }
 
   getInitialBackendStatus(): BackendStatus | null {
-    return null
+    // macOS uses an immutable bundled PyInstaller binary
+    return {
+      installed: true,
+      version: 'bundled',
+      installedAt: Date.now(),
+      packageName: 'whimbox',
+      entryPoint: 'whimbox',
+    }
   }
 
   async tryFastSetup(_pythonPath: string): Promise<PythonEnvInfo | null> {
-    return null
+    return {
+      installed: true,
+      command: _pythonPath,
+      version: '3.12 (PyInstaller)',
+      path: _pythonPath,
+      pipAvailable: false,
+    }
   }
 
   shouldSkipLaunchInDev(): boolean {

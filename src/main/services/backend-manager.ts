@@ -90,6 +90,10 @@ export class BackendManager extends EventEmitter {
   }
 
   async installWhl(wheelPath: string, deleteWheel = true) {
+    if (process.platform === 'darwin') {
+      throw new Error('macOS 版本内置了后端环境，不支持独立更新后端。请下载完整的最新客户端安装包。')
+    }
+
     if (!wheelPath) {
       throw new Error('没有找到更新包')
     }
@@ -154,14 +158,19 @@ export class BackendManager extends EventEmitter {
       cwd: app.getPath('userData'),
     }
 
+    const isMac = process.platform === 'darwin'
+    const procArgs = isMac 
+      ? [] 
+      : ['-s', '-m', `${this.backendStatus.entryPoint}.main`]
+
     const proc = spawn(
       pythonManager.embeddedPythonPath,
-      ['-s', '-m', `${this.backendStatus.entryPoint}.main`],
+      procArgs,
       options,
     )
     this.backendProcess = proc
 
-    proc.stderr.on('data', (data: Buffer) => {
+    proc.stderr?.on('data', (data: Buffer) => {
       const text = data.toString('utf-8').trim()
       if (text) log.scope('backend-stderr').info(text)
     })

@@ -13,39 +13,41 @@ env:
   PYTHON_VERSION: '3.12.8'
 
 jobs:
-  build-python-embedded-mac:
+  build-pyinstaller-backend-mac:
     runs-on: macos-14
     steps:
-      - name: Cache Python embedded
-        id: cache-python
-        uses: actions/cache@v4
+      - name: Checkout Whimbox Backend
+        uses: actions/checkout@v4
         with:
-          path: python-embedded-mac
-          key: python-embedded-mac-folder-${{ env.PYTHON_VERSION }}
+          repository: nikkigallery/Whimbox
+          ref: feat_mac
+          path: backend_src
+          
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: ${{ env.PYTHON_VERSION }}
+          cache: 'pip'
 
-      - name: Build Python embedded
-        if: steps.cache-python.outputs.cache-hit != 'true'
+      - name: Install dependencies and PyInstaller
         run: |
-          # Download official indygreg build for macOS arm64
-          curl -L "https://github.com/indygreg/python-build-standalone/releases/download/20241206/cpython-3.12.8+20241206-aarch64-apple-darwin-install_only.tar.gz" -o python-embed.tar.gz
-          tar -xzf python-embed.tar.gz
-          
-          # Rename folder
-          mv python python-embedded-mac
-          
-          # Install pip, setuptools, wheel
-          curl -L https://bootstrap.pypa.io/get-pip.py -o get-pip.py
-          ./python-embedded-mac/bin/python3 get-pip.py --no-warn-script-location
-          ./python-embedded-mac/bin/python3 -m pip install setuptools wheel --no-warn-script-location
+          cd backend_src
+          pip install -r requirements.txt
+          pip install pyinstaller
 
+      - name: Build PyInstaller binary
+        run: |
+          cd backend_src
+          pyinstaller --onefile --name whimbox_backend --collect-all rapidocr_onnxruntime --add-data "whimbox/assets:whimbox/assets" whimbox/main.py
+          
       - name: Upload artifact
         uses: actions/upload-artifact@v4
         with:
-          name: python-embedded-mac
-          path: python-embedded-mac
+          name: whimbox_backend_mac
+          path: backend_src/dist/whimbox_backend
 
   build-electron-mac:
-    needs: build-python-embedded-mac
+    needs: build-pyinstaller-backend-mac
     runs-on: macos-14
     steps:
       - uses: actions/checkout@v4
@@ -62,14 +64,14 @@ jobs:
       - name: Install dependencies
         run: pnpm install
 
-      - name: Download Python embedded
+      - name: Download PyInstaller backend
         uses: actions/download-artifact@v4
         with:
-          name: python-embedded-mac
-          path: assets/python-embedded-mac
+          name: whimbox_backend_mac
+          path: assets/
 
       - name: Restore execute permissions
-        run: chmod -R +x assets/python-embedded-mac/bin/
+        run: chmod +x assets/whimbox_backend
 
       - name: Build Electron app (macOS)
         run: pnpm build --mac

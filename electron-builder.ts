@@ -53,6 +53,12 @@ export default {
     artifactName: `${displayName}-${version}-mac-${'${arch}'}.${'${ext}'}`,
     target: ['dmg', 'zip'],
     identity: '-', // Force ad-hoc signing since we don't have Apple certificates
+    extraFiles: [
+      {
+        from: 'assets/whimbox_backend',
+        to: 'MacOS/whimbox_backend',
+      },
+    ],
   },
 
   nsis: {
