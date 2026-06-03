@@ -247,7 +247,7 @@ async function createVideoOverlayWindow() {
 
   const window = createWindow({
     id: 'video-overlay',
-    title: '奇想盒 - 视频小窗',
+    title: '奇想盒 - 视频悬浮窗',
     x,
     y,
     width,
@@ -261,6 +261,7 @@ async function createVideoOverlayWindow() {
     alwaysOnTop: true,
     skipTaskbar: true,
     hasShadow: false,
+    focusable: process.platform !== 'darwin',
     backgroundColor: '#00000000',
     webPreferences: {
       preload: join(__dirname, '../preload/index.js'),

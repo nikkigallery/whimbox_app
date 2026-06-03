@@ -189,6 +189,7 @@ export async function OverlayWindow() {
     alwaysOnTop: true,
     skipTaskbar: true,
     hasShadow: false,
+    focusable: process.platform !== 'darwin',
     backgroundColor: '#00000000',
     webPreferences: {
       preload: join(__dirname, '../preload/index.js'),
