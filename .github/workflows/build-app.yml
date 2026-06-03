@@ -1,0 +1,89 @@
+name: Build App
+
+on:
+  push:
+    branches: [main]
+    tags:
+      - 'v[0-9]+.[0-9]+.[0-9]+'
+  pull_request:
+    branches: [main]
+  workflow_dispatch:
+
+env:
+  PYTHON_VERSION: '3.12.8'
+
+jobs:
+  build-python-embedded:
+    runs-on: windows-latest
+    steps:
+      - name: Cache Python embedded
+        id: cache-python
+        uses: actions/cache@v4
+        with:
+          path: Python312.zip
+          key: python-embedded-win-${{ env.PYTHON_VERSION }}
+
+      - name: Build Python embedded
+        if: steps.cache-python.outputs.cache-hit != 'true'
+        shell: pwsh
+        run: |
+          # Download official embeddable
+          $url = "https://www.python.org/ftp/python/${{ env.PYTHON_VERSION }}/python-${{ env.PYTHON_VERSION }}-embed-amd64.zip"
+          Invoke-WebRequest -Uri $url -OutFile python-embed.zip
+          Expand-Archive python-embed.zip -DestinationPath python-embedded
+
+          # Enable site-packages
+          $pthFile = Get-ChildItem python-embedded -Filter "python*._pth"
+          (Get-Content $pthFile.FullName) -replace '#import site', 'import site' | Set-Content $pthFile.FullName
+          New-Item -ItemType Directory -Path python-embedded/Lib/site-packages -Force
+
+          # Install pip, setuptools, wheel
+          Invoke-WebRequest -Uri "https://bootstrap.pypa.io/get-pip.py" -OutFile get-pip.py
+          ./python-embedded/python.exe get-pip.py --no-warn-script-location
+          ./python-embedded/python.exe -m pip install setuptools wheel --no-warn-script-location
+
+          # Package
+          Compress-Archive -Path python-embedded/* -DestinationPath Python312.zip
+
+      - name: Upload artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: python-embedded-win
+          path: Python312.zip
+
+  build-electron:
+    needs: build-python-embedded
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: pnpm/action-setup@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version-file: '.nvmrc'
+          cache: 'pnpm'
+
+      - name: Install dependencies
+        run: pnpm install
+
+      - name: Download Python embedded
+        uses: actions/download-artifact@v4
+        with:
+          name: python-embedded-win
+          path: assets/
+
+      - name: Build Electron app
+        run: pnpm build
+
+      - name: Upload installer
+        uses: actions/upload-artifact@v4
+        with:
+          name: whimbox-app-win-x64
+          path: dist/**/*.exe
+
+      - name: Upload to release
+        if: startsWith(github.ref, 'refs/tags/')
+        uses: softprops/action-gh-release@v2
+        with:
+          files: dist/**/*.exe
