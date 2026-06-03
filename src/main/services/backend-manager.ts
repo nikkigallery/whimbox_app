@@ -151,6 +151,7 @@ export class BackendManager extends EventEmitter {
     const options: Parameters<typeof spawn>[2] = {
       windowsHide: true,
       env: pythonManager.env,
+      cwd: app.getPath('userData'),
     }
 
     const proc = spawn(
