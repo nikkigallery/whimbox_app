@@ -1,0 +1,92 @@
+name: Build macOS App
+
+on:
+  push:
+    branches: [main]
+    tags:
+      - 'v[0-9]+.[0-9]+.[0-9]+'
+  pull_request:
+    branches: [main]
+  workflow_dispatch:
+
+env:
+  PYTHON_VERSION: '3.12.8'
+
+jobs:
+  build-python-embedded-mac:
+    runs-on: macos-14
+    steps:
+      - name: Cache Python embedded
+        id: cache-python
+        uses: actions/cache@v4
+        with:
+          path: Python312.zip
+          key: python-embedded-mac-${{ env.PYTHON_VERSION }}
+
+      - name: Build Python embedded
+        if: steps.cache-python.outputs.cache-hit != 'true'
+        run: |
+          # Download official indygreg build for macOS arm64
+          curl -L "https://github.com/indygreg/python-build-standalone/releases/download/20241206/cpython-3.12.8+20241206-aarch64-apple-darwin-install_only.tar.gz" -o python-embed.tar.gz
+          tar -xzf python-embed.tar.gz
+          
+          # Install pip, setuptools, wheel
+          curl -L https://bootstrap.pypa.io/get-pip.py -o get-pip.py
+          ./python/bin/python3 get-pip.py --no-warn-script-location
+          ./python/bin/python3 -m pip install setuptools wheel --no-warn-script-location
+          
+          # Package the contents of the python directory into Python312.zip
+          cd python
+          zip -r ../Python312.zip *
+          cd ..
+
+      - name: Upload artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: python-embedded-mac
+          path: Python312.zip
+
+  build-electron-mac:
+    needs: build-python-embedded-mac
+    runs-on: macos-14
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: pnpm/action-setup@v4
+        with:
+          version: 10.0.0
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version-file: '.nvmrc'
+          cache: 'pnpm'
+
+      - name: Install dependencies
+        run: pnpm install
+
+      - name: Download Python embedded
+        uses: actions/download-artifact@v4
+        with:
+          name: python-embedded-mac
+          path: assets/
+
+      - name: Build Electron app (macOS)
+        run: pnpm build --mac
+
+      - name: Upload installer
+        uses: actions/upload-artifact@v4
+        with:
+          name: whimbox-app-mac-arm64
+          path: |
+            dist/**/*.dmg
+            dist/**/*.zip
+            !dist/**/*.blockmap
+
+      - name: Upload to release
+        if: startsWith(github.ref, 'refs/tags/')
+        uses: softprops/action-gh-release@v2
+        with:
+          files: |
+            dist/**/*.dmg
+            dist/**/*.zip
+            !dist/**/*.blockmap

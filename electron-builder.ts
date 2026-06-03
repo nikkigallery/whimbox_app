@@ -49,6 +49,11 @@ export default {
     requestedExecutionLevel: 'requireAdministrator', // 始终以管理员身份运行
   },
 
+  mac: {
+    artifactName: `${displayName}-${version}-mac-${'${arch}'}.${'${ext}'}`,
+    target: ['dmg', 'zip'],
+  },
+
   nsis: {
     oneClick: false,
     perMachine: false,
