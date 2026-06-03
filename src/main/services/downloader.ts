@@ -35,8 +35,7 @@ export class Downloader extends EventEmitter {
 
   constructor() {
     super()
-    const appDir = app.isPackaged ? dirname(process.execPath) : app.getAppPath()
-    this.downloadDir = join(appDir, 'downloads')
+    this.downloadDir = join(app.getPath('userData'), 'downloads')
     if (!existsSync(this.downloadDir)) {
       mkdirSync(this.downloadDir, { recursive: true })
     }

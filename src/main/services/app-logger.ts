@@ -9,8 +9,7 @@ const LOG_FILE_PREFIX = 'app-'
 
 /** 返回与 configureLogFile 一致的日志目录路径 */
 export function getLogsDir(): string {
-  const appDir = app.isPackaged ? dirname(process.execPath) : app.getAppPath()
-  return join(appDir, 'logs')
+  return join(app.getPath('userData'), 'logs')
 }
 
 /** 删除超过保留天数的按日日志文件 */

@@ -33,10 +33,7 @@ export class ScriptManager extends EventEmitter {
 
   constructor() {
     super()
-    const appDir = app.isPackaged
-      ? path.dirname(process.execPath)
-      : app.getAppPath()
-    this.scriptsDir = path.join(appDir, 'scripts')
+    this.scriptsDir = path.join(app.getPath('userData'), 'scripts')
 
     if (!fs.existsSync(this.scriptsDir)) {
       fs.mkdirSync(this.scriptsDir, { recursive: true })

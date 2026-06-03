@@ -1,13 +1,15 @@
 import { join } from 'node:path'
 import type { IPythonEnvironmentService, PythonEnvInfo, PythonEnvPaths, BackendStatus } from '../../interfaces/IPythonEnvironmentService'
 
+import { app } from 'electron'
+
 /**
  * macOS Python environment service.
- * Uses the bundled `python-embedded` directory.
+ * Uses the `python-embedded` directory extracted to userData.
  */
 export class MacOSPythonEnvironmentService implements IPythonEnvironmentService {
   resolvePaths(appDir: string): PythonEnvPaths {
-    const pythonDir = join(appDir, 'python-embedded')
+    const pythonDir = join(app.getPath('userData'), 'python-embedded')
     const scriptsDir = join(pythonDir, 'bin')
     const pythonPath = join(scriptsDir, 'python3')
     return { pythonPath, pythonDir, scriptsDir, pathSeparator: ':' }
