@@ -34,11 +34,5 @@ export async function MainWindow() {
     window.show()
   })
 
-  window.on('close', () => {
-    for (const window of BrowserWindow.getAllWindows()) {
-      window.destroy()
-    }
-  })
-
   return window
 }

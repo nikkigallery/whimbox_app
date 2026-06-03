@@ -127,40 +127,42 @@ export const content: SettingContent = {
           </Button>
         </div>
       </div>
-      <div className="rounded-xl border border-slate-100 bg-white px-4 py-3 text-sm dark:border-slate-800 dark:bg-slate-900">
-        <div className="flex flex-wrap items-center justify-between gap-3">
-          <div>
-            <p className="font-semibold text-slate-700 dark:text-slate-100">更新</p>
-            <p className="text-xs text-slate-400">如果之前忽略了更新，可以在这里重新检查</p>
-          </div>
-          <div className="flex flex-wrap gap-2">
-            <Button
-              variant="outline"
-              size="sm"
-              onClick={onCheckUpdate}
-              disabled={isProcessing || updateState.status === "checking"}
-            >
-              自动更新
-            </Button>
-            <Button
-              variant="secondary"
-              size="sm"
-              onClick={() => window.App?.launcher?.openExternal(APP_RELEASE_PAGE_URL)}
-              disabled={isProcessing}
-            >
-              github地址
-            </Button>
-            <Button
-              variant="secondary"
-              size="sm"
-              onClick={onManualUpdate}
-              disabled={isProcessing}
-            >
-              手动更新后端
-            </Button>
+      {!window.App?.isMac && (
+        <div className="rounded-xl border border-slate-100 bg-white px-4 py-3 text-sm dark:border-slate-800 dark:bg-slate-900">
+          <div className="flex flex-wrap items-center justify-between gap-3">
+            <div>
+              <p className="font-semibold text-slate-700 dark:text-slate-100">更新</p>
+              <p className="text-xs text-slate-400">如果之前忽略了更新，可以在这里重新检查</p>
+            </div>
+            <div className="flex flex-wrap gap-2">
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={onCheckUpdate}
+                disabled={isProcessing || updateState.status === "checking"}
+              >
+                自动更新
+              </Button>
+              <Button
+                variant="secondary"
+                size="sm"
+                onClick={() => window.App?.launcher?.openExternal(APP_RELEASE_PAGE_URL)}
+                disabled={isProcessing}
+              >
+                github地址
+              </Button>
+              <Button
+                variant="secondary"
+                size="sm"
+                onClick={onManualUpdate}
+                disabled={isProcessing}
+              >
+                手动更新后端
+              </Button>
+            </div>
           </div>
         </div>
-      </div>
+      )}
       <div className="rounded-xl border border-slate-100 bg-white px-4 py-3 text-sm dark:border-slate-800 dark:bg-slate-900">
         <div className="flex flex-wrap items-center justify-between gap-3">
           <div>

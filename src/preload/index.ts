@@ -40,6 +40,7 @@ type AppUpdateState = {
 const API = {
   sayHelloFromBridge: () => console.log('\nHello from bridgeAPI! 👋\n\n'),
   username: process.env.USER,
+  isMac: process.platform === 'darwin',
   appUpdater: {
     checkForUpdates: () => ipcRenderer.invoke('app:check-for-updates'),
     downloadAndInstallUpdate: () => ipcRenderer.invoke('app:download-and-install-update'),

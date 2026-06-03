@@ -1,4 +1,4 @@
-﻿import {
+import {
   ChevronDown,
   CircleDot,
   Gift,
@@ -721,14 +721,16 @@ export function MainScreen() {
                     <Gift className="size-8" />
                   </div>
                   <h1 className="mt-5 text-2xl font-semibold text-slate-800 dark:text-slate-100">
-                    请先更新奇想盒
+                    {window.App?.isMac ? '后端启动失败' : '请先更新奇想盒'}
                   </h1>
                   <p className="mt-3 text-sm text-slate-500 dark:text-slate-400">
-                    未检测到奇想盒后端，功能暂不可用。
+                    {window.App?.isMac ? '未检测到奇想盒后端，请尝试重启软件。' : '未检测到奇想盒后端，功能暂不可用。'}
                   </p>
-                  <p className="mt-1 text-sm text-slate-500 dark:text-slate-400">
-                    请查看通知中的使用教程，进行更新。
-                  </p>
+                  {!window.App?.isMac && (
+                    <p className="mt-1 text-sm text-slate-500 dark:text-slate-400">
+                      请查看通知中的使用教程，进行更新。
+                    </p>
+                  )}
                 </div>
               </div>
             ) : ['auto-navigate', 'auto-macro', 'auto-music'].includes(activePage) ? (

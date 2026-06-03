@@ -51,6 +51,7 @@ export default {
 
   mac: {
     artifactName: `${displayName}-${version}-mac-${'${arch}'}.${'${ext}'}`,
+    icon: `${resources}/build/icons/icon.png`,
     target: ['dmg', 'zip'],
     identity: '-', // Force ad-hoc signing since we don't have Apple certificates
     extraFiles: [
