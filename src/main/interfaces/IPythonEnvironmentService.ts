@@ -39,6 +39,16 @@ export interface IPythonEnvironmentService {
    * proceed with the normal Windows setup flow.
    */
   tryFastSetup(pythonPath: string): Promise<PythonEnvInfo | null>
+
+  /**
+   * Whether to skip launching the backend when running in development mode.
+   */
+  shouldSkipLaunchInDev(): boolean
+
+  /**
+   * Optional working directory for spawning the backend process.
+   */
+  getSpawnCwd?(): string | null
 }
 
 // Re-export types used by the interface (defined here to avoid circular deps)

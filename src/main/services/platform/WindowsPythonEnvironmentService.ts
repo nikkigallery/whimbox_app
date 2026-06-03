@@ -34,4 +34,8 @@ export class WindowsPythonEnvironmentService implements IPythonEnvironmentServic
     // Windows always goes through the full setup flow.
     return null
   }
+
+  shouldSkipLaunchInDev(): boolean {
+    return true
+  }
 }

@@ -18,6 +18,7 @@ import { MainWindow } from './windows/main'
 import { OverlayWindow, persistOverlayState } from './windows/overlay'
 import { SplashWindow } from './windows/splash'
 import { persistVideoOverlayState, unregisterVideoOverlayShortcuts } from './windows/video-overlay'
+import { getPythonEnvironmentService } from './services/platform/pythonEnvironmentServiceFactory'
 import log from 'electron-log/main.js'
 
 if (process.platform === 'win32') {
@@ -119,7 +120,7 @@ makeAppWithSingleInstanceLock(async () => {
     })
 
     const backendStatus = backendManager.getBackendStatus()
-    const skipLaunchInDev = false; // Force launch in DEV
+    const skipLaunchInDev = ENVIRONMENT.IS_DEV && getPythonEnvironmentService().shouldSkipLaunchInDev()
     if (skipLaunchInDev && !splashWindow.isDestroyed() && splashWindow.webContents) {
       splashWindow.webContents.send('splash:python-progress', {
         stage: 'ensure-done',

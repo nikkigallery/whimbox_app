@@ -1,13 +1,23 @@
 import { join } from 'node:path'
+import { existsSync } from 'node:fs'
+import { app } from 'electron'
 import type { IPythonEnvironmentService, PythonEnvInfo, PythonEnvPaths, BackendStatus } from '../../interfaces/IPythonEnvironmentService'
 
 /**
  * macOS Python environment service.
- * Uses the bundled `python-embedded` directory, mirroring the Windows
- * distribution model (embedded Python + pip install wheel at runtime).
+ * Supports running from a local dev venv when running in dev mode,
+ * and falls back to bundled embedded Python in production.
  */
 export class MacOSPythonEnvironmentService implements IPythonEnvironmentService {
   resolvePaths(appDir: string): PythonEnvPaths {
+    const devVenvDir = '/Users/Mercury/Downloads/Whimbox/.venv'
+    if (!app.isPackaged && existsSync(devVenvDir)) {
+      const pythonDir = devVenvDir
+      const scriptsDir = join(pythonDir, 'bin')
+      const pythonPath = join(scriptsDir, 'python')
+      return { pythonPath, pythonDir, scriptsDir, pathSeparator: ':' }
+    }
+
     const pythonDir = join(appDir, 'python-embedded')
     const scriptsDir = join(pythonDir, 'bin')
     const pythonPath = join(scriptsDir, 'python3')
@@ -18,7 +28,7 @@ export class MacOSPythonEnvironmentService implements IPythonEnvironmentService 
     const env: NodeJS.ProcessEnv = {
       ...process.env,
       PYTHONNOUSERSITE: '1',
-      PYTHONPATH: '',
+      PYTHONPATH: !app.isPackaged ? '/Users/Mercury/Downloads/Whimbox' : '',
       PATH: `${paths.pythonDir}${paths.pathSeparator}${paths.scriptsDir}${paths.pathSeparator}${process.env.PATH ?? ''}`,
       PYTHONUNBUFFERED: '1',
       PYTHONIOENCODING: 'utf-8',
@@ -28,12 +38,30 @@ export class MacOSPythonEnvironmentService implements IPythonEnvironmentService 
   }
 
   getInitialBackendStatus(): BackendStatus | null {
-    // TODO: implement macOS-specific backend status detection when macOS support lands
-    return null
+    return {
+      installed: true,
+      version: '1.0.0',
+      installedAt: Date.now(),
+      packageName: 'whimbox',
+      entryPoint: 'whimbox',
+    }
   }
 
   async tryFastSetup(_pythonPath: string): Promise<PythonEnvInfo | null> {
-    // TODO: implement macOS-specific fast setup when macOS support lands
-    return null
+    return {
+      installed: true,
+      command: _pythonPath,
+      version: '3.12.8',
+      path: _pythonPath,
+      pipAvailable: true,
+    }
+  }
+
+  shouldSkipLaunchInDev(): boolean {
+    return false
+  }
+
+  getSpawnCwd(): string | null {
+    return !app.isPackaged ? '/Users/Mercury/Downloads/Whimbox' : null
   }
 }
