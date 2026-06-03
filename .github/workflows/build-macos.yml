@@ -20,8 +20,8 @@ jobs:
         id: cache-python
         uses: actions/cache@v4
         with:
-          path: Python312.zip
-          key: python-embedded-mac-${{ env.PYTHON_VERSION }}
+          path: python-embedded-mac
+          key: python-embedded-mac-folder-${{ env.PYTHON_VERSION }}
 
       - name: Build Python embedded
         if: steps.cache-python.outputs.cache-hit != 'true'
@@ -30,21 +30,19 @@ jobs:
           curl -L "https://github.com/indygreg/python-build-standalone/releases/download/20241206/cpython-3.12.8+20241206-aarch64-apple-darwin-install_only.tar.gz" -o python-embed.tar.gz
           tar -xzf python-embed.tar.gz
           
+          # Rename folder
+          mv python python-embedded-mac
+          
           # Install pip, setuptools, wheel
           curl -L https://bootstrap.pypa.io/get-pip.py -o get-pip.py
-          ./python/bin/python3 get-pip.py --no-warn-script-location
-          ./python/bin/python3 -m pip install setuptools wheel --no-warn-script-location
-          
-          # Package the contents of the python directory into Python312.zip
-          cd python
-          zip -r ../Python312.zip *
-          cd ..
+          ./python-embedded-mac/bin/python3 get-pip.py --no-warn-script-location
+          ./python-embedded-mac/bin/python3 -m pip install setuptools wheel --no-warn-script-location
 
       - name: Upload artifact
         uses: actions/upload-artifact@v4
         with:
           name: python-embedded-mac
-          path: Python312.zip
+          path: python-embedded-mac
 
   build-electron-mac:
     needs: build-python-embedded-mac
@@ -68,7 +66,7 @@ jobs:
         uses: actions/download-artifact@v4
         with:
           name: python-embedded-mac
-          path: assets/
+          path: assets/python-embedded-mac
 
       - name: Build Electron app (macOS)
         run: pnpm build --mac

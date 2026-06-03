@@ -108,6 +108,11 @@ export class PythonManager extends EventEmitter {
   }
 
   async extractEmbeddedPython() {
+    if (process.platform === 'darwin') {
+      this.emit('extract-complete', { message: 'macOS 预打包环境无需解压' })
+      return
+    }
+
     const resourceBase = process.resourcesPath ?? app.getAppPath()
     const packagedZipPath = join(resourceBase, 'assets', 'Python312.zip')
     const devZipPath = join(app.getAppPath(), 'assets', 'Python312.zip')
@@ -287,10 +292,14 @@ export class PythonManager extends EventEmitter {
         output: `使用最快的 pip 源: ${fastest}\n`,
       })
 
-      await this.runCommand(pythonEnv.command, ['-s', '-m', 'pip', 'install', '-i', fastest, 'setuptools'], true)
+      const targetArgs = process.platform === 'darwin' && this.env.PYTHONPATH
+        ? ['--target', this.env.PYTHONPATH]
+        : []
+
+      await this.runCommand(pythonEnv.command, ['-s', '-m', 'pip', 'install', '-i', fastest, ...targetArgs, 'setuptools'], true)
       const result = await this.runCommand(
         pythonEnv.command,
-        ['-s', '-m', 'pip', 'install', '-i', fastest, wheelPath],
+        ['-s', '-m', 'pip', 'install', '-i', fastest, ...targetArgs, wheelPath],
         true,
         10 * 60 * 1000,
       )

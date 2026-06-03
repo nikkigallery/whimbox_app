@@ -9,17 +9,19 @@ import { app } from 'electron'
  */
 export class MacOSPythonEnvironmentService implements IPythonEnvironmentService {
   resolvePaths(appDir: string): PythonEnvPaths {
-    const pythonDir = join(app.getPath('userData'), 'python-embedded')
+    const resourceBase = app.isPackaged ? process.resourcesPath : app.getAppPath()
+    const pythonDir = join(resourceBase, 'assets', 'python-embedded-mac')
     const scriptsDir = join(pythonDir, 'bin')
     const pythonPath = join(scriptsDir, 'python3')
     return { pythonPath, pythonDir, scriptsDir, pathSeparator: ':' }
   }
 
   buildEnv(paths: PythonEnvPaths): NodeJS.ProcessEnv {
+    const userSitePackages = join(app.getPath('userData'), 'site-packages')
     return {
       ...process.env,
       PYTHONNOUSERSITE: '1',
-      PYTHONPATH: '',
+      PYTHONPATH: userSitePackages,
       PATH: `${paths.pythonDir}${paths.pathSeparator}${paths.scriptsDir}${paths.pathSeparator}${process.env.PATH ?? ''}`,
       PYTHONUNBUFFERED: '1',
       PYTHONIOENCODING: 'utf-8',
