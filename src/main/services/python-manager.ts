@@ -124,6 +124,16 @@ export class PythonManager extends EventEmitter {
     this.emit('extract-progress', { message: '正在解压内置 Python 环境...' })
     const zip = new AdmZip(zipPath)
     zip.extractAllTo(this.embeddedPythonDir, true)
+
+    if (process.platform !== 'win32') {
+      try {
+        const { execSync } = require('node:child_process')
+        execSync(`chmod -R +x "${this.embeddedPythonScriptsDir}"`)
+      } catch (err) {
+        console.error('Failed to grant execute permissions to python bin directory:', err)
+      }
+    }
+
     this.emit('extract-complete', { message: '内置 Python 解压完成' })
   }
 
