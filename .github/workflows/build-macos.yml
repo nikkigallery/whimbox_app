@@ -73,12 +73,17 @@ jobs:
       - name: Build Electron app (macOS)
         run: pnpm build --mac
 
-      - name: Upload installer
+      - name: Upload DMG installer
         uses: actions/upload-artifact@v4
         with:
-          name: whimbox-app-mac-arm64
+          name: whimbox-app-mac-arm64-dmg
+          path: dist/**/*.dmg
+
+      - name: Upload ZIP installer
+        uses: actions/upload-artifact@v4
+        with:
+          name: whimbox-app-mac-arm64-zip
           path: |
-            dist/**/*.dmg
             dist/**/*.zip
             !dist/**/*.blockmap
 
