@@ -29,6 +29,24 @@ jobs:
           python-version: ${{ env.PYTHON_VERSION }}
           cache: 'pip'
 
+      - name: Filter Windows dependencies from requirements
+        run: |
+          cd backend_src
+          python -c '
+          import codecs
+          try:
+              with codecs.open("requirements.txt", "r", encoding="utf-16") as f:
+                  lines = f.readlines()
+          except UnicodeError:
+              with codecs.open("requirements.txt", "r", encoding="utf-8") as f:
+                  lines = f.readlines()
+          bad_prefixes = ["pyqt5", "pywin32", "pypiwin32", "win10toast", "win32_setctime"]
+          with codecs.open("requirements.txt", "w", encoding="utf-8") as f:
+              for line in lines:
+                  if not any(line.strip().lower().startswith(p) for p in bad_prefixes):
+                      f.write(line)
+          '
+
       - name: Install dependencies and PyInstaller
         run: |
           cd backend_src
