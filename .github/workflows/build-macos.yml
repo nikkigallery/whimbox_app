@@ -38,7 +38,7 @@ jobs:
       - name: Build PyInstaller binary
         run: |
           cd backend_src
-          pyinstaller --onefile --name whimbox_backend --collect-all rapidocr_onnxruntime --add-data "whimbox/assets:whimbox/assets" whimbox/main.py
+          pyinstaller --onefile --name whimbox_backend --collect-all rapidocr_onnxruntime --collect-all langchain_core --collect-all numpy --hidden-import uuid_utils --hidden-import CoreFoundation --add-data "whimbox/assets:whimbox/assets" whimbox/main.py
           
       - name: Upload artifact
         uses: actions/upload-artifact@v4
