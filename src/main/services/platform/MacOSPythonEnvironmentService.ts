@@ -38,23 +38,11 @@ export class MacOSPythonEnvironmentService implements IPythonEnvironmentService 
   }
 
   getInitialBackendStatus(): BackendStatus | null {
-    return {
-      installed: true,
-      version: '1.0.0',
-      installedAt: Date.now(),
-      packageName: 'whimbox',
-      entryPoint: 'whimbox',
-    }
+    return null
   }
 
   async tryFastSetup(_pythonPath: string): Promise<PythonEnvInfo | null> {
-    return {
-      installed: true,
-      command: _pythonPath,
-      version: '3.12.8',
-      path: _pythonPath,
-      pipAvailable: true,
-    }
+    return null
   }
 
   shouldSkipLaunchInDev(): boolean {
