@@ -102,7 +102,7 @@ async function runWhlInstallWithProgress(
       await backendManager.launchBackend()
       sendTaskProgress(win, { status: 'running', title, message: '奇想盒启动中…' })
       reconnectRpcNow()
-      const connected = await waitForRpcConnected(30_000)
+      const connected = await waitForRpcConnected(120_000)
       if (connected) {
         sendTaskProgress(win, { status: 'success', title, message: '更新完成' })
       } else {
@@ -138,7 +138,7 @@ async function runRestartBackend(win: BrowserWindow, title: string): Promise<voi
     await backendManager.launchBackend()
     sendTaskProgress(win, { status: 'running', title, message: '奇想盒启动中…' })
     reconnectRpcNow()
-    const connected = await waitForRpcConnected(30_000)
+    const connected = await waitForRpcConnected(120_000)
     if (connected) {
       sendTaskProgress(win, { status: 'success', title, message: '重启完成' })
     } else {

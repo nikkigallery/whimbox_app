@@ -173,7 +173,7 @@ makeAppWithSingleInstanceLock(async () => {
       backendManager.once('launch-backend-end', () => resolve(false))
     })
     const connected = await Promise.race([
-      waitForRpcConnected(30_000),
+      waitForRpcConnected(120_000),
       backendExitPromise,
     ])
     if (connected && !splashWindow.isDestroyed() && splashWindow.webContents) {
