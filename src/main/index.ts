@@ -1,4 +1,4 @@
-import { BrowserWindow, app, ipcMain } from 'electron'
+import { BrowserWindow, app, ipcMain, dialog, systemPreferences, desktopCapturer } from 'electron'
 
 import { makeAppWithSingleInstanceLock } from 'lib/electron-app/factories/app/instance'
 import { makeAppSetup } from 'lib/electron-app/factories/app/setup'
@@ -25,6 +25,50 @@ if (process.platform === 'win32') {
   app.commandLine.appendSwitch('no-sandbox')
   app.commandLine.appendSwitch('disable-gpu-sandbox')
   app.commandLine.appendSwitch('disable-features', 'RendererCodeIntegrity')
+}
+
+async function checkMacPermissions() {
+  if (process.platform !== 'darwin') return true
+
+  const needsAccessibility = !systemPreferences.isTrustedAccessibilityClient(false)
+  const needsScreen = systemPreferences.getMediaAccessStatus('screen') !== 'granted'
+
+  if (!needsAccessibility && !needsScreen) {
+    return true
+  }
+
+  let msg = '奇想盒需要以下 macOS 系统权限才能正常运行：\n\n'
+  if (needsAccessibility) msg += '• 辅助功能 (监听游戏内全局快捷键和鼠标点击)\n'
+  if (needsScreen) msg += '• 屏幕录制 (识别游戏画面并执行任务)\n'
+  msg += '\n请在接下来弹出的系统设置中，允许奇想盒控制您的电脑并录制屏幕。\n(授权完成后，系统会提示您“退出并重新打开”应用)'
+
+  await dialog.showMessageBox({
+    type: 'warning',
+    title: '需要系统权限',
+    message: msg,
+    buttons: ['去授权']
+  })
+
+  if (needsAccessibility) {
+    systemPreferences.isTrustedAccessibilityClient(true)
+  }
+  if (needsScreen) {
+    try {
+      await desktopCapturer.getSources({ types: ['screen'] })
+    } catch (e) {}
+  }
+
+  await dialog.showMessageBox({
+    type: 'info',
+    title: '等待授权',
+    message: '正在等待您在系统设置中完成授权...\n\n授权完成后，请在系统弹窗中点击“退出并重新打开”。',
+    buttons: ['退出奇想盒']
+  }).then(() => {
+    app.exit(0)
+  })
+
+  await new Promise(() => {}) 
+  return false
 }
 
 let primaryWindow: BrowserWindow | null = null
@@ -97,6 +141,7 @@ makeAppWithSingleInstanceLock(async () => {
   await app.whenReady()
   configureLogFile()
   log.info(`[startup] Whimbox App version=${app.getVersion()} mode=${ENVIRONMENT.IS_DEV ? 'dev' : 'prod'}`,)
+  await checkMacPermissions()
 
   const splashWindow = await SplashWindow()
   await new Promise<void>((resolve) => {
