@@ -109,6 +109,14 @@ export class PythonManager extends EventEmitter {
 
   async extractEmbeddedPython() {
     if (process.platform === 'darwin') {
+      // Ensure execute permissions on bundled Python binaries (they may be
+      // stripped by GitHub Actions artifact upload/download or App Translocation)
+      try {
+        const { execSync } = require('node:child_process')
+        execSync(`chmod -R +x "${this.embeddedPythonScriptsDir}"`)
+      } catch (err) {
+        console.error('Failed to chmod macOS bundled Python bin:', err)
+      }
       this.emit('extract-complete', { message: 'macOS 预打包环境无需解压' })
       return
     }

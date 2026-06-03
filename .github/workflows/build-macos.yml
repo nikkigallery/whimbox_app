@@ -68,6 +68,9 @@ jobs:
           name: python-embedded-mac
           path: assets/python-embedded-mac
 
+      - name: Restore execute permissions
+        run: chmod -R +x assets/python-embedded-mac/bin/
+
       - name: Build Electron app (macOS)
         run: pnpm build --mac
 
