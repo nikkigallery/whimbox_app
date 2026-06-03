@@ -10,9 +10,6 @@
 /build
 /dist
 
-# CI-generated assets (built by workflow)
-assets/Python312.zip
-
 # misc
 .DS_Store
 .env
