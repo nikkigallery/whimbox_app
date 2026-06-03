@@ -50,6 +50,12 @@ export class PythonManager extends EventEmitter {
 
   async detectPythonEnvironment(): Promise<PythonEnvInfo> {
     try {
+      const platformSvc = getPythonEnvironmentService()
+      const fastResult = await platformSvc.tryFastSetup(this.embeddedPythonPath)
+      if (fastResult) {
+        return fastResult
+      }
+
       if (existsSync(this.embeddedPythonPath)) {
         const versionInfo = await this.getPythonVersion(this.embeddedPythonPath)
         const pipAvailable = await this.isPipAvailable(this.embeddedPythonPath)
