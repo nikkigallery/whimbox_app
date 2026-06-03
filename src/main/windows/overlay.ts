@@ -1,11 +1,12 @@
 import { join } from 'node:path'
 
-import { BrowserWindow, ipcMain, screen } from 'electron'
+import { BrowserWindow, ipcMain } from 'electron'
 import log from 'electron-log/main.js'
 import windowStateKeeper from 'electron-window-state'
 
 import { createWindow } from 'lib/electron-app/factories/windows/create'
 import { setVideoOverlayIgnoreMouseEvents } from './video-overlay'
+import { getMonitorService } from '../services/platform/monitorServiceFactory'
 
 const PANEL_DEFAULT_WIDTH = 420
 const PANEL_DEFAULT_HEIGHT = 360
@@ -160,7 +161,7 @@ export async function OverlayWindow() {
     fullScreen: false,
   })
 
-  const workArea = screen.getPrimaryDisplay().workArea
+  const workArea = getMonitorService().getActiveDisplayWorkArea()
   const width = overlayState.width ?? PANEL_DEFAULT_WIDTH
   const height = overlayState.height ?? PANEL_DEFAULT_HEIGHT
   const x =

@@ -1,6 +1,6 @@
 import { join } from 'node:path'
 
-import { BrowserWindow, globalShortcut, ipcMain, screen } from 'electron'
+import { BrowserWindow, globalShortcut, ipcMain } from 'electron'
 import log from 'electron-log/main.js'
 import windowStateKeeper from 'electron-window-state'
 
@@ -10,6 +10,7 @@ import {
   setVideoOverlayState,
   type VideoOverlayPlaybackCommand,
 } from '../services/video-overlay-store'
+import { getMonitorService } from '../services/platform/monitorServiceFactory'
 
 const PANEL_DEFAULT_WIDTH = 520
 const PANEL_DEFAULT_HEIGHT = 320
@@ -238,7 +239,7 @@ async function createVideoOverlayWindow() {
     fullScreen: false,
   })
 
-  const workArea = screen.getPrimaryDisplay().workArea
+  const workArea = getMonitorService().getActiveDisplayWorkArea()
   const width = overlayState.width ?? PANEL_DEFAULT_WIDTH
   const height = overlayState.height ?? PANEL_DEFAULT_HEIGHT
   const x = overlayState.x ?? (workArea.x + workArea.width - width - MARGIN)
