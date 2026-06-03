@@ -152,13 +152,6 @@ export class BackendManager extends EventEmitter {
       windowsHide: true,
       env: pythonManager.env,
     }
-    const platformSvc = getPythonEnvironmentService()
-    if (platformSvc.getSpawnCwd) {
-      const cwd = platformSvc.getSpawnCwd()
-      if (cwd) {
-        options.cwd = cwd
-      }
-    }
 
     const proc = spawn(
       pythonManager.embeddedPythonPath,
