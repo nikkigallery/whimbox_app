@@ -23,11 +23,12 @@ jobs:
           ref: feat_mac
           path: backend_src
           
-      - name: Set up Python
-        uses: actions/setup-python@v5
-        with:
-          python-version: ${{ env.PYTHON_VERSION }}
-          cache: 'pip'
+      - name: Set up Python environment using Homebrew
+        run: |
+          brew install python@3.12
+          /opt/homebrew/bin/python3.12 -m venv venv
+          echo "VIRTUAL_ENV=$PWD/venv" >> $GITHUB_ENV
+          echo "$PWD/venv/bin" >> $GITHUB_PATH
 
       - name: Install dependencies and PyInstaller
         run: |
