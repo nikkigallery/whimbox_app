@@ -40,6 +40,11 @@ jobs:
           cd backend_src
           pyinstaller --onefile --name whimbox_backend --collect-all rapidocr_onnxruntime --collect-all rapidocr --collect-all langchain_core --collect-all numpy --hidden-import uuid_utils --hidden-import CoreFoundation --add-data "whimbox:whimbox" whimbox/main.py
           
+      - name: Run PyInstaller bundle smoke test
+        run: |
+          cd backend_src/dist
+          ./whimbox_backend smokeTest
+          
       - name: Upload artifact
         uses: actions/upload-artifact@v4
         with:
