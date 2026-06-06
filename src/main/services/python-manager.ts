@@ -114,19 +114,6 @@ export class PythonManager extends EventEmitter {
   }
 
   async extractEmbeddedPython() {
-    if (process.platform === 'darwin') {
-      // Ensure execute permissions on bundled Python binaries (they may be
-      // stripped by GitHub Actions artifact upload/download or App Translocation)
-      try {
-        const { execSync } = require('node:child_process')
-        execSync(`chmod -R +x "${this.embeddedPythonScriptsDir}"`)
-      } catch (err) {
-        console.error('Failed to chmod macOS bundled Python bin:', err)
-      }
-      this.emit('extract-complete', { message: 'macOS 预打包环境无需解压' })
-      return
-    }
-
     const resourceBase = process.resourcesPath ?? app.getAppPath()
     const packagedZipPath = join(resourceBase, 'assets', 'Python312.zip')
     const devZipPath = join(app.getAppPath(), 'assets', 'Python312.zip')
@@ -138,6 +125,19 @@ export class PythonManager extends EventEmitter {
 
     if (!existsSync(this.embeddedPythonDir)) {
       mkdirSync(this.embeddedPythonDir, { recursive: true })
+    }
+
+    if (process.platform === 'darwin') {
+      try {
+        const { execSync } = require('node:child_process')
+        const parentDir = dirname(this.embeddedPythonDir)
+        // macOS native unzip preserves +x permissions (unlike adm-zip)
+        execSync(`unzip -o "${zipPath}" -d "${parentDir}"`)
+        this.emit('extract-complete', { message: '内置 Python 环境解压完成' })
+      } catch (err) {
+        throw new Error(`macOS解压失败: ${(err as Error).message}`)
+      }
+      return
     }
 
     this.emit('extract-progress', { message: '正在解压内置 Python 环境...' })

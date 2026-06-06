@@ -9,14 +9,10 @@ import { app } from 'electron'
  */
 export class MacOSPythonEnvironmentService implements IPythonEnvironmentService {
   resolvePaths(appDir: string): PythonEnvPaths {
-    const isPackaged = app.isPackaged
-    // In production, the pyinstaller binary is in Contents/MacOS/whimbox_backend
-    const pythonDir = isPackaged 
-      ? dirname(app.getPath('exe')) 
-      : join(app.getAppPath(), 'assets')
-    
-    const pythonPath = join(pythonDir, 'whimbox_backend')
-    return { pythonPath, pythonDir, scriptsDir: pythonDir, pathSeparator: ':' }
+    const pythonDir = join(appDir, 'python')
+    const pythonPath = join(pythonDir, 'bin', 'python3')
+    const scriptsDir = join(pythonDir, 'bin')
+    return { pythonPath, pythonDir, scriptsDir, pathSeparator: ':' }
   }
 
   buildEnv(paths: PythonEnvPaths): NodeJS.ProcessEnv {
@@ -32,24 +28,13 @@ export class MacOSPythonEnvironmentService implements IPythonEnvironmentService 
   }
 
   getInitialBackendStatus(): BackendStatus | null {
-    // macOS uses an immutable bundled PyInstaller binary
-    return {
-      installed: true,
-      version: 'bundled',
-      installedAt: Date.now(),
-      packageName: 'whimbox',
-      entryPoint: 'whimbox',
-    }
+    // macOS reads status from persisted store; no override needed.
+    return null
   }
 
   async tryFastSetup(_pythonPath: string): Promise<PythonEnvInfo | null> {
-    return {
-      installed: true,
-      command: _pythonPath,
-      version: '3.12 (PyInstaller)',
-      path: _pythonPath,
-      pipAvailable: false,
-    }
+    // macOS always goes through the full setup flow for the standalone python.
+    return null
   }
 
   shouldSkipLaunchInDev(): boolean {

@@ -13,47 +13,38 @@ env:
   PYTHON_VERSION: '3.12.8'
 
 jobs:
-  build-pyinstaller-backend-mac:
+  build-python-embedded-mac:
     runs-on: macos-14
     steps:
-      - name: Checkout Whimbox Backend
-        uses: actions/checkout@v4
+      - name: Cache Python embedded
+        id: cache-python
+        uses: actions/cache@v4
         with:
-          repository: nikkigallery/Whimbox
-          ref: feat_mac
-          path: backend_src
-          
-      - name: Set up Python environment using Homebrew
-        run: |
-          brew install python@3.12
-          /opt/homebrew/bin/python3.12 -m venv venv
-          echo "VIRTUAL_ENV=$PWD/venv" >> $GITHUB_ENV
-          echo "$PWD/venv/bin" >> $GITHUB_PATH
+          path: Python312.zip
+          key: python-embedded-mac-${{ env.PYTHON_VERSION }}-aarch64
 
-      - name: Install dependencies and PyInstaller
+      - name: Build Python embedded
+        if: steps.cache-python.outputs.cache-hit != 'true'
         run: |
-          cd backend_src
-          pip install -r requirements.txt
-          pip install pyinstaller
+          URL=$(curl -sL https://api.github.com/repos/astral-sh/python-build-standalone/releases/latest | grep browser_download_url | grep aarch64-apple-darwin-install_only | grep cpython-3.12 | grep -v stripped | head -n 1 | cut -d '"' -f 4)
+          echo "Downloading $URL"
+          curl -sL "$URL" -o python-embedded.tar.gz
+          tar -xzf python-embedded.tar.gz
+          
+          # Standalone python extracts to a folder named "python"
+          ./python/bin/python3 -m pip install setuptools wheel --no-warn-script-location
+          
+          # Compress into Python312.zip preserving symlinks (-y)
+          zip -ry Python312.zip python/
 
-      - name: Build PyInstaller binary
-        run: |
-          cd backend_src
-          python3 -m PyInstaller --onefile --name whimbox_backend --collect-all rapidocr_onnxruntime --collect-all rapidocr --collect-all langchain_core --collect-all numpy --collect-all cv2 --collect-all pyobjc --collect-all Foundation --collect-all AppKit --hidden-import cv2 --hidden-import ormsgpack --hidden-import ormsgpack.ormsgpack --hidden-import uuid_utils --hidden-import uuid_utils._uuid_utils --hidden-import numpy._core._multiarray_umath --hidden-import CoreFoundation --hidden-import Foundation --hidden-import pyclipper --hidden-import pyclipper._pyclipper --add-data "whimbox:whimbox" --add-data "$(python3 -c 'import rapidocr, os; print(os.path.dirname(rapidocr.__file__))'):rapidocr" whimbox/main.py
-          
-      - name: Run PyInstaller bundle smoke test
-        run: |
-          cd backend_src/dist
-          ./whimbox_backend smokeTest
-          
       - name: Upload artifact
         uses: actions/upload-artifact@v4
         with:
-          name: whimbox_backend_mac
-          path: backend_src/dist/whimbox_backend
+          name: python-embedded-mac
+          path: Python312.zip
 
   build-electron-mac:
-    needs: build-pyinstaller-backend-mac
+    needs: build-python-embedded-mac
     runs-on: macos-14
     steps:
       - uses: actions/checkout@v4
@@ -70,14 +61,11 @@ jobs:
       - name: Install dependencies
         run: pnpm install
 
-      - name: Download PyInstaller backend
+      - name: Download Python embedded
         uses: actions/download-artifact@v4
         with:
-          name: whimbox_backend_mac
+          name: python-embedded-mac
           path: assets/
-
-      - name: Restore execute permissions
-        run: chmod +x assets/whimbox_backend
 
       - name: Build Electron app (macOS)
         run: pnpm build --mac
