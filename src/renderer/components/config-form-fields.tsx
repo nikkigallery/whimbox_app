@@ -1,3 +1,5 @@
+import { useEffect, useRef, useState } from "react"
+import { ChevronDownIcon } from "lucide-react"
 import {
   Combobox,
   ComboboxContent,
@@ -15,13 +17,105 @@ import { cn } from "renderer/lib/utils"
 type ConfigFormFieldsProps = {
   items: ConfigMetaItem[]
   draftConfig: ConfigSection | null
-  onValueChange: (key: string, value: string | number | boolean) => void
+  onValueChange: (key: string, value: string | number | boolean | string[]) => void
   loading: boolean
   loadError: string
   /** 空状态提示 */
   emptyMessage?: string
   /** 表单项容器 className，用于区分整页（如 bg-slate-50）与弹窗内（如 bg-white） */
   itemClassName?: string
+}
+
+type MultiSelectInputProps = {
+  options: string[]
+  value: string[]
+  placeholder?: string
+  onChange: (value: string[]) => void
+}
+
+function MultiSelectInput({
+  options,
+  value,
+  placeholder = "请选择",
+  onChange,
+}: MultiSelectInputProps) {
+  const [open, setOpen] = useState(false)
+  const wrapperRef = useRef<HTMLDivElement | null>(null)
+  const displayValue = value.length > 0 ? value.join(" , ") : ""
+
+  useEffect(() => {
+    if (!open) return
+
+    const handlePointerDown = (event: PointerEvent) => {
+      const target = event.target
+      if (
+        target instanceof Node &&
+        wrapperRef.current &&
+        !wrapperRef.current.contains(target)
+      ) {
+        setOpen(false)
+      }
+    }
+
+    document.addEventListener("pointerdown", handlePointerDown)
+    return () => document.removeEventListener("pointerdown", handlePointerDown)
+  }, [open])
+
+  const toggleOption = (option: string, checked: boolean) => {
+    const nextValue = checked
+      ? [...value, option]
+      : value.filter((item) => item !== option)
+    onChange(Array.from(new Set(nextValue)))
+  }
+
+  return (
+    <div ref={wrapperRef} className="relative w-full min-w-[200px]">
+      <button
+        type="button"
+        aria-expanded={open}
+        className={cn(
+          "border-input dark:bg-input/30 flex h-9 w-full min-w-0 items-center justify-between gap-2 rounded-md border bg-transparent px-3 py-1 text-left text-base shadow-xs transition-[color,box-shadow] outline-none md:text-sm",
+          "focus-visible:border-pink-400 focus-visible:ring-[3px] focus-visible:ring-pink-200/70"
+        )}
+        onClick={() => setOpen((prev) => !prev)}
+      >
+        <span
+          className={cn(
+            "min-w-0 flex-1 truncate",
+            displayValue ? "text-slate-700 dark:text-slate-100" : "text-muted-foreground"
+          )}
+          title={displayValue}
+        >
+          {displayValue || placeholder}
+        </span>
+        <ChevronDownIcon
+          className={cn(
+            "size-4 shrink-0 text-slate-400 transition-transform",
+            open && "rotate-180"
+          )}
+        />
+      </button>
+      {open ? (
+        <div className="absolute left-0 top-full z-50 mt-1 max-h-64 w-full overflow-y-auto rounded-md border border-slate-200 bg-white p-1 shadow-md dark:border-slate-800 dark:bg-slate-900">
+          {options.map((option, index) => (
+            <label
+              key={`${option}-${index}`}
+              className="flex cursor-pointer items-center gap-2 rounded-sm px-2 py-1.5 text-sm text-slate-600 hover:bg-slate-100 dark:text-slate-300 dark:hover:bg-slate-800"
+            >
+              <Checkbox
+                checked={value.includes(option)}
+                onCheckedChange={(checked) =>
+                  toggleOption(option, checked === true)
+                }
+                className="data-[state=checked]:bg-pink-400 data-[state=checked]:border-pink-400 data-[state=checked]:text-white"
+              />
+              <span className="min-w-0 flex-1 truncate">{option}</span>
+            </label>
+          ))}
+        </div>
+      ) : null}
+    </div>
+  )
 }
 
 export function ConfigFormFields({
@@ -62,6 +156,14 @@ export function ConfigFormFields({
         const booleanLike = meta.type === "boolean" || isBooleanLike(value)
         const label = meta.description || key
         const options = meta.options ?? []
+        const selectedValues = Array.isArray(value)
+          ? value.map(String)
+          : meta.type === "array" && value === "全部"
+            ? options
+            : typeof value === "string" && value.length > 0 && value !== "不做周本"
+              ? [value]
+              : []
+
         return (
           <div
             key={key}
@@ -73,7 +175,13 @@ export function ConfigFormFields({
                   {label}
                 </div>
               </div>
-              {booleanLike ? (
+              {meta.type === "array" && options.length > 0 ? (
+                <MultiSelectInput
+                  options={options}
+                  value={selectedValues}
+                  onChange={(nextValue) => onValueChange(key, nextValue)}
+                />
+              ) : booleanLike ? (
                 <label className="inline-flex items-center gap-2 text-sm text-slate-600 dark:text-slate-300">
                   <Checkbox
                     checked={String(value) === "true"}

@@ -3,7 +3,7 @@ import { toast } from "sonner"
 import type { IpcRpcClient } from "renderer/lib/ipc-rpc"
 
 export type ConfigItem = {
-  value: string | number | boolean
+  value: string | number | boolean | string[]
   description?: string
 }
 
@@ -12,7 +12,7 @@ export type ConfigSection = Record<string, ConfigItem>
 export type ConfigMetaItem = {
   key: string
   description?: string
-  type: "string" | "number" | "boolean"
+  type: "string" | "number" | "boolean" | "array"
   options?: string[]
 }
 
@@ -88,12 +88,16 @@ export function useConfigForm({ section, rpcClient, reloadVersion }: UseConfigFo
     return Object.keys(cfg).map((key) => ({
       key,
       description: cfg[key]?.description,
-      type: isBooleanLike(cfg[key]?.value) ? ("boolean" as const) : ("string" as const),
+      type: Array.isArray(cfg[key]?.value)
+        ? ("array" as const)
+        : isBooleanLike(cfg[key]?.value)
+          ? ("boolean" as const)
+          : ("string" as const),
       options: undefined as string[] | undefined,
     })) as ConfigMetaItem[]
   }, [configMeta, draftConfig])
 
-  const handleValueChange = (key: string, value: string | number | boolean) => {
+  const handleValueChange = (key: string, value: string | number | boolean | string[]) => {
     setDraftConfig((prev) => {
       if (!prev) return prev
       return {
@@ -109,11 +113,11 @@ export function useConfigForm({ section, rpcClient, reloadVersion }: UseConfigFo
   /** 修改后立即保存单条（用于「改完即存」模式，不弹成功 toast） */
   const handleValueChangeAndSave = async (
     key: string,
-    value: string | number | boolean
+    value: string | number | boolean | string[]
   ) => {
     if (!draftConfig) return
     const prevValue = draftConfig[key]?.value
-    if (String(value) === String(prevValue ?? "")) return
+    if (JSON.stringify(value) === JSON.stringify(prevValue ?? "")) return
 
     setDraftConfig((prev) => {
       if (!prev) return prev
@@ -155,7 +159,7 @@ export function useConfigForm({ section, rpcClient, reloadVersion }: UseConfigFo
     const updates = Object.entries(draftConfig)
       .filter(([key, item]) => {
         const originalValue = original[key]?.value
-        return String(item.value) !== String(originalValue ?? "")
+        return JSON.stringify(item.value) !== JSON.stringify(originalValue ?? "")
       })
       .map(([key, item]) => ({
         path: `${section}.${key}`,
