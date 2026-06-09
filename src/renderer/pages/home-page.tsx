@@ -26,6 +26,8 @@ type HomePageProps = {
   currentStatus: string
   rpcState: string
   sessionId: string | null
+  agentReady: boolean
+  agentMessage: string
 }
 
 export function HomePage({
@@ -41,23 +43,26 @@ export function HomePage({
   currentStatus,
   rpcState,
   sessionId,
+  agentReady,
+  agentMessage,
 }: HomePageProps) {
   const textareaRef = useRef<HTMLTextAreaElement | null>(null)
 
   const hasConversation = messages.length > 0
-  const isSendDisabled = (!input.trim() && attachments.length === 0) || rpcState !== "open" || !sessionId
-  const isInputDisabled = isConversationPending || rpcState !== "open" || !sessionId
+  const isAgentStarting = rpcState === "open" && sessionId && !agentReady
+  const isSendDisabled = (!input.trim() && attachments.length === 0) || rpcState !== "open" || !sessionId || !agentReady
+  const isInputDisabled = isConversationPending || rpcState !== "open" || !sessionId || !agentReady
   const inputPlaceholder =
     currentStatus ||
     (rpcState === "open"
-      ? "请输入内容..."
+      ? (isAgentStarting ? agentMessage || "AI助手正在启动，请稍等..." : "请输入内容...")
       : "奇想盒后端异常，无法发送消息")
 
   useEffect(() => {
-    if (!isConversationPending && rpcState === "open" && sessionId) {
+    if (!isConversationPending && rpcState === "open" && sessionId && agentReady) {
       textareaRef.current?.focus()
     }
-  }, [isConversationPending, rpcState, sessionId])
+  }, [agentReady, isConversationPending, rpcState, sessionId])
 
   useActivate(() => {
     const raf = window.requestAnimationFrame(() => {

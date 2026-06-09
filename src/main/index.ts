@@ -191,6 +191,7 @@ makeAppWithSingleInstanceLock(async () => {
 
   await waitFor(600)
   splashWindow.close()
+  log.scope('startup').info('splash closed, entering main window')
 
   const window = await makeAppSetup(MainWindow)
   primaryWindow = window

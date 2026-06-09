@@ -101,6 +101,12 @@ const navItems: NavItem[] = [
   { id: 'video-overlay', label: '视频小窗', icon: Tv },
 ]
 
+type AgentStatusState = {
+  ready: boolean
+  status: string
+  message: string
+}
+
 export function MainScreen() {
   const rpcRef = useRef<IpcRpcClient | null>(null)
   if (!rpcRef.current) {
@@ -120,6 +126,11 @@ export function MainScreen() {
   const [taskProgressState, setTaskProgressState] = useState<TaskProgressState>({ status: 'idle' })
   const [toolRunning, setToolRunning] = useState(false)
   const [backendInstalled, setBackendInstalled] = useState<boolean | null>(null)
+  const [agentStatus, setAgentStatus] = useState<AgentStatusState>({
+    ready: false,
+    status: 'starting',
+    message: 'AI助手正在启动，请稍等...',
+  })
 
   const launcherApi = useMemo(() => window.App.launcher, [])
   const appUpdater = useMemo(() => window.App.appUpdater, [])
@@ -154,6 +165,7 @@ export function MainScreen() {
     rpcClient,
     sessionId,
     rpcState,
+    agentReady: agentStatus.ready,
   })
   const {
     messages,
@@ -170,6 +182,18 @@ export function MainScreen() {
 
   useEffect(() => {
     const off = rpcClient.on('notification', (n) => {
+      if (n.method === 'event.agent.status') {
+        const params = n.params as Partial<AgentStatusState> | undefined
+        setAgentStatus({
+          ready: Boolean(params?.ready),
+          status: typeof params?.status === 'string' ? params.status : 'starting',
+          message:
+            typeof params?.message === 'string' && params.message
+              ? params.message
+              : (params?.ready ? '' : 'AI助手正在启动，请稍等...'),
+        })
+        return
+      }
       if (n.method !== 'event.run.status') return
       const params = n.params as { source?: string; phase?: string } | undefined
       if (params?.source !== 'agent') return
@@ -179,6 +203,42 @@ export function MainScreen() {
     })
     return () => off()
   }, [rpcClient])
+
+  useEffect(() => {
+    if (rpcState !== 'open') {
+      setAgentStatus({
+        ready: false,
+        status: 'starting',
+        message: 'AI助手正在启动，请稍等...',
+      })
+      return
+    }
+    let active = true
+    rpcClient
+      .sendRequest<AgentStatusState>('agent.status', {})
+      .then((status) => {
+        if (!active) return
+        setAgentStatus({
+          ready: Boolean(status?.ready),
+          status: typeof status?.status === 'string' ? status.status : 'starting',
+          message:
+            typeof status?.message === 'string' && status.message
+              ? status.message
+              : (status?.ready ? '' : 'AI助手正在启动，请稍等...'),
+        })
+      })
+      .catch(() => {
+        if (!active) return
+        setAgentStatus({
+          ready: false,
+          status: 'starting',
+          message: 'AI助手正在启动，请稍等...',
+        })
+      })
+    return () => {
+      active = false
+    }
+  }, [rpcClient, rpcState])
 
   useEffect(() => {
     window.App.conversation.pushState({
@@ -463,6 +523,8 @@ export function MainScreen() {
             currentStatus={currentStatus}
             rpcState={rpcState}
             sessionId={sessionId}
+            agentReady={agentStatus.ready}
+            agentMessage={agentStatus.message}
           />
         )
     }

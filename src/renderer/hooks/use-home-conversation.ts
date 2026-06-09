@@ -45,6 +45,7 @@ export type UseHomeConversationOptions = {
   rpcClient: IpcRpcClient
   sessionId: string | null
   rpcState: string
+  agentReady: boolean
 }
 
 const formatAgentStatus = (phase: string, detail: string, rawDetail?: string) => {
@@ -68,6 +69,7 @@ export function useHomeConversation({
   rpcClient,
   sessionId,
   rpcState,
+  agentReady,
 }: UseHomeConversationOptions) {
   const [messages, setMessages] = useState<UiMessage[]>([])
   const [input, setInput] = useState('')
@@ -510,6 +512,7 @@ export function useHomeConversation({
     const text = (payload.text != null ? payload.text : input).trim()
     const currentAttachments = payload.attachments ?? attachments
     if ((!text && currentAttachments.length === 0) || rpcState !== 'open' || !sessionId || isAnyPending) return
+    if (!agentReady) return
     if (override == null) {
       setInput('')
       setAttachments([])
@@ -613,7 +616,7 @@ export function useHomeConversation({
       setIsConversationPending(false)
       setCurrentStatus((prev) => (prev === '发送失败' || prev === '已停止' || prev === '执行失败' ? prev : ''))
     }
-  }, [attachments, input, isAnyPending, rpcState, sessionId, rpcClient])
+  }, [agentReady, attachments, input, isAnyPending, rpcState, sessionId, rpcClient])
 
   const handleStop = useCallback(async () => {
     if (rpcState !== 'open' || !sessionId || !isAnyPending) return
