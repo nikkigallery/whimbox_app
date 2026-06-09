@@ -93,6 +93,17 @@ makeAppWithSingleInstanceLock(async () => {
     BrowserWindow.getFocusedWindow()?.close()
   })
 
+  ipcMain.handle('launcher:get-auto-start', () => {
+    return app.getLoginItemSettings().openAtLogin
+  })
+
+  ipcMain.handle('launcher:set-auto-start', (_event, enabled: boolean) => {
+    app.setLoginItemSettings({
+      openAtLogin: enabled === true,
+    })
+    return app.getLoginItemSettings().openAtLogin
+  })
+
   await app.whenReady()
   configureLogFile()
   log.info(`[startup] Whimbox App version=${app.getVersion()} mode=${ENVIRONMENT.IS_DEV ? 'dev' : 'prod'}`,)

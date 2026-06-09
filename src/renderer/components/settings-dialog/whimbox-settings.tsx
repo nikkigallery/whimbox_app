@@ -1,5 +1,7 @@
+import { useEffect, useState } from "react"
 import { Settings } from "lucide-react"
 import { Button } from "renderer/components/ui/button"
+import { Checkbox } from "renderer/components/ui/checkbox"
 import { ThemeToggle } from "renderer/components/theme-provider"
 import { ConfigFormFields } from "renderer/components/config-form-fields"
 import { KeybindInput } from "renderer/components/settings-dialog/keybind-input"
@@ -69,6 +71,70 @@ async function handleRunUninstaller() {
   }
 }
 
+function AutoStartSetting() {
+  const [enabled, setEnabled] = useState(false)
+  const [loading, setLoading] = useState(true)
+  const [saving, setSaving] = useState(false)
+
+  useEffect(() => {
+    let disposed = false
+
+    window.App.launcher
+      .getAutoStart()
+      .then((value) => {
+        if (!disposed) setEnabled(value)
+      })
+      .catch((error) => {
+        if (!disposed) {
+          toast.error(error instanceof Error ? error.message : "读取开机自启动设置失败")
+        }
+      })
+      .finally(() => {
+        if (!disposed) setLoading(false)
+      })
+
+    return () => {
+      disposed = true
+    }
+  }, [])
+
+  async function handleChange(value: boolean) {
+    const previous = enabled
+    setEnabled(value)
+    setSaving(true)
+
+    try {
+      const actual = await window.App.launcher.setAutoStart(value)
+      setEnabled(actual)
+    } catch (error) {
+      setEnabled(previous)
+      toast.error(error instanceof Error ? error.message : "保存开机自启动设置失败")
+    } finally {
+      setSaving(false)
+    }
+  }
+
+  return (
+    <div className="rounded-xl border border-slate-100 bg-white px-4 py-3 text-sm dark:border-slate-800 dark:bg-slate-900">
+      <div className="flex flex-wrap items-center justify-between gap-3">
+        <div>
+          <p className="font-semibold text-slate-700 dark:text-slate-100">开机自启动</p>
+          <p className="text-xs text-slate-400">开机后自动启动奇想盒</p>
+        </div>
+        <label className="flex items-center gap-2 text-sm text-slate-600 dark:text-slate-200">
+          <Checkbox
+            checked={enabled}
+            disabled={loading || saving}
+            onCheckedChange={(checked) => handleChange(checked === true)}
+            className="data-[state=checked]:bg-pink-400 data-[state=checked]:border-pink-400 data-[state=checked]:text-white"
+          />
+          <span>{enabled ? "已开启" : "已关闭"}</span>
+        </label>
+      </div>
+    </div>
+  )
+}
+
 export const content: SettingContent = {
   title: "奇想盒设置",
   description: "奇想盒本身的设置",
@@ -85,6 +151,7 @@ export const content: SettingContent = {
   ) => (
     <div className="space-y-3">
       <ThemeToggle />
+      <AutoStartSetting />
       <div className="rounded-xl border border-slate-100 bg-white px-4 py-3 text-sm dark:border-slate-800 dark:bg-slate-900">
         <div className="flex flex-wrap items-center justify-between gap-3">
           <div>

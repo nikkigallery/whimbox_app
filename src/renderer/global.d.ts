@@ -144,6 +144,8 @@ declare global {
         }>
         launchBackend: () => Promise<unknown>
         stopBackend: () => Promise<unknown>
+        getAutoStart: () => Promise<boolean>
+        setAutoStart: (enabled: boolean) => Promise<boolean>
         runUninstaller: () => Promise<unknown>
         getAppVersion: () => Promise<string>
         getAnnouncements: () => Promise<{
