@@ -47,11 +47,12 @@ export default {
     icon: `${resources}/build/icons/icon.ico`,
     target: [{ target: 'nsis', arch: ['x64'] }],
     requestedExecutionLevel: 'requireAdministrator', // 始终以管理员身份运行
+    signAndEditExecutable: true,
   },
 
   nsis: {
     oneClick: false,
-    perMachine: false,
+    perMachine: true,
     allowToChangeInstallationDirectory: true,
     allowElevation: true,
     installerIcon: `${resources}/build/icons/icon.ico`,
