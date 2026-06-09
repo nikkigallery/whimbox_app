@@ -11,7 +11,7 @@ import { backendManager } from './services/backend-manager'
 import { ensurePythonEnvironment, registerLauncherIpc } from './services/launcher-ipc'
 import { registerAppUpdater, unregisterAppUpdater } from './services/updater'
 import { pythonManager } from './services/python-manager'
-import { registerRpcBridge, stopRpcBridge, waitForRpcConnected } from './services/rpc-bridge'
+import { registerRpcBridge, setRpcMainWindow, stopRpcBridge, waitForRpcConnected } from './services/rpc-bridge'
 import { createTray, destroyTray } from './services/tray'
 import { registerConversationBridge } from './services/conversation-bridge'
 import { MainWindow } from './windows/main'
@@ -195,6 +195,7 @@ makeAppWithSingleInstanceLock(async () => {
 
   const window = await makeAppSetup(MainWindow)
   primaryWindow = window
+  setRpcMainWindow(window)
   const overlayWindow = await OverlayWindow()
   void overlayWindow
 

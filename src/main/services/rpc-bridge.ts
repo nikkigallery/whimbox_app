@@ -7,11 +7,16 @@ import log from 'electron-log/main.js'
 let initialized = false
 const rpcClient = new RpcClient()
 let currentSessionId: string | null = null
+let mainWindowForTaskStart: BrowserWindow | null = null
 
 const broadcast = (channel: string, payload: unknown) => {
   for (const window of BrowserWindow.getAllWindows()) {
     window.webContents.send(channel, payload)
   }
+}
+
+export function setRpcMainWindow(window: BrowserWindow | null) {
+  mainWindowForTaskStart = window
 }
 
 export function registerRpcBridge() {
@@ -45,6 +50,9 @@ export function registerRpcBridge() {
         (source === 'agent' && phase === 'started' && hasAgentToolCall)
         || (source !== 'agent' && phase === 'started')
       if (shouldAutoShow) {
+        if (mainWindowForTaskStart && !mainWindowForTaskStart.isDestroyed()) {
+          mainWindowForTaskStart.minimize()
+        }
         setOverlayIgnoreMouseEvents(true)
         showOverlayOnToolStart()
       } else if (phase === 'stopping') {
