@@ -241,22 +241,18 @@ export class RpcClient {
   private scheduleReconnect() {
     if (!this.shouldReconnect) return
     if (this.reconnectTimer) return
-    const baseDelay = 500
-    const maxDelay = 10_000
-    const attempt = Math.min(this.reconnectAttempts, 6)
-    const delay = Math.min(baseDelay * 2 ** attempt, maxDelay)
-    const jitter = Math.random() * 200
+    const delay = 1_000
     this.reconnectAttempts += 1
     // console.info('[rpc] reconnect: schedule', {
     //   attempt: this.reconnectAttempts,
-    //   delay: Math.round(delay + jitter),
+    //   delay,
     // })
     this.reconnectTimer = setTimeout(() => {
       this.reconnectTimer = null
       if (this.state === 'open' || this.state === 'connecting') return
       // console.info('[rpc] reconnect: attempt', { attempt: this.reconnectAttempts })
       this.connect()
-    }, delay + jitter)
+    }, delay)
   }
 
   private emit<K extends ListenerKey>(event: K, payload: RpcListenerMap[K]) {
