@@ -54,6 +54,7 @@ import { useUnifiedUpdate } from 'renderer/hooks/use-unified-update'
 import { toast } from 'sonner'
 import { Toaster } from 'renderer/components/ui/sonner'
 import { UpdatePromptDialog } from 'renderer/components/update-prompt-dialog'
+import { AnnouncementDialog } from 'renderer/components/announcement-dialog'
 import {
   Collapsible,
   CollapsibleContent,
@@ -533,6 +534,7 @@ export function MainScreen() {
   return (
     <>
       <Toaster />
+      <AnnouncementDialog />
       <UpdatePromptDialog
         open={updatePromptOpen}
         onClose={closeUpdatePrompt}
