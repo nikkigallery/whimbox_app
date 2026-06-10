@@ -1,4 +1,6 @@
 import { BrowserWindow, app, ipcMain } from 'electron'
+import { execFile } from 'node:child_process'
+import { promisify } from 'node:util'
 
 import { makeAppWithSingleInstanceLock } from 'lib/electron-app/factories/app/instance'
 import { makeAppSetup } from 'lib/electron-app/factories/app/setup'
@@ -19,6 +21,9 @@ import { OverlayWindow, persistOverlayState } from './windows/overlay'
 import { SplashWindow } from './windows/splash'
 import { persistVideoOverlayState, unregisterVideoOverlayShortcuts } from './windows/video-overlay'
 import log from 'electron-log/main.js'
+
+const execFileAsync = promisify(execFile)
+const AUTO_START_TASK_NAME = 'Whimbox Auto Start'
 
 if (process.platform === 'win32') {
   app.commandLine.appendSwitch('no-sandbox')
@@ -71,6 +76,49 @@ function forwardPythonProgressTo(splashWindow: BrowserWindow) {
   }
 }
 
+async function getAutoStartEnabled() {
+  if (process.platform !== 'win32') {
+    return app.getLoginItemSettings().openAtLogin
+  }
+
+  try {
+    await execFileAsync('schtasks', ['/Query', '/TN', AUTO_START_TASK_NAME])
+    return true
+  } catch {
+    return false
+  }
+}
+
+async function setAutoStartEnabled(enabled: boolean) {
+  if (process.platform !== 'win32') {
+    app.setLoginItemSettings({ openAtLogin: enabled })
+    return app.getLoginItemSettings().openAtLogin
+  }
+
+  if (enabled) {
+    await execFileAsync('schtasks', [
+      '/Create',
+      '/TN',
+      AUTO_START_TASK_NAME,
+      '/TR',
+      `"${process.execPath}"`,
+      '/SC',
+      'ONLOGON',
+      '/RL',
+      'HIGHEST',
+      '/F',
+    ])
+  } else {
+    try {
+      await execFileAsync('schtasks', ['/Delete', '/TN', AUTO_START_TASK_NAME, '/F'])
+    } catch {
+      // ignore missing task
+    }
+  }
+
+  return getAutoStartEnabled()
+}
+
 makeAppWithSingleInstanceLock(async () => {
   ipcMain.handle('window:minimize', () => {
     BrowserWindow.getFocusedWindow()?.minimize()
@@ -93,15 +141,12 @@ makeAppWithSingleInstanceLock(async () => {
     BrowserWindow.getFocusedWindow()?.close()
   })
 
-  ipcMain.handle('launcher:get-auto-start', () => {
-    return app.getLoginItemSettings().openAtLogin
+  ipcMain.handle('launcher:get-auto-start', async () => {
+    return getAutoStartEnabled()
   })
 
-  ipcMain.handle('launcher:set-auto-start', (_event, enabled: boolean) => {
-    app.setLoginItemSettings({
-      openAtLogin: enabled === true,
-    })
-    return app.getLoginItemSettings().openAtLogin
+  ipcMain.handle('launcher:set-auto-start', async (_event, enabled: boolean) => {
+    return setAutoStartEnabled(enabled === true)
   })
 
   await app.whenReady()

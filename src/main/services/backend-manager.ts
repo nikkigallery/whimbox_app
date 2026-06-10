@@ -148,10 +148,12 @@ export class BackendManager extends EventEmitter {
       throw new Error('未找到可用的 Python 环境')
     }
 
+    const backendCwd = app.isPackaged ? dirname(app.getPath('exe')) : process.cwd()
     const proc = spawn(
       pythonManager.embeddedPythonPath,
       ['-s', '-m', `${this.backendStatus.entryPoint}.main`],
       {
+        cwd: backendCwd,
         windowsHide: true,
         env: pythonManager.env,
       },
