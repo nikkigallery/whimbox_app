@@ -83,6 +83,7 @@ export function useUnifiedUpdate({
   const pendingUnifiedCheckRef = useRef(false)
   const unifiedCheckRef = useRef<{
     currentElectronVersion: string
+    currentBackendStatusReady: boolean
     currentBackendInstalled: boolean
     currentBackendVersion: string
     backend: UnifiedBackend | undefined
@@ -90,6 +91,7 @@ export function useUnifiedUpdate({
     fromSettings: boolean
   }>({
     currentElectronVersion: '',
+    currentBackendStatusReady: false,
     currentBackendInstalled: false,
     currentBackendVersion: '',
     backend: undefined,
@@ -162,6 +164,7 @@ export function useUnifiedUpdate({
       pendingUnifiedCheckRef.current = true
       unifiedCheckRef.current = {
         currentElectronVersion: '',
+        currentBackendStatusReady: false,
         currentBackendInstalled,
         currentBackendVersion,
         backend: undefined,
@@ -172,7 +175,12 @@ export function useUnifiedUpdate({
 
       const tryFinish = () => {
         const r = unifiedCheckRef.current
-        if (r.currentElectronVersion === '' || r.backend === undefined || r.electron === undefined) return
+        if (
+          r.currentElectronVersion === '' ||
+          !r.currentBackendStatusReady ||
+          r.backend === undefined ||
+          r.electron === undefined
+        ) return
         pendingUnifiedCheckRef.current = false
         const needBackend =
           r.backend &&
@@ -220,6 +228,19 @@ export function useUnifiedUpdate({
         unifiedCheckRef.current.currentElectronVersion = v ?? '0.0.0'
         tryFinishUnifiedCheckRef.current()
       })
+      launcherApi
+        .getBackendStatus()
+        .then((status) => {
+          setBackendStatus(status)
+          unifiedCheckRef.current.currentBackendInstalled = Boolean(status?.installed)
+          unifiedCheckRef.current.currentBackendVersion = status?.version ?? '0.0.0'
+          unifiedCheckRef.current.currentBackendStatusReady = true
+          tryFinishUnifiedCheckRef.current()
+        })
+        .catch(() => {
+          unifiedCheckRef.current.currentBackendStatusReady = true
+          tryFinishUnifiedCheckRef.current()
+        })
       apiClient
         .checkWhimboxUpdate()
         .then((res) => {
@@ -232,7 +253,7 @@ export function useUnifiedUpdate({
         })
       appUpdater.checkForUpdates()
     },
-    [launcherApi, appUpdater, backendStatus?.version],
+    [launcherApi, appUpdater, backendStatus?.installed, backendStatus?.version],
   )
 
   const handleCheckAppUpdate = useCallback(async () => {
