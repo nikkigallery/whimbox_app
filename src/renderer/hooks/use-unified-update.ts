@@ -83,12 +83,14 @@ export function useUnifiedUpdate({
   const pendingUnifiedCheckRef = useRef(false)
   const unifiedCheckRef = useRef<{
     currentElectronVersion: string
+    currentBackendInstalled: boolean
     currentBackendVersion: string
     backend: UnifiedBackend | undefined
     electron: UnifiedElectron | undefined
     fromSettings: boolean
   }>({
     currentElectronVersion: '',
+    currentBackendInstalled: false,
     currentBackendVersion: '',
     backend: undefined,
     electron: undefined,
@@ -155,10 +157,12 @@ export function useUnifiedUpdate({
 
   const runUnifiedUpdateCheck = useCallback(
     (fromSettings: boolean) => {
+      const currentBackendInstalled = backendStatus?.installed ?? false
       const currentBackendVersion = backendStatus?.version ?? '0.0.0'
       pendingUnifiedCheckRef.current = true
       unifiedCheckRef.current = {
         currentElectronVersion: '',
+        currentBackendInstalled,
         currentBackendVersion,
         backend: undefined,
         electron: undefined,
@@ -171,7 +175,9 @@ export function useUnifiedUpdate({
         if (r.currentElectronVersion === '' || r.backend === undefined || r.electron === undefined) return
         pendingUnifiedCheckRef.current = false
         const needBackend =
-          r.backend && compareVersion(r.backend.version, r.currentBackendVersion) > 0
+          r.backend &&
+          (!r.currentBackendInstalled ||
+            compareVersion(r.backend.version, r.currentBackendVersion) > 0)
         const needElectron =
           r.electron?.status === 'available' &&
           r.electron.version != null &&
@@ -189,7 +195,8 @@ export function useUnifiedUpdate({
             : r.currentBackendVersion
         const ignored = getIgnoredVersion()
         const skipIgnoredCheck = r.fromSettings
-        if (newVersion && (skipIgnoredCheck || newVersion !== ignored)) {
+        const forceBackendInstall = !!r.backend && !r.currentBackendInstalled
+        if (newVersion && (forceBackendInstall || skipIgnoredCheck || newVersion !== ignored)) {
           lastUnifiedCheckResultRef.current = {
             hasBackend: !!needBackend,
             url: needBackend && r.backend ? r.backend.url : undefined,
