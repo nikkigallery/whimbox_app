@@ -174,6 +174,7 @@ makeAppWithSingleInstanceLock(async () => {
       message: result.message,
     })
 
+    await backendManager.refreshBackendStatus()
     const backendStatus = backendManager.getBackendStatus()
     const skipLaunchInDev = ENVIRONMENT.IS_DEV
     if (skipLaunchInDev && !splashWindow.isDestroyed() && splashWindow.webContents) {

@@ -265,7 +265,7 @@ export function registerLauncherIpc(window: BrowserWindow) {
     })
   })
 
-  ipcMain.handle('launcher:get-backend-status', () => backendManager.getBackendStatus())
+  ipcMain.handle('launcher:get-backend-status', () => backendManager.refreshBackendStatus())
   ipcMain.handle('launcher:launch-backend', () => backendManager.launchBackend())
   ipcMain.handle('launcher:stop-backend', () => backendManager.stopBackend())
   ipcMain.handle('launcher:run-uninstaller', async () => {

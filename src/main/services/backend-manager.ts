@@ -1,15 +1,13 @@
 import { app, shell } from 'electron'
 import { spawn } from 'node:child_process'
-import { existsSync, mkdirSync, unlinkSync } from 'node:fs'
+import { unlinkSync } from 'node:fs'
 import { dirname, join } from 'node:path'
 import { EventEmitter } from 'node:events'
-import Store from 'electron-store'
 
 import log from 'electron-log/main.js'
 
 import { downloader } from './downloader'
 import { pythonManager } from './python-manager'
-import { getPythonEnvironmentService } from './platform/pythonEnvironmentServiceFactory'
 
 import path from 'node:path'
 
@@ -24,10 +22,7 @@ type BackendStatus = {
   entryPoint: string | null
 }
 
-const BACKEND_STATUS_KEY = 'backendStatus'
-const backendStatusStore = new Store<{ [BACKEND_STATUS_KEY]: BackendStatus }>({
-  name: 'backend-status',
-})
+const BACKEND_PACKAGE_NAME = 'whimbox'
 
 const defaultBackendStatus: BackendStatus = {
   installed: false,
@@ -44,48 +39,40 @@ export class BackendManager extends EventEmitter {
   constructor() {
     super()
 
-    this.backendStatus = this.loadBackendStatus()
-  }
-
-  private loadBackendStatus(): BackendStatus {
-    // Let the platform service override first (e.g. macOS pre-installed venv)
-    const platformOverride = getPythonEnvironmentService().getInitialBackendStatus()
-    if (platformOverride) {
-      return {
-        installed: platformOverride.installed,
-        version: platformOverride.version ?? null,
-        installedAt: platformOverride.installedAt ?? null,
-        packageName: platformOverride.packageName ?? null,
-        entryPoint: platformOverride.entryPoint ?? null,
-      }
-    }
-
-    try {
-      const stored = backendStatusStore.get(BACKEND_STATUS_KEY)
-      if (stored && typeof stored === 'object' && 'installed' in stored) {
-        return {
-          installed: Boolean(stored.installed),
-          version: stored.version ?? null,
-          installedAt: stored.installedAt ?? null,
-          packageName: stored.packageName ?? null,
-          entryPoint: stored.entryPoint ?? null,
-        }
-      }
-    } catch (error) {
-      console.error('加载后端状态失败:', error)
-    }
-    return { ...defaultBackendStatus }
-  }
-
-  private saveBackendStatus() {
-    try {
-      backendStatusStore.set(BACKEND_STATUS_KEY, this.backendStatus)
-    } catch (error) {
-      console.error('保存后端状态失败:', error)
-    }
+    this.backendStatus = { ...defaultBackendStatus }
   }
 
   getBackendStatus() {
+    return this.backendStatus
+  }
+
+  async refreshBackendStatus() {
+    try {
+      const pythonEnv = await pythonManager.detectPythonEnvironment()
+      if (!pythonEnv.installed || !pythonEnv.command) {
+        this.backendStatus = { ...defaultBackendStatus }
+        return this.backendStatus
+      }
+
+      const version = (
+        await pythonManager.runCommand(pythonEnv.command, [
+          '-s',
+          '-c',
+          `import importlib.metadata as m; print(m.version("${BACKEND_PACKAGE_NAME}"))`,
+        ])
+      ).trim()
+
+      this.backendStatus = {
+        installed: true,
+        version,
+        installedAt: null,
+        packageName: BACKEND_PACKAGE_NAME,
+        entryPoint: BACKEND_PACKAGE_NAME.replace(/-/g, '_'),
+      }
+    } catch {
+      this.backendStatus = { ...defaultBackendStatus }
+    }
+
     return this.backendStatus
   }
 
@@ -97,21 +84,13 @@ export class BackendManager extends EventEmitter {
 
     const fileName = wheelPath.split(/[\\/]/).pop() ?? ''
     const packageInfo = this.extractPackageInfo(fileName)
-    const entryPoint = packageInfo.name.replace(/-/g, '_')
     // await pythonManager.runCommand(
     //   pythonManager.embeddedPythonPath,
     //   ['-s', '-m', `${entryPoint}.main`, 'init'],
     //   false,
     // )
 
-    this.backendStatus = {
-      installed: true,
-      version: packageInfo.version,
-      installedAt: Date.now(),
-      packageName: packageInfo.name,
-      entryPoint,
-    }
-    this.saveBackendStatus()
+    await this.refreshBackendStatus()
 
     if (deleteWheel) {
       try {
@@ -139,6 +118,8 @@ export class BackendManager extends EventEmitter {
   }
 
   async launchBackend() {
+    await this.refreshBackendStatus()
+
     if (!this.backendStatus.installed || !this.backendStatus.entryPoint) {
       throw new Error('后端未安装')
     }
