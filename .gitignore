@@ -29,3 +29,10 @@ downloads
 logs
 python-embedded
 configs
+
+# Map Mask smoke/debug artifacts and Electron profiles
+.map-mask-smoke-user-data*/
+map-mask-smoke-artifacts/
+map-mask-viewport-artifacts/
+*.log
+*.png

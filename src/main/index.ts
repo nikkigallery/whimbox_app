@@ -1,5 +1,6 @@
 import { BrowserWindow, app, ipcMain } from 'electron'
 import { execFile } from 'node:child_process'
+import { join } from 'node:path'
 import { promisify } from 'node:util'
 
 import { makeAppWithSingleInstanceLock } from 'lib/electron-app/factories/app/instance'
@@ -19,11 +20,16 @@ import { registerConversationBridge } from './services/conversation-bridge'
 import { MainWindow } from './windows/main'
 import { OverlayWindow, persistOverlayState } from './windows/overlay'
 import { SplashWindow } from './windows/splash'
+import { persistMapMaskOverlayState } from './windows/map-mask-overlay'
 import { persistVideoOverlayState, unregisterVideoOverlayShortcuts } from './windows/video-overlay'
 import log from 'electron-log/main.js'
 
 const execFileAsync = promisify(execFile)
 const AUTO_START_TASK_NAME = 'Whimbox Auto Start'
+
+if (process.env.WHIMBOX_MAP_MASK_SMOKE === '1') {
+  app.setPath('userData', join(process.cwd(), '.map-mask-smoke-user-data'))
+}
 
 if (process.platform === 'win32') {
   app.commandLine.appendSwitch('no-sandbox')
@@ -267,6 +273,11 @@ makeAppWithSingleInstanceLock(async () => {
   registerAppLogger()
   registerLauncherIpc(window)
   registerAppUpdater(window)
+  if (process.env.WHIMBOX_MAP_MASK_SMOKE === '1') {
+    void import('./services/map-mask-smoke')
+      .then(({ runMapMaskSmoke }) => runMapMaskSmoke({ waitForRpcConnected }))
+      .catch((error) => log.error('[map-mask-smoke] failed', error))
+  }
   try {
     await startAuthServer(window)
   } catch (error) {
@@ -289,6 +300,7 @@ makeAppWithSingleInstanceLock(async () => {
 app.on('before-quit', () => {
   persistOverlayState()
   persistVideoOverlayState()
+  persistMapMaskOverlayState()
   unregisterVideoOverlayShortcuts()
   primaryWindow = null
   destroyTray()
