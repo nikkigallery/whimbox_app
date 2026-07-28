@@ -42,6 +42,7 @@ type ScriptRow = {
   count?: number
   region?: string
   map?: string
+  loopCount?: number
 }
 
 type DeleteTarget = {
@@ -129,6 +130,7 @@ const normalizeScripts = (payload: unknown): ScriptRow[] => {
         count: typeof info.count === "number" ? info.count : undefined,
         region: typeof info.region === "string" ? info.region : undefined,
         map: typeof info.map === "string" ? info.map : undefined,
+        loopCount: Array.isArray(record.loops) ? record.loops.length : 0,
       }
     })
     .filter((item): item is ScriptRow => item !== null)
@@ -371,6 +373,7 @@ export function ScriptSelectPage({
         { key: "target", label: "目标" },
         { key: "count", label: "数量" },
         { key: "region", label: "区域" },
+        { key: "loopCount", label: "循环段" },
       ] as const
     }
     return [{ key: "name", label: mode === "music" ? "乐谱名称" : "宏名称" }] as const
@@ -540,6 +543,9 @@ export function ScriptSelectPage({
                         <TableCell>{item.target || "-"}</TableCell>
                         <TableCell>{item.count ?? "-"}</TableCell>
                         <TableCell>{regionText}</TableCell>
+                        <TableCell>
+                          {item.loopCount ? `${item.loopCount} 段` : "-"}
+                        </TableCell>
                       </>
                     ) : null}
                   </TableRow>
