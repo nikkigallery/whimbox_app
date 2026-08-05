@@ -450,6 +450,47 @@ function formatImageRect(viewport: MapMaskState['viewport']) {
   return `${viewport.image_width.toFixed(1)}x${viewport.image_height.toFixed(1)} at ${viewport.image_left.toFixed(1)},${viewport.image_top.toFixed(1)}`
 }
 
+function viewportForOverlayCoordinates(
+  viewport: MapMaskViewport | null,
+  sourceScreenWidth: number | null | undefined,
+  sourceScreenHeight: number | null | undefined,
+  overlayWidth: number,
+  overlayHeight: number,
+): MapMaskViewport | null {
+  if (!viewport) return null
+
+  const inferredSourceWidth = Math.max(
+    viewport.screen_width,
+    viewport.screen_left + viewport.screen_width,
+  )
+  const inferredSourceHeight = Math.max(
+    viewport.screen_height,
+    viewport.screen_top + viewport.screen_height,
+  )
+  const sourceWidth = isFiniteNumber(sourceScreenWidth) && sourceScreenWidth > 0
+    ? sourceScreenWidth
+    : inferredSourceWidth
+  const sourceHeight = isFiniteNumber(sourceScreenHeight) && sourceScreenHeight > 0
+    ? sourceScreenHeight
+    : inferredSourceHeight
+  if (sourceWidth <= 0 || sourceHeight <= 0 || overlayWidth <= 0 || overlayHeight <= 0) {
+    return viewport
+  }
+
+  const scaleX = overlayWidth / sourceWidth
+  const scaleY = overlayHeight / sourceHeight
+  if (Math.abs(scaleX - 1) < 0.000001 && Math.abs(scaleY - 1) < 0.000001) {
+    return viewport
+  }
+  return {
+    ...viewport,
+    screen_left: viewport.screen_left * scaleX,
+    screen_top: viewport.screen_top * scaleY,
+    screen_width: viewport.screen_width * scaleX,
+    screen_height: viewport.screen_height * scaleY,
+  }
+}
+
 function viewportToCalibrationJson(
   viewport: MapMaskViewport,
   bounds: GameWindowBounds | null,
@@ -679,12 +720,44 @@ export function MapMaskOverlayScreen() {
   const [placementMode, setPlacementMode] = useState(false)
   const [continuousPlacement, setContinuousPlacement] = useState(false)
   const [mapPointerInside, setMapPointerInside] = useState(false)
+  const [overlaySize, setOverlaySize] = useState(() => ({
+    width: window.innerWidth,
+    height: window.innerHeight,
+  }))
+
+  useEffect(() => {
+    const updateOverlaySize = () => {
+      setOverlaySize({ width: window.innerWidth, height: window.innerHeight })
+    }
+    window.addEventListener('resize', updateOverlaySize)
+    updateOverlaySize()
+    return () => window.removeEventListener('resize', updateOverlaySize)
+  }, [])
 
   const selectedSet = useMemo(() => new Set(selectedLabelIds), [selectedLabelIds])
   const labelById = useMemo(() => new Map(labels.map((label) => [label.id, label])), [labels])
   const enabled = visibleResult.state.enabled
   const activeViewport = isValidViewport(visibleResult.state.viewport) ? visibleResult.state.viewport : null
   const calibrationViewport = calibrationDraft ?? activeViewport
+  const projectionSourceViewport = visibleResult.state.viewport_mode.includes('auto-center')
+    ? activeViewport
+    : calibrationViewport
+  const overlayViewport = useMemo(
+    () => viewportForOverlayCoordinates(
+      projectionSourceViewport,
+      visibleResult.state.viewport_screen_width,
+      visibleResult.state.viewport_screen_height,
+      overlaySize.width,
+      overlaySize.height,
+    ),
+    [
+      overlaySize.height,
+      overlaySize.width,
+      projectionSourceViewport,
+      visibleResult.state.viewport_screen_height,
+      visibleResult.state.viewport_screen_width,
+    ],
+  )
   const calibrationJson = useMemo(
     () => (calibrationViewport ? viewportToCalibrationJson(calibrationViewport, bounds) : null),
     [bounds, calibrationViewport],
@@ -694,8 +767,8 @@ export function MapMaskOverlayScreen() {
     [visibleResult.state],
   )
   const mouseCalibrationInfo = useMemo(
-    () => computeMouseCalibrationInfo(calibrationViewport, mousePosition),
-    [calibrationViewport, mousePosition],
+    () => computeMouseCalibrationInfo(overlayViewport, mousePosition),
+    [mousePosition, overlayViewport],
   )
   const selectedDraftPoint = useMemo(
     () => localPointDrafts.find((point) => point.id === selectedPoint?.point.id) ?? null,
@@ -703,17 +776,17 @@ export function MapMaskOverlayScreen() {
   )
   const backendRenderedPoints = useMemo(() => {
     if (!samplePointsVisible) return []
-    return remapVisiblePoints(visibleResult.points, activeViewport, calibrationViewport)
-  }, [activeViewport, calibrationViewport, samplePointsVisible, visibleResult.points])
+    return remapVisiblePoints(visibleResult.points, activeViewport, overlayViewport)
+  }, [activeViewport, overlayViewport, samplePointsVisible, visibleResult.points])
   const localRenderedPoints = useMemo(() => {
     if (!visibleResult.state.is_bigmap_open) return []
     if (!localPointsVisible) return []
     return localPointDrafts.flatMap((point) => {
       if (selectedSet.size > 0 && !selectedSet.has(point.label_id)) return []
-      const visible = visibleFromLocalPoint(point, calibrationViewport)
+      const visible = visibleFromLocalPoint(point, overlayViewport)
       return visible ? [visible] : []
     })
-  }, [calibrationViewport, localPointDrafts, localPointsVisible, selectedSet, visibleResult.state.is_bigmap_open])
+  }, [localPointDrafts, localPointsVisible, overlayViewport, selectedSet, visibleResult.state.is_bigmap_open])
   const renderedPoints = useMemo(
     () => [...backendRenderedPoints, ...localRenderedPoints],
     [backendRenderedPoints, localRenderedPoints],
@@ -812,19 +885,19 @@ export function MapMaskOverlayScreen() {
       const inCalibrationPanel = isInside(calibrationPanelRef.current, event.clientX, event.clientY)
       const inPopup = isInside(popupRef.current, event.clientX, event.clientY)
       uiHoverRef.current = inToolbar || inCalibrationPanel || inPopup
-      const info = computeMouseCalibrationInfo(calibrationViewport, nextMousePosition)
-      const insideMap = Boolean(!uiHoverRef.current && calibrationViewport && info?.insideArea)
+      const info = computeMouseCalibrationInfo(overlayViewport, nextMousePosition)
+      const insideMap = Boolean(!uiHoverRef.current && overlayViewport && info?.insideArea)
       mapPointerInsideRef.current = insideMap
       ctrlMapAddArmedRef.current = Boolean(insideMap && event.ctrlKey)
       setMapPointerInside(insideMap)
-      if (insideMap && calibrationViewport && info) {
-        setLastMapHoverCoordinate(toLastMapHoverCoordinate(calibrationViewport, info))
+      if (insideMap && overlayViewport && info) {
+        setLastMapHoverCoordinate(toLastMapHoverCoordinate(overlayViewport, info))
       }
       updatePointerMode()
     }
     window.addEventListener('mousemove', handleMouseMove)
     return () => window.removeEventListener('mousemove', handleMouseMove)
-  }, [calibrationViewport, updatePointerMode])
+  }, [overlayViewport, updatePointerMode])
 
   useEffect(() => {
     try {
@@ -973,7 +1046,7 @@ export function MapMaskOverlayScreen() {
         label_ids: nextSelected,
       }).catch(() => {})
     }
-    const visiblePoint = visibleFromLocalPoint(point, calibrationViewport)
+    const visiblePoint = visibleFromLocalPoint(point, overlayViewport)
     if (visiblePoint) {
       setSelectedPoint({
         point: visiblePoint,
@@ -984,7 +1057,7 @@ export function MapMaskOverlayScreen() {
     }
     setCopyMessage(`added ${point.name}`)
   }, [
-    calibrationViewport,
+    overlayViewport,
     labelById,
     labels,
     localPointDrafts.length,
@@ -1020,7 +1093,7 @@ export function MapMaskOverlayScreen() {
       const inPopup = isInside(popupRef.current, event.clientX, event.clientY)
       if (inToolbar || inCalibrationPanel || inPopup) return
 
-      const coordinate = coordinateFromScreenPosition(calibrationViewport, event.clientX, event.clientY)
+      const coordinate = coordinateFromScreenPosition(overlayViewport, event.clientX, event.clientY)
       if (!coordinate) {
         if (placementModeRef.current) setCopyMessage('请把鼠标移到地图区域')
         return
@@ -1038,7 +1111,7 @@ export function MapMaskOverlayScreen() {
 
     window.addEventListener('mousedown', handleMouseDown, true)
     return () => window.removeEventListener('mousedown', handleMouseDown, true)
-  }, [addLocalPointAtCoordinate, calibrationViewport, setPlacementModeEnabled])
+  }, [addLocalPointAtCoordinate, overlayViewport, setPlacementModeEnabled])
 
   useEffect(() => {
     const handleKeyDown = (event: KeyboardEvent) => {
@@ -1382,7 +1455,7 @@ export function MapMaskOverlayScreen() {
       <MapMaskCanvas
         points={renderedPoints}
         labels={labels}
-        viewport={calibrationViewport}
+        viewport={overlayViewport}
         enabled={enabled}
         selectedPointId={selectedPoint?.point.id ?? null}
         onPointHover={handlePointHover}
@@ -1791,8 +1864,8 @@ export function MapMaskOverlayScreen() {
           <p className="truncate">
             calibration fallback: {visibleResult.state.viewport_fallback_used ? 'yes' : 'no'}
           </p>
-          <p className="truncate">map area: {formatViewportRect(calibrationViewport)}</p>
-          <p className="truncate">map image: {formatImageRect(calibrationViewport)}</p>
+          <p className="truncate">map area (overlay): {formatViewportRect(overlayViewport)}</p>
+          <p className="truncate">map image: {formatImageRect(overlayViewport)}</p>
           <p className="truncate">
             nearest point: {visibleResult.state.nearest_loaded_point_name || 'none'} / image{' '}
             {formatCoord(visibleResult.state.nearest_loaded_point_image_x)},
@@ -1806,7 +1879,7 @@ export function MapMaskOverlayScreen() {
             {formatCoord(visibleResult.state.nearest_loaded_point_delta_screen_y)}
           </p>
           <p className="truncate">
-            zoom: {formatScale(calibrationViewport?.scale)} / map: {calibrationViewport?.map_name ?? 'n/a'}
+            zoom: {formatScale(overlayViewport?.scale)} / map: {overlayViewport?.map_name ?? 'n/a'}
           </p>
           <p className="truncate">
             backend points: {samplePointsVisible ? 'shown' : 'hidden'} / backend rendered:{' '}
@@ -1908,7 +1981,7 @@ export function MapMaskOverlayScreen() {
       {calibrationVisible ? <CalibrationOverlay /> : null}
       {viewportDebugVisible ? (
         <ViewportCalibrationOverlay
-          viewport={calibrationViewport}
+          viewport={overlayViewport}
           mousePosition={mousePosition}
           mouseInfo={mouseCalibrationInfo}
         />
@@ -1916,7 +1989,7 @@ export function MapMaskOverlayScreen() {
 
       {placementMode ? (
         <PlacementModeOverlay
-          viewport={calibrationViewport}
+          viewport={overlayViewport}
           coordinate={mapPointerInside ? lastMapHoverCoordinate : null}
           continuous={continuousPlacement}
         />
