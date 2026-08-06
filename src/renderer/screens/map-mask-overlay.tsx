@@ -693,6 +693,15 @@ export function MapMaskOverlayScreen() {
   const continuousPlacementRef = useRef(false)
   const mapPointerInsideRef = useRef(false)
   const ctrlMapAddArmedRef = useRef(false)
+  const visiblePollSequenceRef = useRef(0)
+  const visiblePollLastStartedRef = useRef<number | null>(null)
+  const visiblePollLastCommittedRef = useRef(0)
+  const visiblePollTimingRef = useRef<{
+    sequence: number
+    startedAt: number
+    responseAt: number
+    rpcMs: number
+  } | null>(null)
 
   const [labels, setLabels] = useState<MapMaskLabel[]>([])
   const [selectedLabelIds, setSelectedLabelIds] = useState<string[]>([])
@@ -825,11 +834,49 @@ export function MapMaskOverlayScreen() {
   }, [])
 
   const refreshVisiblePoints = useCallback(async () => {
+    const sequence = ++visiblePollSequenceRef.current
+    const startedAt = performance.now()
+    const previousStartedAt = visiblePollLastStartedRef.current
+    visiblePollLastStartedRef.current = startedAt
     const result = await window.App.rpc.request(
       'map_mask.get_visible_points',
     ) as MapMaskVisiblePointsResponse
+    const responseAt = performance.now()
+    const rpcMs = responseAt - startedAt
+    const backendUpdatedAt = Date.parse(result.state.last_viewport_update_time)
+    const backendResultAgeMs = Number.isFinite(backendUpdatedAt)
+      ? Date.now() - backendUpdatedAt
+      : null
+    console.info(
+      '[map-mask-latency] phase=rpc-response'
+      + ` seq=${sequence}`
+      + ` poll_gap_ms=${previousStartedAt === null ? 'initial' : (startedAt - previousStartedAt).toFixed(2)}`
+      + ` rpc_ms=${rpcMs.toFixed(2)}`
+      + ` backend_result_age_ms=${backendResultAgeMs === null ? 'n/a' : backendResultAgeMs}`
+      + ` motion_diff=${result.state.motion_diff ?? 'n/a'}`
+      + ` blocked=${result.state.motion_unstable}`
+      + ` stable_count=${result.state.motion_stable_count}`
+      + ` center=${result.state.viewport_center_x},${result.state.viewport_center_y}`
+      + ` reason=${result.state.center_accept_reason || result.state.center_rejected_reason}`,
+    )
+    visiblePollTimingRef.current = { sequence, startedAt, responseAt, rpcMs }
     setVisibleResult(result)
   }, [])
+
+  useEffect(() => {
+    const timing = visiblePollTimingRef.current
+    if (!timing || timing.sequence === visiblePollLastCommittedRef.current) return
+    visiblePollLastCommittedRef.current = timing.sequence
+    const committedCenter = (
+      `${visibleResult.state.viewport_center_x},${visibleResult.state.viewport_center_y}`
+    )
+    console.info(
+      `[map-mask-latency] phase=react-commit seq=${timing.sequence}`
+      + ` response_to_commit_ms=${(performance.now() - timing.responseAt).toFixed(2)}`
+      + ` request_to_commit_ms=${(performance.now() - timing.startedAt).toFixed(2)}`
+      + ` center=${committedCenter}`,
+    )
+  }, [visibleResult])
 
   const refreshAll = useCallback(async () => {
     setRefreshing(true)
@@ -844,6 +891,13 @@ export function MapMaskOverlayScreen() {
   }, [refreshBounds, refreshLabels, refreshVisiblePoints])
 
   useEffect(() => {
+    let disposed = false
+    let starting = false
+    let visiblePollInFlight = false
+    let boundsPollInFlight = false
+    let visibleTimer: number | null = null
+    let boundsTimer: number | null = null
+
     document.documentElement.classList.add('overlay-window')
     document.body.classList.add('overlay-window')
     setPointerPassthrough(true)
@@ -851,17 +905,70 @@ export function MapMaskOverlayScreen() {
       setCalibrationVisible(options.calibrationOverlayEnabled)
       setViewportDebugVisible(options.viewportDebugEnabled)
     })
-    void refreshAll()
 
-    const timer = window.setInterval(() => {
-      void refreshVisiblePoints().catch((err) => {
+    const pollVisiblePoints = async () => {
+      if (visiblePollInFlight) return
+      visiblePollInFlight = true
+      try {
+        await refreshVisiblePoints()
+      } catch (err) {
         setError(err instanceof Error ? err.message : String(err))
-      })
-      void refreshBounds().catch(() => {})
-    }, 800)
+      } finally {
+        visiblePollInFlight = false
+      }
+    }
+
+    const pollBounds = async () => {
+      if (boundsPollInFlight) return
+      boundsPollInFlight = true
+      try {
+        await refreshBounds()
+      } catch {
+        // The game window may disappear temporarily while minimized.
+      } finally {
+        boundsPollInFlight = false
+      }
+    }
+
+    const stopPolling = () => {
+      if (visibleTimer !== null) window.clearInterval(visibleTimer)
+      if (boundsTimer !== null) window.clearInterval(boundsTimer)
+      visibleTimer = null
+      boundsTimer = null
+    }
+
+    const startPolling = async () => {
+      if (starting || visibleTimer !== null || disposed) return
+      starting = true
+      try {
+        await refreshAll()
+        if (disposed || document.visibilityState !== 'visible') {
+          return
+        }
+        visibleTimer = window.setInterval(() => void pollVisiblePoints(), 50)
+        boundsTimer = window.setInterval(() => void pollBounds(), 800)
+      } catch (err) {
+        setError(err instanceof Error ? err.message : String(err))
+      } finally {
+        starting = false
+      }
+    }
+
+    const handleVisibilityChange = () => {
+      if (document.visibilityState === 'visible') {
+        void startPolling()
+      } else {
+        stopPolling()
+      }
+    }
+
+    document.addEventListener('visibilitychange', handleVisibilityChange)
+    handleVisibilityChange()
 
     return () => {
-      window.clearInterval(timer)
+      disposed = true
+      document.removeEventListener('visibilitychange', handleVisibilityChange)
+      stopPolling()
       document.documentElement.classList.remove('overlay-window')
       document.body.classList.remove('overlay-window')
       setPointerPassthrough(false)
