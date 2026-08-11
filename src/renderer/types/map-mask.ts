@@ -213,6 +213,13 @@ export type MapMaskUserStatus = {
   auth_error: string
   openid_masked: string
   hide_awarded: boolean
+  refreshing: boolean
+  refresh_error: string
+  refresh_failure_count: number
+  refresh_reason: string
+  last_refresh_at: string
+  last_refresh_reason: string
+  next_refresh_in_seconds: number
   awarded_star_count: number
   awarded_dewdrop_count: number
   awarded_box_count: number

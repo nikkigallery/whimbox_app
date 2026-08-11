@@ -19,6 +19,7 @@ export function MapMaskPage() {
   const [loading, setLoading] = useState(false)
   const [userStatus, setUserStatus] = useState<MapMaskUserStatus | null>(null)
   const [loginBusy, setLoginBusy] = useState(false)
+  const [refreshBusy, setRefreshBusy] = useState(false)
 
   const refresh = useCallback(async () => {
     setLoading(true)
@@ -43,6 +44,17 @@ export function MapMaskPage() {
   useEffect(() => {
     void refresh()
   }, [refresh])
+
+  useEffect(() => {
+    const timer = window.setInterval(() => {
+      void (window.App.rpc.request(
+        'map_mask.get_user_status',
+      ) as Promise<MapMaskUserStatus>)
+        .then(setUserStatus)
+        .catch(() => undefined)
+    }, 1000)
+    return () => window.clearInterval(timer)
+  }, [])
 
   const handleOpen = async () => {
     try {
@@ -81,6 +93,32 @@ export function MapMaskPage() {
     } finally {
       setLoginBusy(false)
       await refresh()
+    }
+  }
+
+  const handleUserRefresh = async () => {
+    setRefreshBusy(true)
+    try {
+      let next = await window.App.rpc.request(
+        'map_mask.refresh_pearpal_user_state',
+      ) as MapMaskUserStatus
+      setUserStatus(next)
+      while (next.refreshing) {
+        await new Promise((resolve) => setTimeout(resolve, 250))
+        next = await window.App.rpc.request(
+          'map_mask.get_user_status',
+        ) as MapMaskUserStatus
+        setUserStatus(next)
+      }
+      if (next.refresh_error) {
+        toast.error(next.refresh_error)
+      } else {
+        toast.success('PearPal user state refreshed')
+      }
+    } catch (error) {
+      toast.error(error instanceof Error ? error.message : 'PearPal refresh failed')
+    } finally {
+      setRefreshBusy(false)
     }
   }
 
@@ -218,24 +256,34 @@ export function MapMaskPage() {
               </div>
               <div className="flex flex-wrap items-center justify-end gap-2">
                 <Button
-                  type="button"
+                  disabled={loginBusy || refreshBusy || userStatus?.refreshing}
+                  onClick={() => void (
+                    userStatus?.authenticated ? handleUserRefresh() : handleLogin()
+                  )}
                   size="sm"
-                  onClick={() => void handleLogin()}
-                  disabled={loginBusy}
+                  type="button"
                 >
-                  <LogIn className="size-4" />
+                  {userStatus?.authenticated ? (
+                    <RefreshCw
+                      className={refreshBusy || userStatus.refreshing ? 'size-4 animate-spin' : 'size-4'}
+                    />
+                  ) : (
+                    <LogIn className="size-4" />
+                  )}
                   {loginBusy
                     ? 'Waiting for login...'
-                    : userStatus?.authenticated
-                      ? 'Refresh user state'
-                      : 'Login'}
+                    : refreshBusy || userStatus?.refreshing
+                      ? 'Refreshing...'
+                      : userStatus?.authenticated
+                        ? 'Refresh user state'
+                        : 'Login'}
                 </Button>
                 <Button
                   type="button"
                   size="sm"
                   variant="outline"
                   onClick={() => void handleToggleAwarded()}
-                  disabled={!userStatus?.authenticated || loginBusy}
+                  disabled={!userStatus?.authenticated || loginBusy || refreshBusy}
                 >
                   Hide collected: {userStatus?.hide_awarded ? 'on' : 'off'}
                 </Button>
@@ -245,7 +293,7 @@ export function MapMaskPage() {
                     size="sm"
                     variant="outline"
                     onClick={() => void handleDisconnect()}
-                    disabled={loginBusy}
+                    disabled={loginBusy || refreshBusy}
                   >
                     <LogOut className="size-4" />
                     Disconnect
@@ -256,6 +304,34 @@ export function MapMaskPage() {
             <dl className="grid gap-2 text-xs text-slate-500 sm:grid-cols-2 dark:text-slate-400">
               <Row label="status" value={userStatus?.auth_state ?? 'pending'} />
               <Row label="account" value={userStatus?.openid_masked || 'anonymous'} />
+              <Row
+                label="refresh"
+                value={
+                  userStatus?.refreshing
+                    ? `refreshing (${userStatus.refresh_reason || 'scheduled'})`
+                    : 'idle'
+                }
+              />
+              <Row
+                label="last refreshed"
+                value={
+                  userStatus?.last_refresh_at
+                    ? `${userStatus.last_refresh_at} (${userStatus.last_refresh_reason || 'unknown'})`
+                    : 'never'
+                }
+              />
+              <Row
+                label="next retry"
+                value={
+                  userStatus && userStatus.refresh_failure_count > 0
+                    ? `${userStatus.next_refresh_in_seconds}s`
+                    : 'none'
+                }
+              />
+              <Row
+                label="refresh error"
+                value={userStatus?.refresh_error || 'none'}
+              />
               <Row
                 label="stars collected"
                 value={String(userStatus?.awarded_star_count ?? 0)}
