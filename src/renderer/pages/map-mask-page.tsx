@@ -1,359 +1,328 @@
-import { useCallback, useEffect, useState } from 'react'
-import { LogIn, LogOut, MapPinned, PlayCircle, RefreshCw, Square, UserRound } from 'lucide-react'
+import { useCallback, useEffect, useState, type ReactNode } from 'react'
+import {
+  Box,
+  Droplets,
+  MapPinned,
+  RefreshCw,
+  Sparkles,
+  Star,
+} from 'lucide-react'
 import { toast } from 'sonner'
 
 import { ScrollCenterLayout } from 'renderer/components/scroll-center-layout'
 import { SettingsPageLayout } from 'renderer/components/settings-page-layout'
 import { Button } from 'renderer/components/ui/button'
+import { Checkbox } from 'renderer/components/ui/checkbox'
 import type {
-  GameWindowBounds,
   MapMaskLabelsResponse,
-  MapMaskState,
   MapMaskUserStatus,
 } from 'renderer/types/map-mask'
 
-export function MapMaskPage() {
-  const [state, setState] = useState<MapMaskState | null>(null)
-  const [labelCount, setLabelCount] = useState(0)
-  const [bounds, setBounds] = useState<GameWindowBounds | null>(null)
-  const [loading, setLoading] = useState(false)
-  const [userStatus, setUserStatus] = useState<MapMaskUserStatus | null>(null)
-  const [loginBusy, setLoginBusy] = useState(false)
-  const [refreshBusy, setRefreshBusy] = useState(false)
+type SetSelectedLabelsResponse = string[] | MapMaskLabelsResponse
 
-  const refresh = useCallback(async () => {
-    setLoading(true)
+const filters = [
+  {
+    id: 'pearpal_box',
+    name: '宝箱',
+    description: '显示尚未收集的宝箱',
+    icon: Box,
+    iconClassName:
+      'bg-amber-100 text-amber-600 dark:bg-amber-500/15 dark:text-amber-300',
+  },
+  {
+    id: 'pearpal_star',
+    name: '奇想星',
+    description: '显示尚未收集的奇想星',
+    icon: Star,
+    iconClassName:
+      'bg-pink-100 text-pink-600 dark:bg-pink-500/15 dark:text-pink-300',
+  },
+  {
+    id: 'pearpal_dewdrop',
+    name: '灵感露珠',
+    description: '显示尚未收集的灵感露珠',
+    icon: Droplets,
+    iconClassName:
+      'bg-cyan-100 text-cyan-600 dark:bg-cyan-500/15 dark:text-cyan-300',
+  },
+] as const
+const supportedLabelIds = new Set(filters.map(filter => filter.id))
+
+const delay = (milliseconds: number) =>
+  new Promise(resolve => {
+    window.setTimeout(resolve, milliseconds)
+  })
+
+export function MapMaskPage() {
+  const [selectedLabelIds, setSelectedLabelIds] = useState<string[]>([])
+  const [settingsLoading, setSettingsLoading] = useState(true)
+  const [opening, setOpening] = useState(false)
+  const [refreshing, setRefreshing] = useState(false)
+  const [updatingFilter, setUpdatingFilter] = useState(false)
+
+  const loadFilters = useCallback(async () => {
     try {
-      const [nextState, labels, nextBounds, nextUserStatus] = await Promise.all([
-        window.App.rpc.request('map_mask.get_state') as Promise<MapMaskState>,
-        window.App.rpc.request('map_mask.get_labels') as Promise<MapMaskLabelsResponse>,
-        window.App.mapMaskOverlay?.getBounds(),
-        window.App.rpc.request('map_mask.get_user_status') as Promise<MapMaskUserStatus>,
-      ])
-      setState(nextState)
-      setLabelCount(labels.labels.length)
-      setBounds(nextBounds ?? null)
-      setUserStatus(nextUserStatus)
+      const response = (await window.App.rpc.request(
+        'map_mask.get_labels'
+      )) as MapMaskLabelsResponse
+      const selected = response.selected_label_ids.filter(labelId =>
+        supportedLabelIds.has(labelId as (typeof filters)[number]['id'])
+      )
+      setSelectedLabelIds(selected)
+      if (selected.length !== response.selected_label_ids.length) {
+        await window.App.rpc.request('map_mask.set_selected_labels', {
+          label_ids: selected,
+        })
+      }
     } catch (error) {
-      toast.error(error instanceof Error ? error.message : 'Map mask RPC failed')
+      toast.error(
+        error instanceof Error ? error.message : '读取点位筛选设置失败'
+      )
     } finally {
-      setLoading(false)
+      setSettingsLoading(false)
     }
   }, [])
 
   useEffect(() => {
-    void refresh()
-  }, [refresh])
+    void loadFilters()
+  }, [loadFilters])
 
-  useEffect(() => {
-    const timer = window.setInterval(() => {
-      void (window.App.rpc.request(
-        'map_mask.get_user_status',
-      ) as Promise<MapMaskUserStatus>)
-        .then(setUserStatus)
-        .catch(() => undefined)
-    }, 1000)
-    return () => window.clearInterval(timer)
+  const waitForLogin = useCallback(async () => {
+    let status = (await window.App.rpc.request(
+      'map_mask.start_pearpal_login'
+    )) as MapMaskUserStatus
+
+    for (let attempt = 0; attempt < 240; attempt += 1) {
+      if (
+        status.auth_state !== 'opening-login' &&
+        status.auth_state !== 'loading-user-state'
+      ) {
+        break
+      }
+      await delay(500)
+      status = (await window.App.rpc.request(
+        'map_mask.get_user_status'
+      )) as MapMaskUserStatus
+    }
+
+    if (status.auth_state !== 'authenticated' || !status.authenticated) {
+      throw new Error(
+        status.auth_error || '登录未完成，请重新打开地图遮罩后再试'
+      )
+    }
+    return status
   }, [])
+
+  const refreshUserState = useCallback(async () => {
+    let status = (await window.App.rpc.request(
+      'map_mask.refresh_pearpal_user_state'
+    )) as MapMaskUserStatus
+
+    for (let attempt = 0; status.refreshing && attempt < 120; attempt += 1) {
+      await delay(250)
+      status = (await window.App.rpc.request(
+        'map_mask.get_user_status'
+      )) as MapMaskUserStatus
+    }
+
+    if (status.refreshing) {
+      throw new Error('刷新收集进度超时，请稍后重试')
+    }
+    if (status.refresh_error) {
+      throw new Error(status.refresh_error)
+    }
+    return status
+  }, [])
+
+  const ensureUserSession = useCallback(async () => {
+    const status = (await window.App.rpc.request(
+      'map_mask.get_user_status'
+    )) as MapMaskUserStatus
+
+    if (status.authenticated) {
+      try {
+        return await refreshUserState()
+      } catch {
+        // An expired session is repaired by opening the website login window below.
+      }
+    }
+    return waitForLogin()
+  }, [refreshUserState, waitForLogin])
 
   const handleOpen = async () => {
+    if (settingsLoading || opening || refreshing || updatingFilter) return
+    setOpening(true)
     try {
+      await ensureUserSession()
+      await window.App.rpc.request('map_mask.set_hide_awarded', {
+        hide_awarded: true,
+      })
       await window.App.mapMaskOverlay?.show()
-      await refresh()
+      toast.success('地图遮罩已打开，请回到游戏并打开大地图')
     } catch (error) {
-      toast.error(error instanceof Error ? error.message : 'Open map mask failed')
-    }
-  }
-
-  const handleClose = async () => {
-    await window.App.mapMaskOverlay?.hide()
-  }
-
-  const handleLogin = async () => {
-    setLoginBusy(true)
-    try {
-      let next = await window.App.rpc.request(
-        'map_mask.start_pearpal_login',
-      ) as MapMaskUserStatus
-      setUserStatus(next)
-      while (next.auth_state === 'opening-login' || next.auth_state === 'loading-user-state') {
-        await new Promise((resolve) => setTimeout(resolve, 500))
-        next = await window.App.rpc.request(
-          'map_mask.get_user_status',
-        ) as MapMaskUserStatus
-        setUserStatus(next)
-      }
-      if (next.authenticated) {
-        toast.success('PearPal user state loaded')
-      } else if (next.auth_state === 'error') {
-        toast.error(next.auth_error || 'PearPal login failed')
-      }
-    } catch (error) {
-      toast.error(error instanceof Error ? error.message : 'PearPal login failed')
+      toast.error(error instanceof Error ? error.message : '打开地图遮罩失败')
     } finally {
-      setLoginBusy(false)
-      await refresh()
+      setOpening(false)
     }
   }
 
-  const handleUserRefresh = async () => {
-    setRefreshBusy(true)
+  const handleRefresh = async () => {
+    if (settingsLoading || opening || refreshing || updatingFilter) return
+    setRefreshing(true)
     try {
-      let next = await window.App.rpc.request(
-        'map_mask.refresh_pearpal_user_state',
-      ) as MapMaskUserStatus
-      setUserStatus(next)
-      while (next.refreshing) {
-        await new Promise((resolve) => setTimeout(resolve, 250))
-        next = await window.App.rpc.request(
-          'map_mask.get_user_status',
-        ) as MapMaskUserStatus
-        setUserStatus(next)
-      }
-      if (next.refresh_error) {
-        toast.error(next.refresh_error)
-      } else {
-        toast.success('PearPal user state refreshed')
-      }
+      await ensureUserSession()
+      toast.success('收集进度已刷新')
     } catch (error) {
-      toast.error(error instanceof Error ? error.message : 'PearPal refresh failed')
+      toast.error(error instanceof Error ? error.message : '刷新收集进度失败')
     } finally {
-      setRefreshBusy(false)
+      setRefreshing(false)
     }
   }
 
-  const handleDisconnect = async () => {
+  const handleFilterChange = async (labelId: string, checked: boolean) => {
+    if (settingsLoading || opening || refreshing || updatingFilter) return
+    const previous = selectedLabelIds
+    const next = checked
+      ? Array.from(new Set([...selectedLabelIds, labelId]))
+      : selectedLabelIds.filter(id => id !== labelId)
+    setSelectedLabelIds(next)
+    setUpdatingFilter(true)
     try {
-      const next = await window.App.rpc.request(
-        'map_mask.disconnect_pearpal_user',
-      ) as MapMaskUserStatus
-      setUserStatus(next)
+      const saved = (await window.App.rpc.request(
+        'map_mask.set_selected_labels',
+        {
+          label_ids: next,
+        }
+      )) as SetSelectedLabelsResponse
+      setSelectedLabelIds(
+        Array.isArray(saved) ? saved : saved.selected_label_ids
+      )
     } catch (error) {
-      toast.error(error instanceof Error ? error.message : 'Disconnect failed')
+      setSelectedLabelIds(previous)
+      toast.error(error instanceof Error ? error.message : '更新点位筛选失败')
+    } finally {
+      setUpdatingFilter(false)
     }
   }
 
-  const handleToggleAwarded = async () => {
-    try {
-      const next = await window.App.rpc.request(
-        'map_mask.set_hide_awarded',
-        { hide_awarded: !userStatus?.hide_awarded },
-      ) as MapMaskUserStatus
-      setUserStatus(next)
-    } catch (error) {
-      toast.error(error instanceof Error ? error.message : 'Update filter failed')
-    }
-  }
+  const actionBusy = settingsLoading || opening || refreshing || updatingFilter
 
   return (
     <ScrollCenterLayout
-      scrollOuter={false}
-      innerClassName="flex flex-1 flex-col min-h-0 gap-4 px-10 py-8"
+      innerClassName="flex min-h-0 flex-1 flex-col gap-6 px-6 py-8 lg:px-10"
+      scrollOuter
     >
       <SettingsPageLayout
-        className="flex-1 min-h-0"
-        title="Map Mask"
-        description="Sample-data overlay for the local map mask MVP."
-        actions={
-          <div className="flex items-center gap-2">
-            <Button
-              type="button"
-              onClick={handleOpen}
-              disabled={loading}
-              className="rounded-xl bg-pink-400 text-white shadow-sm hover:bg-pink-500 dark:bg-pink-500 dark:hover:bg-pink-400"
-            >
-              <PlayCircle className="size-4" />
-              Open overlay
-            </Button>
-            <Button
-              type="button"
-              variant="outline"
-              onClick={handleClose}
-              disabled={loading}
-              className="rounded-xl border-slate-200 bg-white text-slate-700 hover:bg-slate-50 dark:border-slate-700 dark:bg-slate-900 dark:text-slate-100 dark:hover:bg-slate-800"
-            >
-              <Square className="size-4" />
-              Hide overlay
-            </Button>
-          </div>
-        }
+        className="mx-auto w-full max-w-5xl"
+        description="在游戏大地图上显示尚未收集的探索点位。"
+        title="地图遮罩"
       >
-        <div className="grid gap-4 md:grid-cols-2">
-          <section className="rounded-lg border border-slate-200 bg-white p-4 text-sm shadow-sm dark:border-slate-800 dark:bg-slate-900">
-            <div className="mb-3 flex items-center justify-between gap-3">
-              <div className="flex items-center gap-2 font-semibold text-slate-800 dark:text-slate-100">
-                <MapPinned className="size-4 text-pink-400" />
-                Backend state
+        <div className="grid gap-6">
+          <section className="overflow-hidden rounded-3xl border border-pink-100 bg-gradient-to-br from-pink-50 via-white to-cyan-50 p-6 shadow-sm dark:border-pink-900/40 dark:from-pink-950/30 dark:via-slate-950 dark:to-cyan-950/30 sm:p-8">
+            <div className="flex flex-col gap-6 lg:flex-row lg:items-center lg:justify-between">
+              <div className="max-w-2xl">
+                <div className="mb-4 flex size-12 items-center justify-center rounded-2xl bg-pink-400 text-white shadow-lg shadow-pink-200/60 dark:shadow-pink-950/50">
+                  <MapPinned className="size-6" />
+                </div>
+                <h2 className="text-xl font-semibold text-slate-900 dark:text-slate-50">
+                  打开地图，即刻查看附近收集物
+                </h2>
+                <p className="mt-2 text-sm leading-6 text-slate-600 dark:text-slate-300">
+                  首次使用或登录失效时会自动打开网页登录窗口。完成登录后，遮罩会继续打开，无需手动复制账号信息。
+                </p>
               </div>
-              <Button
-                type="button"
-                variant="ghost"
-                size="icon-sm"
-                onClick={() => void refresh()}
-                disabled={loading}
-              >
-                <RefreshCw className={loading ? 'size-4 animate-spin' : 'size-4'} />
-              </Button>
+              <div className="flex shrink-0 flex-col gap-3 sm:flex-row lg:flex-col xl:flex-row">
+                <Button
+                  className="h-11 rounded-xl bg-pink-400 px-5 text-white shadow-sm hover:bg-pink-500 dark:bg-pink-500 dark:hover:bg-pink-400"
+                  disabled={actionBusy}
+                  onClick={() => void handleOpen()}
+                  type="button"
+                >
+                  {opening ? (
+                    <RefreshCw className="size-4 animate-spin" />
+                  ) : (
+                    <MapPinned className="size-4" />
+                  )}
+                  {opening ? '正在准备遮罩…' : '打开地图遮罩'}
+                </Button>
+                <Button
+                  className="h-11 rounded-xl"
+                  disabled={actionBusy}
+                  onClick={() => void handleRefresh()}
+                  type="button"
+                  variant="outline"
+                >
+                  <RefreshCw
+                    className={refreshing ? 'size-4 animate-spin' : 'size-4'}
+                  />
+                  {refreshing ? '正在刷新…' : '刷新收集物'}
+                </Button>
+              </div>
             </div>
-            <dl className="space-y-2 text-xs text-slate-500 dark:text-slate-400">
-              <Row label="enabled" value={state ? String(state.enabled) : 'pending'} />
-              <Row label="bigmap" value={state ? String(state.is_bigmap_open) : 'pending'} />
-              <Row label="provider" value={state?.provider ?? 'pending'} />
-              <Row label="selected" value={String(state?.selected_label_ids.length ?? 0)} />
-              <Row label="labels" value={String(labelCount)} />
-              <Row
-                label="viewport"
-                value={state?.has_valid_viewport ? state.viewport?.map_name ?? 'valid' : 'invalid'}
-              />
-              <Row label="viewport mode" value={state?.viewport_mode ?? 'pending'} />
-              <Row label="viewport source" value={state?.viewport_source ?? 'pending'} />
-              <Row label="viewport fallback" value={state ? String(state.viewport_fallback_used) : 'pending'} />
-              <Row label="viewport error" value={state?.viewport_calibration_error || 'none'} />
-              <Row label="detection" value={state?.detection_source ?? 'pending'} />
-              <Row
-                label="raw/stable"
-                value={
-                  state
-                    ? `${String(state.raw_is_bigmap_open)} / ${String(state.stable_is_bigmap_open)}`
-                    : 'pending'
-                }
-              />
-              <Row
-                label="counts"
-                value={
-                  state
-                    ? `${state.consecutive_open_count}/${state.consecutive_closed_count}`
-                    : 'pending'
-                }
-              />
-              <Row label="detect error" value={state?.detection_error || 'none'} />
-            </dl>
           </section>
 
-          <section className="rounded-lg border border-slate-200 bg-white p-4 text-sm shadow-sm dark:border-slate-800 dark:bg-slate-900">
-            <div className="mb-3 flex items-center gap-2 font-semibold text-slate-800 dark:text-slate-100">
-              <MapPinned className="size-4 text-cyan-500" />
-              Window tracker
+          <section className="rounded-3xl border border-slate-200 bg-white p-6 shadow-sm dark:border-slate-800 dark:bg-slate-950">
+            <div className="mb-5">
+              <h2 className="font-semibold text-slate-900 dark:text-slate-50">
+                显示点位
+              </h2>
+              <p className="mt-1 text-sm text-slate-500 dark:text-slate-400">
+                选择需要显示在游戏大地图上的收集物类型。
+              </p>
             </div>
-            <dl className="space-y-2 text-xs text-slate-500 dark:text-slate-400">
-              <Row label="source" value={bounds?.source ?? 'pending'} />
-              <Row label="found" value={bounds ? String(bounds.isGameWindowFound) : 'pending'} />
-              <Row
-                label="bounds"
-                value={
-                  bounds
-                    ? `${bounds.width}x${bounds.height} at ${bounds.x},${bounds.y}`
-                    : 'pending'
-                }
-              />
-            </dl>
-          </section>
-          <section className="rounded-lg border border-slate-200 bg-white p-4 text-sm shadow-sm md:col-span-2 dark:border-slate-800 dark:bg-slate-900">
-            <div className="mb-3 flex items-center justify-between gap-3">
-              <div className="flex items-center gap-2 font-semibold text-slate-800 dark:text-slate-100">
-                <UserRound className="size-4 text-violet-500" />
-                PearPal user
-              </div>
-              <div className="flex flex-wrap items-center justify-end gap-2">
-                <Button
-                  disabled={loginBusy || refreshBusy || userStatus?.refreshing}
-                  onClick={() => void (
-                    userStatus?.authenticated ? handleUserRefresh() : handleLogin()
-                  )}
-                  size="sm"
-                  type="button"
-                >
-                  {userStatus?.authenticated ? (
-                    <RefreshCw
-                      className={refreshBusy || userStatus.refreshing ? 'size-4 animate-spin' : 'size-4'}
-                    />
-                  ) : (
-                    <LogIn className="size-4" />
-                  )}
-                  {loginBusy
-                    ? 'Waiting for login...'
-                    : refreshBusy || userStatus?.refreshing
-                      ? 'Refreshing...'
-                      : userStatus?.authenticated
-                        ? 'Refresh user state'
-                        : 'Login'}
-                </Button>
-                <Button
-                  type="button"
-                  size="sm"
-                  variant="outline"
-                  onClick={() => void handleToggleAwarded()}
-                  disabled={!userStatus?.authenticated || loginBusy || refreshBusy}
-                >
-                  Hide collected: {userStatus?.hide_awarded ? 'on' : 'off'}
-                </Button>
-                {userStatus?.authenticated ? (
-                  <Button
-                    type="button"
-                    size="sm"
-                    variant="outline"
-                    onClick={() => void handleDisconnect()}
-                    disabled={loginBusy || refreshBusy}
+            <div className="grid gap-3 md:grid-cols-3">
+              {filters.map(filter => {
+                const Icon = filter.icon
+                const checked = selectedLabelIds.includes(filter.id)
+                return (
+                  <label
+                    className="flex cursor-pointer items-center gap-3 rounded-2xl border border-slate-200 p-4 transition-colors hover:border-pink-200 hover:bg-pink-50/50 has-[[data-state=checked]]:border-pink-200 has-[[data-state=checked]]:bg-pink-50/70 dark:border-slate-800 dark:hover:border-pink-900 dark:hover:bg-pink-950/20 dark:has-[[data-state=checked]]:border-pink-900 dark:has-[[data-state=checked]]:bg-pink-950/25"
+                    htmlFor={`map-mask-filter-${filter.id}`}
+                    key={filter.id}
                   >
-                    <LogOut className="size-4" />
-                    Disconnect
-                  </Button>
-                ) : null}
-              </div>
+                    <span
+                      className={`flex size-10 shrink-0 items-center justify-center rounded-xl ${filter.iconClassName}`}
+                    >
+                      <Icon className="size-5" />
+                    </span>
+                    <span className="min-w-0 flex-1">
+                      <span className="block text-sm font-medium text-slate-800 dark:text-slate-100">
+                        {filter.name}
+                      </span>
+                      <span className="mt-0.5 block text-xs text-slate-500 dark:text-slate-400">
+                        {filter.description}
+                      </span>
+                    </span>
+                    <Checkbox
+                      checked={checked}
+                      disabled={actionBusy}
+                      id={`map-mask-filter-${filter.id}`}
+                      onCheckedChange={value => {
+                        void handleFilterChange(filter.id, value === true)
+                      }}
+                    />
+                  </label>
+                )
+              })}
             </div>
-            <dl className="grid gap-2 text-xs text-slate-500 sm:grid-cols-2 dark:text-slate-400">
-              <Row label="status" value={userStatus?.auth_state ?? 'pending'} />
-              <Row label="account" value={userStatus?.openid_masked || 'anonymous'} />
-              <Row
-                label="refresh"
-                value={
-                  userStatus?.refreshing
-                    ? `refreshing (${userStatus.refresh_reason || 'scheduled'})`
-                    : 'idle'
-                }
-              />
-              <Row
-                label="last refreshed"
-                value={
-                  userStatus?.last_refresh_at
-                    ? `${userStatus.last_refresh_at} (${userStatus.last_refresh_reason || 'unknown'})`
-                    : 'never'
-                }
-              />
-              <Row
-                label="next retry"
-                value={
-                  userStatus && userStatus.refresh_failure_count > 0
-                    ? `${userStatus.next_refresh_in_seconds}s`
-                    : 'none'
-                }
-              />
-              <Row
-                label="refresh error"
-                value={userStatus?.refresh_error || 'none'}
-              />
-              <Row
-                label="stars collected"
-                value={String(userStatus?.awarded_star_count ?? 0)}
-              />
-              <Row
-                label="dewdrops collected"
-                value={String(userStatus?.awarded_dewdrop_count ?? 0)}
-              />
-              <Row
-                label="boxes collected"
-                value={String(userStatus?.awarded_box_count ?? 0)}
-              />
-              <Row
-                label="matched in current data"
-                value={
-                  userStatus
-                    ? `${userStatus.matched_awarded_star_count} stars / ${userStatus.matched_awarded_dewdrop_count} dewdrops / ${userStatus.matched_awarded_box_count} boxes`
-                    : 'pending'
-                }
-              />
-              <Row label="error" value={userStatus?.auth_error || 'none'} />
-            </dl>
+          </section>
+
+          <section className="rounded-3xl border border-slate-200 bg-white p-6 shadow-sm dark:border-slate-800 dark:bg-slate-950">
+            <div className="flex items-center gap-2 text-slate-900 dark:text-slate-50">
+              <Sparkles className="size-5 text-pink-400" />
+              <h2 className="font-semibold">使用方法</h2>
+            </div>
+            <ol className="mt-5 grid gap-4 text-sm text-slate-600 md:grid-cols-3 dark:text-slate-300">
+              <Instruction index="1" title="打开遮罩">
+                点击“打开地图遮罩”。如需登录，请在自动弹出的网页中完成操作。
+              </Instruction>
+              <Instruction index="2" title="进入大地图">
+                回到游戏并打开大地图，未收集点位会自动显示并随地图拖动。
+              </Instruction>
+              <Instruction index="3" title="同步进度">
+                收集后可等待自动同步，或点击“刷新收集物”立即更新显示结果。
+              </Instruction>
+            </ol>
           </section>
         </div>
       </SettingsPageLayout>
@@ -361,11 +330,26 @@ export function MapMaskPage() {
   )
 }
 
-function Row({ label, value }: { label: string; value: string }) {
+function Instruction({
+  index,
+  title,
+  children,
+}: {
+  index: string
+  title: string
+  children: ReactNode
+}) {
   return (
-    <div className="flex items-center justify-between gap-4">
-      <dt className="text-slate-400">{label}</dt>
-      <dd className="min-w-0 truncate text-right text-slate-700 dark:text-slate-200">{value}</dd>
-    </div>
+    <li className="flex gap-3">
+      <span className="flex size-7 shrink-0 items-center justify-center rounded-full bg-slate-100 text-xs font-semibold text-slate-600 dark:bg-slate-800 dark:text-slate-300">
+        {index}
+      </span>
+      <span className="leading-6">
+        <strong className="block font-medium text-slate-800 dark:text-slate-100">
+          {title}
+        </strong>
+        {children}
+      </span>
+    </li>
   )
 }
