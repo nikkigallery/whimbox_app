@@ -288,8 +288,8 @@ const API = {
         message?: string
         overlay?: { x: number; y: number; width: number; height: number } | null
       }>,
-    setIgnoreMouseEvents: (ignore: boolean, options?: { forward?: boolean }) =>
-      ipcRenderer.invoke('map-mask-overlay:set-ignore-mouse-events', ignore, options),
+    setIgnoreMouseEvents: (ignore: boolean) =>
+      ipcRenderer.invoke('map-mask-overlay:set-ignore-mouse-events', ignore),
     getDebugOptions: () =>
       ipcRenderer.invoke('map-mask-overlay:get-debug-options') as Promise<{
         calibrationOverlayEnabled: boolean

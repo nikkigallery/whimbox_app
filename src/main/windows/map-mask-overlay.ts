@@ -113,12 +113,11 @@ export function getMapMaskOverlayWindow() {
 
 export function setMapMaskOverlayIgnoreMouseEvents(
   ignore: boolean,
-  options?: { forward?: boolean },
 ) {
   const win = mapMaskOverlayWindowRef
   if (!win || win.isDestroyed()) return
   mapMaskOverlayIgnoringMouseEvents = ignore
-  win.setIgnoreMouseEvents(ignore, options)
+  win.setIgnoreMouseEvents(ignore)
 }
 
 export function getMapMaskOverlayDebugState() {
@@ -154,7 +153,7 @@ function registerMapMaskOverlayIpc() {
   ipcMain.handle('map-mask-overlay:show', async () => {
     const win = await ensureMapMaskOverlayWindow()
     mapMaskOverlayVisibleRequested = true
-    setMapMaskOverlayIgnoreMouseEvents(true, { forward: true })
+    setMapMaskOverlayIgnoreMouseEvents(true)
     await bringMapMaskOverlayToFront(win)
     startFollowGameWindow()
     return true
@@ -197,8 +196,8 @@ function registerMapMaskOverlayIpc() {
 
   ipcMain.handle(
     'map-mask-overlay:set-ignore-mouse-events',
-    (_event, ignore: boolean, options?: { forward?: boolean }) => {
-      setMapMaskOverlayIgnoreMouseEvents(ignore, options)
+    (_event, ignore: boolean) => {
+      setMapMaskOverlayIgnoreMouseEvents(ignore)
     },
   )
 }
@@ -236,7 +235,7 @@ async function createMapMaskOverlayWindow() {
   hiddenBecauseGameMinimized = false
   allowMapMaskOverlayClose = false
   hiddenBecauseGameUnfocused = false
-  window.setIgnoreMouseEvents(true, { forward: true })
+  window.setIgnoreMouseEvents(true)
   window.setVisibleOnAllWorkspaces(true, { visibleOnFullScreen: true })
 
   window.on('show', () => {

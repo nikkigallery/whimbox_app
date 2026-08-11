@@ -1,8 +1,8 @@
-import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
+import log from 'electron-log/renderer'
+import { useEffect, useMemo, useRef, useState } from 'react'
 
 import type {
   MapMaskLabel,
-  MapMaskViewport,
   VisibleMapMaskPoint,
 } from 'renderer/types/map-mask'
 
@@ -12,25 +12,13 @@ type CanvasPoint = {
   y: number
 }
 
-type CanvasPointerEvent =
-  | React.PointerEvent<HTMLCanvasElement>
-  | React.MouseEvent<HTMLCanvasElement>
-
 type MapMaskCanvasProps = {
   points: VisibleMapMaskPoint[]
   labels: MapMaskLabel[]
-  viewport: MapMaskViewport | null
   enabled: boolean
-  selectedPointId: string | null
-  onPointHover: (
-    point: VisibleMapMaskPoint | null,
-    position: { x: number; y: number } | null,
-  ) => void
-  onPointClick: (
-    point: VisibleMapMaskPoint,
-    position: { x: number; y: number },
-  ) => void
 }
+
+const PERFORMANCE_LOG_INTERVAL_MS = 2000
 
 const markerColors = [
   '#ff6b8a',
@@ -60,35 +48,43 @@ function toCanvasPoint(
   return { point, x: point.screen_x, y: point.screen_y }
 }
 
-function findHit(
-  points: CanvasPoint[],
-  x: number,
-  y: number,
-): CanvasPoint | null {
-  let best: CanvasPoint | null = null
-  let bestDistance = Number.POSITIVE_INFINITY
-  for (const item of points) {
-    const dx = item.x - x
-    const dy = item.y - y
-    const distance = Math.sqrt(dx * dx + dy * dy)
-    if (distance <= 18 && distance < bestDistance) {
-      best = item
-      bestDistance = distance
-    }
-  }
-  return best
-}
-
 export function MapMaskCanvas({
   points,
   labels,
   enabled,
-  selectedPointId,
-  onPointHover,
-  onPointClick,
 }: MapMaskCanvasProps) {
   const canvasRef = useRef<HTMLCanvasElement | null>(null)
   const [size, setSize] = useState({ width: 1, height: 1 })
+  const drawStatsRef = useRef({
+    draws: 0,
+    totalDrawMs: 0,
+    maxDrawMs: 0,
+    pointCount: 0,
+    enabled: false,
+  })
+
+  useEffect(() => {
+    const timer = window.setInterval(() => {
+      const stats = drawStatsRef.current
+      const averageDrawMs = stats.draws
+        ? stats.totalDrawMs / stats.draws
+        : 0
+      log.info(
+        '[map-mask-perf] canvas ' +
+          `draws=${stats.draws} avg_draw_ms=${averageDrawMs.toFixed(2)} ` +
+          `max_draw_ms=${stats.maxDrawMs.toFixed(2)} ` +
+          `points=${stats.pointCount} enabled=${stats.enabled}`
+      )
+      drawStatsRef.current = {
+        draws: 0,
+        totalDrawMs: 0,
+        maxDrawMs: 0,
+        pointCount: stats.pointCount,
+        enabled: stats.enabled,
+      }
+    }, PERFORMANCE_LOG_INTERVAL_MS)
+    return () => window.clearInterval(timer)
+  }, [])
 
   const labelById = useMemo(() => {
     return new Map(labels.map((label) => [label.id, label]))
@@ -119,6 +115,7 @@ export function MapMaskCanvas({
   useEffect(() => {
     const canvas = canvasRef.current
     if (!canvas) return
+    const started = performance.now()
 
     const ratio = Math.max(1, window.devicePixelRatio || 1)
     canvas.width = Math.round(size.width * ratio)
@@ -130,21 +127,29 @@ export function MapMaskCanvas({
     context.setTransform(ratio, 0, 0, ratio, 0, 0)
     context.clearRect(0, 0, size.width, size.height)
 
-    if (!enabled) return
+    if (!enabled) {
+      const elapsed = performance.now() - started
+      const stats = drawStatsRef.current
+      stats.draws += 1
+      stats.totalDrawMs += elapsed
+      stats.maxDrawMs = Math.max(stats.maxDrawMs, elapsed)
+      stats.pointCount = 0
+      stats.enabled = false
+      return
+    }
 
     for (const item of canvasPoints) {
       const label = labelById.get(item.point.label_id)
       const color = hashColor(item.point.label_id)
-      const selected = selectedPointId === item.point.id
 
       context.save()
       context.shadowColor = 'rgba(15, 23, 42, 0.45)'
-      context.shadowBlur = selected ? 16 : 10
+      context.shadowBlur = 10
       context.beginPath()
-      context.arc(item.x, item.y, selected ? 12 : 9, 0, Math.PI * 2)
+      context.arc(item.x, item.y, 9, 0, Math.PI * 2)
       context.fillStyle = color
       context.fill()
-      context.lineWidth = selected ? 3 : 2
+      context.lineWidth = 2
       context.strokeStyle = 'rgba(255, 255, 255, 0.94)'
       context.stroke()
 
@@ -156,43 +161,17 @@ export function MapMaskCanvas({
       context.fillText(markerGlyph(label), item.x, item.y + 0.5)
       context.restore()
     }
-  }, [canvasPoints, enabled, labelById, selectedPointId, size.height, size.width])
 
-  const resolvePointer = useCallback(
-    (event: CanvasPointerEvent) => {
-      const rect = event.currentTarget.getBoundingClientRect()
-      const x = event.clientX - rect.left
-      const y = event.clientY - rect.top
-      const hit = findHit(canvasPoints, x, y)
-      return {
-        hit,
-        position: hit
-          ? {
-              x: rect.left + hit.x,
-              y: rect.top + hit.y,
-            }
-          : null,
-      }
-    },
-    [canvasPoints],
-  )
+    const elapsed = performance.now() - started
+    const stats = drawStatsRef.current
+    stats.draws += 1
+    stats.totalDrawMs += elapsed
+    stats.maxDrawMs = Math.max(stats.maxDrawMs, elapsed)
+    stats.pointCount = canvasPoints.length
+    stats.enabled = true
+  }, [canvasPoints, enabled, labelById, size.height, size.width])
 
   return (
-    <canvas
-      ref={canvasRef}
-      className="absolute inset-0 size-full"
-      onPointerMove={(event) => {
-        const { hit, position } = resolvePointer(event)
-        onPointHover(hit?.point ?? null, position)
-      }}
-      onPointerLeave={() => onPointHover(null, null)}
-      onClick={(event) => {
-        const { hit, position } = resolvePointer(event)
-        if (!hit || !position) return
-        event.preventDefault()
-        event.stopPropagation()
-        onPointClick(hit.point, position)
-      }}
-    />
+    <canvas ref={canvasRef} className="absolute inset-0 size-full" />
   )
 }

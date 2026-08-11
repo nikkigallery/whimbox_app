@@ -100,7 +100,6 @@ export type MapMaskState = {
   tracking_mode: 'idle' | 'tracking' | 'reacquire' | string
   motion_diff: number | null
   motion_unstable: boolean
-  motion_stable_count: number
   candidate_distance_to_last_good: number | null
   local_match_confidence: number | null
   global_match_confidence: number | null
@@ -129,16 +128,10 @@ export type MapMaskState = {
   detection_source: string
   detection_confidence: number
   raw_is_bigmap_open: boolean
-  stable_is_bigmap_open: boolean
-  consecutive_open_count: number
-  consecutive_closed_count: number
   detection_error: string
   last_detection_time: string
   last_successful_detection_time: string
   detection_duration_ms: number
-  detection_interval_ms: number
-  stable_open_frames: number
-  stable_closed_frames: number
   debug?: boolean
   message?: string
 }

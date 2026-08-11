@@ -1,4 +1,5 @@
-import { useCallback, useEffect, useMemo, useState } from 'react'
+import log from 'electron-log/renderer'
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 
 import { MapMaskCanvas } from 'renderer/components/map-mask/map-mask-canvas'
 import type {
@@ -9,6 +10,9 @@ import type {
   MapMaskVisiblePointsResponse,
   VisibleMapMaskPoint,
 } from 'renderer/types/map-mask'
+
+const POINT_POSITION_TOLERANCE_PX = 2
+const PERFORMANCE_LOG_INTERVAL_MS = 2000
 
 function isFiniteNumber(value: unknown): value is number {
   return typeof value === 'number' && Number.isFinite(value)
@@ -120,6 +124,51 @@ function remapVisiblePoints(
   })
 }
 
+function hasSameViewport(
+  previous: MapMaskState['viewport'],
+  next: MapMaskState['viewport']
+) {
+  const previousValid = isValidViewport(previous)
+  const nextValid = isValidViewport(next)
+  if (!previousValid || !nextValid) return previousValid === nextValid
+  return previous.map_name === next.map_name
+}
+
+function hasSameRenderableSnapshot(
+  previous: MapMaskVisiblePointsResponse | null,
+  next: MapMaskVisiblePointsResponse
+) {
+  if (!previous) return false
+  if (
+    previous.state.enabled !== next.state.enabled ||
+    previous.state.is_bigmap_open !== next.state.is_bigmap_open ||
+    previous.state.viewport_screen_width !==
+      next.state.viewport_screen_width ||
+    previous.state.viewport_screen_height !==
+      next.state.viewport_screen_height ||
+    !hasSameViewport(previous.state.viewport, next.state.viewport) ||
+    previous.points.length !== next.points.length
+  ) {
+    return false
+  }
+
+  for (let index = 0; index < previous.points.length; index += 1) {
+    const previousPoint = previous.points[index]
+    const nextPoint = next.points[index]
+    if (
+      previousPoint.id !== nextPoint.id ||
+      previousPoint.label_id !== nextPoint.label_id ||
+      Math.abs(previousPoint.screen_x - nextPoint.screen_x) >=
+        POINT_POSITION_TOLERANCE_PX ||
+      Math.abs(previousPoint.screen_y - nextPoint.screen_y) >=
+        POINT_POSITION_TOLERANCE_PX
+    ) {
+      return false
+    }
+  }
+  return true
+}
+
 export function MapMaskOverlayScreen() {
   const [labels, setLabels] = useState<MapMaskLabel[]>([])
   const [visibleResult, setVisibleResult] =
@@ -128,6 +177,47 @@ export function MapMaskOverlayScreen() {
     width: window.innerWidth,
     height: window.innerHeight,
   }))
+  const lastRenderableResultRef =
+    useRef<MapMaskVisiblePointsResponse | null>(null)
+  const snapshotStatsRef = useRef({
+    requests: 0,
+    successes: 0,
+    failures: 0,
+    visualUpdates: 0,
+    skippedUpdates: 0,
+    totalRpcMs: 0,
+    maxRpcMs: 0,
+    pointCount: 0,
+  })
+
+  useEffect(() => {
+    const timer = window.setInterval(() => {
+      const stats = snapshotStatsRef.current
+      const averageRpcMs = stats.successes
+        ? stats.totalRpcMs / stats.successes
+        : 0
+      log.info(
+        '[map-mask-perf] snapshots ' +
+          `requests=${stats.requests} successes=${stats.successes} ` +
+          `failures=${stats.failures} visual_updates=${stats.visualUpdates} ` +
+          `skipped=${stats.skippedUpdates} ` +
+          `avg_rpc_ms=${averageRpcMs.toFixed(2)} ` +
+          `max_rpc_ms=${stats.maxRpcMs.toFixed(2)} ` +
+          `points=${stats.pointCount}`
+      )
+      snapshotStatsRef.current = {
+        requests: 0,
+        successes: 0,
+        failures: 0,
+        visualUpdates: 0,
+        skippedUpdates: 0,
+        totalRpcMs: 0,
+        maxRpcMs: 0,
+        pointCount: stats.pointCount,
+      }
+    }, PERFORMANCE_LOG_INTERVAL_MS)
+    return () => window.clearInterval(timer)
+  }, [])
 
   useEffect(() => {
     const updateOverlaySize = () => {
@@ -146,29 +236,40 @@ export function MapMaskOverlayScreen() {
   }, [])
 
   const refreshVisiblePoints = useCallback(async () => {
-    const result = (await window.App.rpc.request(
-      'map_mask.get_visible_points'
-    )) as MapMaskVisiblePointsResponse
-    setVisibleResult(result)
-  }, [])
-
-  const syncToGameWindow = useCallback(async () => {
-    await window.App.mapMaskOverlay?.syncToGameWindow()
+    const started = performance.now()
+    snapshotStatsRef.current.requests += 1
+    try {
+      const result = (await window.App.rpc.request(
+        'map_mask.get_visible_points'
+      )) as MapMaskVisiblePointsResponse
+      const elapsed = performance.now() - started
+      const stats = snapshotStatsRef.current
+      stats.successes += 1
+      stats.totalRpcMs += elapsed
+      stats.maxRpcMs = Math.max(stats.maxRpcMs, elapsed)
+      stats.pointCount = result.points.length
+      if (hasSameRenderableSnapshot(lastRenderableResultRef.current, result)) {
+        stats.skippedUpdates += 1
+        return
+      }
+      lastRenderableResultRef.current = result
+      stats.visualUpdates += 1
+      setVisibleResult(result)
+    } catch (error) {
+      snapshotStatsRef.current.failures += 1
+      throw error
+    }
   }, [])
 
   useEffect(() => {
     let disposed = false
     let starting = false
     let visiblePollInFlight = false
-    let boundsPollInFlight = false
     let visibleTimer: number | null = null
-    let boundsTimer: number | null = null
 
     document.documentElement.classList.add('overlay-window')
     document.body.classList.add('overlay-window')
-    void window.App.mapMaskOverlay?.setIgnoreMouseEvents(true, {
-      forward: true,
-    })
+    void window.App.mapMaskOverlay?.setIgnoreMouseEvents(true)
 
     const pollVisiblePoints = async () => {
       if (visiblePollInFlight || disposed) return
@@ -182,23 +283,9 @@ export function MapMaskOverlayScreen() {
       }
     }
 
-    const pollBounds = async () => {
-      if (boundsPollInFlight || disposed) return
-      boundsPollInFlight = true
-      try {
-        await syncToGameWindow()
-      } catch {
-        // The game window may disappear temporarily while minimized.
-      } finally {
-        boundsPollInFlight = false
-      }
-    }
-
     const stopPolling = () => {
       if (visibleTimer !== null) window.clearInterval(visibleTimer)
-      if (boundsTimer !== null) window.clearInterval(boundsTimer)
       visibleTimer = null
-      boundsTimer = null
     }
 
     const startPolling = async () => {
@@ -207,11 +294,9 @@ export function MapMaskOverlayScreen() {
       await Promise.allSettled([
         refreshLabels(),
         pollVisiblePoints(),
-        pollBounds(),
       ])
       if (!disposed && document.visibilityState === 'visible') {
         visibleTimer = window.setInterval(() => void pollVisiblePoints(), 50)
-        boundsTimer = window.setInterval(() => void pollBounds(), 800)
       }
       starting = false
     }
@@ -234,7 +319,7 @@ export function MapMaskOverlayScreen() {
       document.documentElement.classList.remove('overlay-window')
       document.body.classList.remove('overlay-window')
     }
-  }, [refreshLabels, refreshVisiblePoints, syncToGameWindow])
+  }, [refreshLabels, refreshVisiblePoints])
 
   const sourceViewport = visibleResult?.state.viewport ?? null
   const activeViewport = isValidViewport(sourceViewport) ? sourceViewport : null
@@ -276,11 +361,7 @@ export function MapMaskOverlayScreen() {
       <MapMaskCanvas
         enabled={enabled}
         labels={labels}
-        onPointClick={() => undefined}
-        onPointHover={() => undefined}
         points={renderedPoints}
-        selectedPointId={null}
-        viewport={overlayViewport}
       />
     </main>
   )

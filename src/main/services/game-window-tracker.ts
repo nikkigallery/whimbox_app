@@ -1,11 +1,9 @@
-import { execFile } from 'node:child_process'
 import { existsSync, readFileSync } from 'node:fs'
 import { join, resolve } from 'node:path'
-import { promisify } from 'node:util'
 
 import log from 'electron-log/main.js'
 
-const execFileAsync = promisify(execFile)
+import { sendRpcRequest } from './rpc-bridge'
 
 export type GameWindowTrackerMode = 'debug' | 'real-window'
 
@@ -106,8 +104,7 @@ const DEFAULT_PROCESS_NAMES = [
   'X6Game-Win64-Shipping.exe',
   'X6Game.exe',
 ]
-const LOOKUP_TIMEOUT_MS = 5000
-const DEFAULT_TRACKER_INTERVAL_MS = 1000
+const DEFAULT_TRACKER_INTERVAL_MS = 100
 
 class GameWindowTracker {
   private readonly debugBounds: DebugBounds
@@ -115,9 +112,9 @@ class GameWindowTracker {
   private readonly processNames: string[]
   private readonly trackerMode: GameWindowTrackerMode
   private readonly trackerIntervalMs: number
-  private readonly windowLookupScript: string
   private currentBounds: GameWindowBounds
   private refreshPromise: Promise<GameWindowBounds> | null = null
+  private lastLookupWarning: string | null = null
 
   constructor() {
     const config = loadTrackerConfig()
@@ -126,10 +123,6 @@ class GameWindowTracker {
     this.processNames = resolveProcessNames(config)
     this.trackerMode = resolveTrackerMode(config)
     this.trackerIntervalMs = resolveTrackerInterval()
-    this.windowLookupScript = buildWindowLookupScript(
-      this.titleKeywords,
-      this.processNames,
-    )
     this.currentBounds = this.buildDebugBounds(
       this.trackerMode === 'debug'
         ? 'debug tracker mode'
@@ -168,8 +161,11 @@ class GameWindowTracker {
     }
 
     try {
-      const found = await findGameWindow(this.windowLookupScript)
+      const found = await sendRpcRequest<NativeWindowLookupResult>(
+        'map_mask.get_game_window_state',
+      )
       if (found?.found && isUsableWindowBounds(found)) {
+        this.lastLookupWarning = null
         return this.commitBounds({
           x: Math.round(found.x),
           y: Math.round(found.y),
@@ -210,7 +206,10 @@ class GameWindowTracker {
       )
     } catch (error) {
       const message = error instanceof Error ? error.message : String(error)
-      log.warn(`[game-window-tracker] lookup failed: ${message}`)
+      if (message !== this.lastLookupWarning) {
+        log.warn(`[game-window-tracker] backend lookup failed: ${message}`)
+        this.lastLookupWarning = message
+      }
       return this.commitBounds(
         this.buildDebugBounds(`lookup failed: ${message}`),
         started,
@@ -294,7 +293,7 @@ function resolveTrackerMode(config: TrackerConfig): GameWindowTrackerMode {
 function resolveTrackerInterval(): number {
   const value = Number(process.env.WHIMBOX_MAP_MASK_TRACKER_INTERVAL_MS)
   if (!Number.isFinite(value)) return DEFAULT_TRACKER_INTERVAL_MS
-  return Math.max(250, Math.round(value))
+  return Math.max(50, Math.round(value))
 }
 
 function resolveTitleKeywords(config: TrackerConfig): string[] {
@@ -440,283 +439,6 @@ function isUsableWindowBounds(
     value.width > 0 &&
     value.height > 0
   )
-}
-
-async function findGameWindow(
-  script: string,
-): Promise<NativeWindowLookupResult | null> {
-  const { stdout } = await execFileAsync(
-    'powershell.exe',
-    ['-NoProfile', '-ExecutionPolicy', 'Bypass', '-Command', script],
-    {
-      windowsHide: true,
-      timeout: LOOKUP_TIMEOUT_MS,
-      maxBuffer: 1024 * 1024,
-    },
-  )
-  const text = stdout.trim()
-  if (!text) return null
-  return JSON.parse(text) as NativeWindowLookupResult
-}
-
-function buildWindowLookupScript(titleKeywords: string[], processNames: string[]) {
-  const keywordsJson = JSON.stringify(titleKeywords).replace(/'/g, "''")
-  const processNamesJson = JSON.stringify(processNames).replace(/'/g, "''")
-  return `
-$ErrorActionPreference = 'Stop'
-Add-Type @"
-using System;
-using System.Runtime.InteropServices;
-using System.Text;
-
-public class WhimboxMapMaskWindow {
-  public delegate bool EnumWindowsProc(IntPtr hWnd, IntPtr lParam);
-
-  [DllImport("user32.dll")]
-  public static extern bool EnumWindows(EnumWindowsProc lpEnumFunc, IntPtr lParam);
-
-  [DllImport("user32.dll")]
-  public static extern bool IsWindowVisible(IntPtr hWnd);
-
-  [DllImport("user32.dll")]
-  public static extern bool IsIconic(IntPtr hWnd);
-
-  [DllImport("user32.dll")]
-  public static extern IntPtr GetForegroundWindow();
-
-  [DllImport("user32.dll")]
-  public static extern int GetWindowTextLength(IntPtr hWnd);
-
-  [DllImport("user32.dll", CharSet = CharSet.Unicode)]
-  public static extern int GetWindowText(IntPtr hWnd, StringBuilder text, int count);
-
-  [DllImport("user32.dll")]
-  public static extern bool GetWindowRect(IntPtr hWnd, out RECT rect);
-
-  [DllImport("user32.dll")]
-  public static extern bool GetClientRect(IntPtr hWnd, out RECT rect);
-
-  [DllImport("user32.dll")]
-  public static extern bool ClientToScreen(IntPtr hWnd, ref POINT point);
-
-  [DllImport("user32.dll")]
-  public static extern uint GetDpiForWindow(IntPtr hWnd);
-
-  [DllImport("user32.dll")]
-  public static extern IntPtr GetShellWindow();
-
-  [DllImport("user32.dll")]
-  public static extern uint GetWindowThreadProcessId(IntPtr hWnd, out uint processId);
-
-  [StructLayout(LayoutKind.Sequential)]
-  public struct RECT {
-    public int Left;
-    public int Top;
-    public int Right;
-    public int Bottom;
-  }
-
-  [StructLayout(LayoutKind.Sequential)]
-  public struct POINT {
-    public int X;
-    public int Y;
-  }
-}
-"@
-
-$keywords = ConvertFrom-Json -InputObject '${keywordsJson}'
-if ($null -eq $keywords) {
-  $keywords = @()
-} elseif ($keywords -isnot [System.Array]) {
-  $keywords = @($keywords)
-}
-$processNames = ConvertFrom-Json -InputObject '${processNamesJson}'
-if ($null -eq $processNames) {
-  $processNames = @()
-} elseif ($processNames -isnot [System.Array]) {
-  $processNames = @($processNames)
-}
-$shellWindow = [WhimboxMapMaskWindow]::GetShellWindow()
-$foregroundWindow = [WhimboxMapMaskWindow]::GetForegroundWindow()
-$candidates = New-Object System.Collections.Generic.List[object]
-
-function Normalize-ProcessName([string]$name) {
-  if ([string]::IsNullOrWhiteSpace($name)) { return $null }
-  $trimmed = $name.Trim()
-  if ($trimmed.EndsWith('.exe', [System.StringComparison]::OrdinalIgnoreCase)) {
-    return $trimmed
-  }
-  return "$($trimmed).exe"
-}
-
-function Test-TitleMatch([string]$title) {
-  $safeTitle = if ($null -eq $title) { '' } else { $title }
-  foreach ($keyword in $keywords) {
-    $text = [string]$keyword
-    if ([string]::IsNullOrWhiteSpace($text)) { continue }
-    if ($safeTitle.IndexOf($text, [System.StringComparison]::OrdinalIgnoreCase) -ge 0) {
-      return $true
-    }
-  }
-  return $false
-}
-
-function Test-ProcessMatch([string]$processName) {
-  $normalized = Normalize-ProcessName $processName
-  if ([string]::IsNullOrWhiteSpace($normalized)) { return $false }
-  foreach ($expected in $processNames) {
-    $expectedName = Normalize-ProcessName ([string]$expected)
-    if ([string]::IsNullOrWhiteSpace($expectedName)) { continue }
-    if ([string]::Equals($normalized, $expectedName, [System.StringComparison]::OrdinalIgnoreCase)) {
-      return $true
-    }
-  }
-  return $false
-}
-
-$processNameByPid = @{}
-Get-Process | ForEach-Object {
-  try {
-    $processNameByPid[[int]$_.Id] = Normalize-ProcessName $_.ProcessName
-  } catch {}
-}
-
-[WhimboxMapMaskWindow]::EnumWindows({
-  param([IntPtr]$hWnd, [IntPtr]$lParam)
-  if ($hWnd -eq $shellWindow) { return $true }
-  if (-not [WhimboxMapMaskWindow]::IsWindowVisible($hWnd)) { return $true }
-
-  $length = [WhimboxMapMaskWindow]::GetWindowTextLength($hWnd)
-  $title = ''
-  if ($length -gt 0) {
-    $builder = New-Object System.Text.StringBuilder ($length + 1)
-    [void][WhimboxMapMaskWindow]::GetWindowText($hWnd, $builder, $builder.Capacity)
-    $title = $builder.ToString()
-  }
-
-  $pidValue = [uint32]0
-  [void][WhimboxMapMaskWindow]::GetWindowThreadProcessId($hWnd, [ref]$pidValue)
-  $processName = $null
-  if ($pidValue -gt 0) {
-    $processName = $processNameByPid[[int]$pidValue]
-  }
-
-  $titleMatched = Test-TitleMatch $title
-  $processMatched = Test-ProcessMatch $processName
-  if (-not $titleMatched -and -not $processMatched) {
-    return $true
-  }
-
-  $rect = New-Object WhimboxMapMaskWindow+RECT
-  if (-not [WhimboxMapMaskWindow]::GetWindowRect($hWnd, [ref]$rect)) {
-    return $true
-  }
-
-  $windowWidth = $rect.Right - $rect.Left
-  $windowHeight = $rect.Bottom - $rect.Top
-  if ($windowWidth -le 0 -or $windowHeight -le 0) {
-    return $true
-  }
-
-  $windowRect = [pscustomobject]@{
-    left = $rect.Left
-    top = $rect.Top
-    right = $rect.Right
-    bottom = $rect.Bottom
-    x = $rect.Left
-    y = $rect.Top
-    width = $windowWidth
-    height = $windowHeight
-  }
-
-  $client = New-Object WhimboxMapMaskWindow+RECT
-  $clientPoint = New-Object WhimboxMapMaskWindow+POINT
-  $clientPoint.X = 0
-  $clientPoint.Y = 0
-  $clientOk = [WhimboxMapMaskWindow]::GetClientRect($hWnd, [ref]$client)
-  $clientScreenOk = [WhimboxMapMaskWindow]::ClientToScreen($hWnd, [ref]$clientPoint)
-  $clientWidth = $client.Right - $client.Left
-  $clientHeight = $client.Bottom - $client.Top
-  $clientAreaAvailable = $clientOk -and $clientScreenOk -and $clientWidth -gt 0 -and $clientHeight -gt 0
-
-  if ($clientAreaAvailable) {
-    $appliedX = $clientPoint.X
-    $appliedY = $clientPoint.Y
-    $appliedWidth = $clientWidth
-    $appliedHeight = $clientHeight
-    $appliedSource = 'client-area'
-    $clientRect = [pscustomobject]@{
-      left = $clientPoint.X
-      top = $clientPoint.Y
-      right = $clientPoint.X + $clientWidth
-      bottom = $clientPoint.Y + $clientHeight
-      x = $clientPoint.X
-      y = $clientPoint.Y
-      width = $clientWidth
-      height = $clientHeight
-    }
-  } else {
-    $appliedX = $rect.Left
-    $appliedY = $rect.Top
-    $appliedWidth = $windowWidth
-    $appliedHeight = $windowHeight
-    $appliedSource = 'window-rect'
-    $clientRect = $null
-  }
-
-  $dpiScale = 1.0
-  try {
-    $dpi = [WhimboxMapMaskWindow]::GetDpiForWindow($hWnd)
-    if ($dpi -gt 0) {
-      $dpiScale = [math]::Round(([double]$dpi / 96.0), 4)
-    }
-  } catch {
-    $dpiScale = 1.0
-  }
-
-  $candidates.Add([pscustomobject]@{
-    found = $true
-    matchedBy = if ($titleMatched) { 'title' } else { 'process' }
-    titleMatched = $titleMatched
-    processMatched = $processMatched
-    title = $title
-    handle = $hWnd.ToInt64().ToString()
-    processName = $processName
-    pid = [int]$pidValue
-    x = $appliedX
-    y = $appliedY
-    width = $appliedWidth
-    height = $appliedHeight
-    appliedBoundsSource = $appliedSource
-    clientAreaAvailable = $clientAreaAvailable
-    clientX = if ($clientAreaAvailable) { $clientPoint.X } else { $null }
-    clientY = if ($clientAreaAvailable) { $clientPoint.Y } else { $null }
-    clientWidth = if ($clientAreaAvailable) { $clientWidth } else { $null }
-    clientHeight = if ($clientAreaAvailable) { $clientHeight } else { $null }
-    windowRect = $windowRect
-    clientRect = $clientRect
-    dpiScale = $dpiScale
-    scaleFactor = $dpiScale
-    isForeground = $foregroundWindow -eq $hWnd
-    isMinimized = [WhimboxMapMaskWindow]::IsIconic($hWnd)
-  }) | Out-Null
-  return $true
-}, [IntPtr]::Zero) | Out-Null
-
-$result = $candidates | Where-Object { $_.titleMatched } | Select-Object -First 1
-if ($null -eq $result) {
-  $result = $candidates | Where-Object { $_.processMatched } | Select-Object -First 1
-  if ($null -ne $result) {
-    $result.matchedBy = 'process'
-  }
-}
-
-if ($null -eq $result) {
-  [pscustomobject]@{ found = $false } | ConvertTo-Json -Compress
-} else {
-  $result | ConvertTo-Json -Compress
-}
-`
 }
 
 export const gameWindowTracker = new GameWindowTracker()

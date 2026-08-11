@@ -156,7 +156,7 @@ export async function runMapMaskSmoke(options: SmokeOptions) {
     smokeLog(`RPC connected=${String(report.rpcConnected)}`)
 
     const win = await MapMaskOverlayWindow()
-    setMapMaskOverlayIgnoreMouseEvents(true, { forward: true })
+    setMapMaskOverlayIgnoreMouseEvents(true)
     win.setAlwaysOnTop(true, 'normal')
     win.setVisibleOnAllWorkspaces(true, { visibleOnFullScreen: true })
     win.showInactive()
