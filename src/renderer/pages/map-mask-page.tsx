@@ -261,6 +261,10 @@ export function MapMaskPage() {
                 value={String(userStatus?.awarded_star_count ?? 0)}
               />
               <Row
+                label="dewdrops collected"
+                value={String(userStatus?.awarded_dewdrop_count ?? 0)}
+              />
+              <Row
                 label="boxes collected"
                 value={String(userStatus?.awarded_box_count ?? 0)}
               />
@@ -268,7 +272,7 @@ export function MapMaskPage() {
                 label="matched in current data"
                 value={
                   userStatus
-                    ? `${userStatus.matched_awarded_star_count} stars / ${userStatus.matched_awarded_box_count} boxes`
+                    ? `${userStatus.matched_awarded_star_count} stars / ${userStatus.matched_awarded_dewdrop_count} dewdrops / ${userStatus.matched_awarded_box_count} boxes`
                     : 'pending'
                 }
               />

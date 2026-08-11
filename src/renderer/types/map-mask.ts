@@ -214,7 +214,9 @@ export type MapMaskUserStatus = {
   openid_masked: string
   hide_awarded: boolean
   awarded_star_count: number
+  awarded_dewdrop_count: number
   awarded_box_count: number
   matched_awarded_star_count: number
+  matched_awarded_dewdrop_count: number
   matched_awarded_box_count: number
 }
