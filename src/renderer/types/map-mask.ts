@@ -171,6 +171,7 @@ export type GameWindowBounds = {
   appliedBoundsSource: 'debug-fixed' | 'client-area' | 'window-rect'
   trackerMode: 'debug' | 'real-window'
   isGameWindowFound: boolean
+  isForeground: boolean
   isMinimized: boolean
   clientAreaAvailable: boolean
   clientX: number | null

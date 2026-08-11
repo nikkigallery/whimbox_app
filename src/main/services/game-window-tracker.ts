@@ -29,6 +29,7 @@ export type GameWindowBounds = {
   appliedBoundsSource: 'debug-fixed' | 'client-area' | 'window-rect'
   trackerMode: GameWindowTrackerMode
   isGameWindowFound: boolean
+  isForeground: boolean
   isMinimized: boolean
   clientAreaAvailable: boolean
   clientX: number | null
@@ -88,6 +89,7 @@ type NativeWindowLookupResult = {
   clientRect?: GameWindowRect | null
   dpiScale?: number
   scaleFactor?: number
+  isForeground?: boolean
   isMinimized?: boolean
 }
 
@@ -177,6 +179,7 @@ class GameWindowTracker {
           appliedBoundsSource: found.appliedBoundsSource ?? 'window-rect',
           trackerMode: this.trackerMode,
           isGameWindowFound: true,
+          isForeground: Boolean(found.isForeground),
           isMinimized: Boolean(found.isMinimized),
           clientAreaAvailable: Boolean(found.clientAreaAvailable),
           clientX: asFiniteNumber(found.clientX),
@@ -226,6 +229,7 @@ class GameWindowTracker {
       previous.width !== next.width ||
       previous.height !== next.height ||
       previous.source !== next.source ||
+      previous.isForeground !== next.isForeground ||
       previous.isMinimized !== next.isMinimized
     )
     this.currentBounds = {
@@ -247,6 +251,7 @@ class GameWindowTracker {
       appliedBoundsSource: 'debug-fixed',
       trackerMode: this.trackerMode,
       isGameWindowFound: false,
+      isForeground: this.trackerMode === 'debug',
       isMinimized: false,
       clientAreaAvailable: true,
       clientX: this.debugBounds.x,
@@ -477,6 +482,9 @@ public class WhimboxMapMaskWindow {
   public static extern bool IsIconic(IntPtr hWnd);
 
   [DllImport("user32.dll")]
+  public static extern IntPtr GetForegroundWindow();
+
+  [DllImport("user32.dll")]
   public static extern int GetWindowTextLength(IntPtr hWnd);
 
   [DllImport("user32.dll", CharSet = CharSet.Unicode)]
@@ -529,6 +537,7 @@ if ($null -eq $processNames) {
   $processNames = @($processNames)
 }
 $shellWindow = [WhimboxMapMaskWindow]::GetShellWindow()
+$foregroundWindow = [WhimboxMapMaskWindow]::GetForegroundWindow()
 $candidates = New-Object System.Collections.Generic.List[object]
 
 function Normalize-ProcessName([string]$name) {
@@ -688,6 +697,7 @@ Get-Process | ForEach-Object {
     clientRect = $clientRect
     dpiScale = $dpiScale
     scaleFactor = $dpiScale
+    isForeground = $foregroundWindow -eq $hWnd
     isMinimized = [WhimboxMapMaskWindow]::IsIconic($hWnd)
   }) | Out-Null
   return $true

@@ -12,7 +12,12 @@ let followGameWindowTimer: ReturnType<typeof setInterval> | null = null
 let mapMaskOverlayIgnoringMouseEvents = true
 let mapMaskOverlayVisibleRequested = false
 let hiddenBecauseGameMinimized = false
+let hiddenBecauseGameUnfocused = false
 let allowMapMaskOverlayClose = false
+
+function isHiddenBecauseGameInactive() {
+  return hiddenBecauseGameMinimized || hiddenBecauseGameUnfocused
+}
 
 function isCalibrationOverlayEnabledByEnv() {
   const value = process.env.WHIMBOX_MAP_MASK_DEBUG_OVERLAY ?? process.env.WHIMBOX_MAP_MASK_CALIBRATION_OVERLAY
@@ -37,16 +42,22 @@ async function refreshTrackedBounds(): Promise<GameWindowBounds> {
 async function applyTrackedBounds(win: BrowserWindow) {
   const bounds = await refreshTrackedBounds()
 
-  if (bounds.isGameWindowFound && bounds.isMinimized) {
-    hiddenBecauseGameMinimized = true
+  const shouldHideBecauseMinimized = bounds.isGameWindowFound && bounds.isMinimized
+  const shouldHideBecauseUnfocused = bounds.trackerMode === 'real-window' && (
+    !bounds.isGameWindowFound || !bounds.isForeground
+  )
+  if (shouldHideBecauseMinimized || shouldHideBecauseUnfocused) {
+    hiddenBecauseGameMinimized = shouldHideBecauseMinimized
+    hiddenBecauseGameUnfocused = shouldHideBecauseUnfocused
     if (win.isVisible()) {
       win.hide()
     }
     return bounds
   }
 
-  const wasHiddenBecauseGameMinimized = hiddenBecauseGameMinimized
+  const wasHiddenBecauseGameInactive = isHiddenBecauseGameInactive()
   hiddenBecauseGameMinimized = false
+  hiddenBecauseGameUnfocused = false
   const nextBounds = {
     x: bounds.x,
     y: bounds.y,
@@ -63,7 +74,7 @@ async function applyTrackedBounds(win: BrowserWindow) {
     win.setBounds(nextBounds)
   }
 
-  if (wasHiddenBecauseGameMinimized && mapMaskOverlayVisibleRequested && !win.isVisible()) {
+  if (wasHiddenBecauseGameInactive && mapMaskOverlayVisibleRequested && !win.isVisible()) {
     win.showInactive()
   }
 
@@ -74,7 +85,7 @@ async function bringMapMaskOverlayToFront(win: BrowserWindow) {
   await applyTrackedBounds(win)
   win.setAlwaysOnTop(true, 'normal')
   win.setVisibleOnAllWorkspaces(true, { visibleOnFullScreen: true })
-  if (!hiddenBecauseGameMinimized) {
+  if (!isHiddenBecauseGameInactive()) {
     win.showInactive()
   }
 }
@@ -121,6 +132,7 @@ export function getMapMaskOverlayDebugState() {
     bounds: win && !win.isDestroyed() ? win.getBounds() : null,
     hiddenBecauseGameMinimized,
     visibleRequested: mapMaskOverlayVisibleRequested,
+    hiddenBecauseGameUnfocused,
     tracker: gameWindowTracker.getBounds(),
   }
 }
@@ -154,6 +166,7 @@ function registerMapMaskOverlayIpc() {
     mapMaskOverlayVisibleRequested = false
     hiddenBecauseGameMinimized = false
     win.hide()
+    hiddenBecauseGameUnfocused = false
     stopFollowGameWindow()
     return true
   })
@@ -222,18 +235,19 @@ async function createMapMaskOverlayWindow() {
   mapMaskOverlayVisibleRequested = false
   hiddenBecauseGameMinimized = false
   allowMapMaskOverlayClose = false
+  hiddenBecauseGameUnfocused = false
   window.setIgnoreMouseEvents(true, { forward: true })
   window.setVisibleOnAllWorkspaces(true, { visibleOnFullScreen: true })
 
   window.on('show', () => {
-    if (!hiddenBecauseGameMinimized) {
+    if (!isHiddenBecauseGameInactive()) {
       mapMaskOverlayVisibleRequested = true
     }
     startFollowGameWindow()
   })
 
   window.on('hide', () => {
-    if (!mapMaskOverlayVisibleRequested || !hiddenBecauseGameMinimized) {
+    if (!mapMaskOverlayVisibleRequested || !isHiddenBecauseGameInactive()) {
       stopFollowGameWindow()
     }
   })
