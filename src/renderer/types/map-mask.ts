@@ -206,3 +206,15 @@ export type GameWindowRect = {
   width: number
   height: number
 }
+
+export type MapMaskUserStatus = {
+  auth_state: 'anonymous' | 'opening-login' | 'loading-user-state' | 'authenticated' | 'cancelled' | 'error' | string
+  authenticated: boolean
+  auth_error: string
+  openid_masked: string
+  hide_awarded: boolean
+  awarded_star_count: number
+  awarded_box_count: number
+  matched_awarded_star_count: number
+  matched_awarded_box_count: number
+}
