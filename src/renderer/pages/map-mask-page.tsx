@@ -214,21 +214,20 @@ export function MapMaskPage() {
     >
       <SettingsPageLayout
         className="mx-auto w-full max-w-5xl"
-        description="在游戏大地图上显示尚未收集的探索点位。"
         title="地图遮罩"
       >
         <div className="grid gap-6">
-          <section className="overflow-hidden rounded-3xl border border-pink-100 bg-gradient-to-br from-pink-50 via-white to-cyan-50 p-6 shadow-sm dark:border-pink-900/40 dark:from-pink-950/30 dark:via-slate-950 dark:to-cyan-950/30 sm:p-8">
+          <section className="overflow-hidden rounded-3xl border border-pink-100 bg-gradient-to-br from-pink-50 via-white to-cyan-50 p-6 shadow-sm dark:border-pink-900/40 dark:from-pink-950/30 dark:via-slate-950 dark:to-cyan-950/30 sm:p-4">
             <div className="flex flex-col gap-6 lg:flex-row lg:items-center lg:justify-between">
               <div className="max-w-2xl">
-                <div className="mb-4 flex size-12 items-center justify-center rounded-2xl bg-pink-400 text-white shadow-lg shadow-pink-200/60 dark:shadow-pink-950/50">
-                  <MapPinned className="size-6" />
-                </div>
                 <h2 className="text-xl font-semibold text-slate-900 dark:text-slate-50">
                   打开地图，即刻查看附近收集物
                 </h2>
                 <p className="mt-2 text-sm leading-6 text-slate-600 dark:text-slate-300">
-                  首次使用或登录失效时会自动打开网页登录窗口。完成登录后，遮罩会继续打开，无需手动复制账号信息。
+                  首次使用会打开美鸭梨登录窗口，登录后即可同步未收集的点位。
+                </p>
+                <p className="text-sm leading-6 text-slate-600 dark:text-slate-300">
+                  奇想盒不会记录你的账号密码，请放心使用！
                 </p>
               </div>
               <div className="flex shrink-0 flex-col gap-3 sm:flex-row lg:flex-col xl:flex-row">
@@ -255,20 +254,16 @@ export function MapMaskPage() {
                   <RefreshCw
                     className={refreshing ? 'size-4 animate-spin' : 'size-4'}
                   />
-                  {refreshing ? '正在刷新…' : '刷新收集物'}
+                  {refreshing ? '正在刷新…' : '刷新点位'}
                 </Button>
               </div>
             </div>
           </section>
 
-          <section className="rounded-3xl border border-slate-200 bg-white p-6 shadow-sm dark:border-slate-800 dark:bg-slate-950">
-            <div className="mb-5">
-              <h2 className="font-semibold text-slate-900 dark:text-slate-50">
-                显示点位
-              </h2>
-              <p className="mt-1 text-sm text-slate-500 dark:text-slate-400">
-                选择需要显示在游戏大地图上的收集物类型。
-              </p>
+          <section className="rounded-3xl border border-slate-200 bg-white p-4 shadow-sm dark:border-slate-800 dark:bg-slate-950">
+            <div className="flex items-center gap-2 text-slate-900 dark:text-slate-50 mb-3">
+              <MapPinned className="size-5 text-pink-400" />
+              <h2 className="font-semibold">显示点位</h2>
             </div>
             <div className="grid gap-3 md:grid-cols-3">
               {filters.map(filter => {
@@ -276,7 +271,7 @@ export function MapMaskPage() {
                 const checked = selectedLabelIds.includes(filter.id)
                 return (
                   <label
-                    className="flex cursor-pointer items-center gap-3 rounded-2xl border border-slate-200 p-4 transition-colors hover:border-pink-200 hover:bg-pink-50/50 has-[[data-state=checked]]:border-pink-200 has-[[data-state=checked]]:bg-pink-50/70 dark:border-slate-800 dark:hover:border-pink-900 dark:hover:bg-pink-950/20 dark:has-[[data-state=checked]]:border-pink-900 dark:has-[[data-state=checked]]:bg-pink-950/25"
+                    className="flex cursor-pointer items-center gap-3 rounded-2xl border border-slate-200 p-3 transition-colors hover:border-pink-200 hover:bg-pink-50/50 has-[[data-state=checked]]:border-pink-200 has-[[data-state=checked]]:bg-pink-50/70 dark:border-slate-800 dark:hover:border-pink-900 dark:hover:bg-pink-950/20 dark:has-[[data-state=checked]]:border-pink-900 dark:has-[[data-state=checked]]:bg-pink-950/25"
                     htmlFor={`map-mask-filter-${filter.id}`}
                     key={filter.id}
                   >
@@ -307,20 +302,20 @@ export function MapMaskPage() {
             </div>
           </section>
 
-          <section className="rounded-3xl border border-slate-200 bg-white p-6 shadow-sm dark:border-slate-800 dark:bg-slate-950">
+          <section className="rounded-3xl border border-slate-200 bg-white p-4 shadow-sm dark:border-slate-800 dark:bg-slate-950">
             <div className="flex items-center gap-2 text-slate-900 dark:text-slate-50">
               <Sparkles className="size-5 text-pink-400" />
               <h2 className="font-semibold">使用方法</h2>
             </div>
-            <ol className="mt-5 grid gap-4 text-sm text-slate-600 md:grid-cols-3 dark:text-slate-300">
+            <ol className="mt-3 grid gap-4 text-sm text-slate-600 md:grid-cols-3 dark:text-slate-300">
               <Instruction index="1" title="打开遮罩">
                 点击“打开地图遮罩”。如需登录，请在自动弹出的网页中完成操作。
               </Instruction>
               <Instruction index="2" title="进入大地图">
-                回到游戏并打开大地图，未收集点位会自动显示并随地图拖动。
+                回到游戏并打开大地图，将大地图缩放至最大，未收集点位会自动显示并随地图拖动。
               </Instruction>
               <Instruction index="3" title="同步进度">
-                收集后可等待自动同步，或点击“刷新收集物”立即更新显示结果。
+                收集后可等待自动同步，或点击“刷新点位”立即刷新。
               </Instruction>
             </ol>
           </section>
