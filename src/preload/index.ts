@@ -179,6 +179,12 @@ const API = {
       }
     },
   },
+  mapMaskOverlay: {
+    show: () => ipcRenderer.invoke('map-mask-overlay:show'),
+    hide: () => ipcRenderer.invoke('map-mask-overlay:hide'),
+    setIgnoreMouseEvents: (ignore: boolean) =>
+      ipcRenderer.invoke('map-mask-overlay:set-ignore-mouse-events', ignore),
+  },
   conversation: {
     getState: () =>
       ipcRenderer.invoke('conversation:get-state') as Promise<{

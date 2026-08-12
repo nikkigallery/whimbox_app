@@ -2,7 +2,6 @@ import { BrowserWindow, ipcMain } from 'electron'
 
 import { RpcClient } from './rpc-client'
 import { forceShowOverlay, setOverlayIgnoreMouseEvents, showOverlayOnToolStart } from '../windows/overlay'
-import log from 'electron-log/main.js'
 
 let initialized = false
 const rpcClient = new RpcClient()
@@ -123,6 +122,13 @@ export function registerRpcBridge() {
 /** 立即发起一次 RPC 重连（用于后台重启后立刻重连，避免等指数退避） */
 export function reconnectRpcNow() {
   rpcClient.reconnectNow()
+}
+
+export function sendRpcRequest<T = unknown>(
+  method: string,
+  params?: Record<string, unknown>,
+) {
+  return rpcClient.sendRequest<T>(method, params)
 }
 
 /**

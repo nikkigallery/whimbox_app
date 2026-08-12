@@ -24,7 +24,7 @@ declare global {
         addShownAsBallListener: (callback: () => void) => () => void
       }
       videoOverlay?: {
-        setIgnoreMouseEvents: (ignore: boolean, options?: { forward?: boolean }) => Promise<void>
+        setIgnoreMouseEvents: (ignore: boolean) => Promise<void>
         show: () => Promise<void>
         hide: () => Promise<void>
         getBounds: () => Promise<{ x: number; y: number; width: number; height: number }>
@@ -66,6 +66,11 @@ declare global {
         onNavigate: (callback: (url: string) => void) => () => void
         onPlaybackCommand: (callback: (command: 'toggle_play' | 'seek_forward' | 'seek_backward') => void) => () => void
         onFocusInput: (callback: () => void) => () => void
+      }
+      mapMaskOverlay?: {
+        show: () => Promise<boolean>
+        hide: () => Promise<boolean>
+        setIgnoreMouseEvents: (ignore: boolean) => Promise<void>
       }
       conversation: {
         getState: () => Promise<{
@@ -227,5 +232,3 @@ declare namespace JSX {
     }
   }
 }
-
-export {}
