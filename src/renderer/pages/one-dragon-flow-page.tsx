@@ -40,7 +40,7 @@ import { Spinner } from "renderer/components/ui/spinner"
 import type { IpcRpcClient } from "renderer/lib/ipc-rpc"
 import { cn } from "renderer/lib/utils"
 
-type CustomStepType = "path" | "macro" | "close_game"
+type CustomStepType = "path" | "macro"
 type StepSection = "pre" | "post"
 
 type DefaultStepItem = {
@@ -58,9 +58,9 @@ type CustomStepItem = {
 
 type OneDragonFlowResponse = {
   default_steps?: DefaultStepItem[]
-  pre_custom_steps?: CustomStepItem[]
-  post_custom_steps?: CustomStepItem[]
-  custom_steps?: CustomStepItem[]
+  pre_custom_steps?: unknown[]
+  post_custom_steps?: unknown[]
+  custom_steps?: unknown[]
 }
 
 type ScriptRow = {
@@ -108,10 +108,9 @@ type CustomStepSectionProps = {
 const TYPE_LABELS: Record<CustomStepType, string> = {
   path: "执行跑图脚本",
   macro: "执行宏脚本",
-  close_game: "关闭游戏",
 }
 
-const typeOptions: CustomStepType[] = ["path", "macro", "close_game"]
+const typeOptions: CustomStepType[] = ["path", "macro"]
 
 const normalizeScripts = (payload: unknown): string[] => {
   if (!payload) return []
@@ -138,19 +137,20 @@ const normalizeScripts = (payload: unknown): string[] => {
     .map((item) => item.name)
 }
 
-const normalizeCustomSteps = (steps: CustomStepItem[] | undefined): CustomStepItem[] => {
+const normalizeCustomSteps = (steps: unknown): CustomStepItem[] => {
   if (!Array.isArray(steps)) return []
-  return steps
-    .filter((step) => step && typeof step.id === "string")
-    .map((step) => ({
-      id: step.id,
-      enabled: Boolean(step.enabled),
-      type:
-        step.type === "path" || step.type === "macro" || step.type === "close_game"
-          ? step.type
-          : "path",
-      script_name: typeof step.script_name === "string" ? step.script_name : "",
-    }))
+  return steps.flatMap((step): CustomStepItem[] => {
+    if (!step || typeof step !== "object") return []
+    const item = step as Record<string, unknown>
+    if (typeof item.id !== "string") return []
+    if (item.type !== "path" && item.type !== "macro") return []
+    return [{
+      id: item.id,
+      enabled: Boolean(item.enabled),
+      type: item.type,
+      script_name: typeof item.script_name === "string" ? item.script_name : "",
+    }]
+  })
 }
 
 const createStepId = () =>
@@ -233,23 +233,12 @@ function SortableCustomStepRow({
           onValueChange={(nextValue) =>
             onCommitScriptName(nextValue ? String(nextValue) : "")
           }
-          onInputValueChange={(nextValue) => {
-            if (step.type === "close_game") return
-            onLocalScriptNameChange(nextValue)
-          }}
+          onInputValueChange={onLocalScriptNameChange}
         >
           <ComboboxInput
             className="w-full"
-            disabled={step.type === "close_game"}
-            placeholder={step.type === "close_game"
-              ? "关闭游戏无需脚本"
-              : step.type === "path"
-                ? "请输入跑图脚本名"
-                : "请输入宏脚本名"}
-            onBlur={(event) => {
-              if (step.type === "close_game") return
-              onCommitScriptName(event.target.value)
-            }}
+            placeholder={step.type === "path" ? "请输入跑图脚本名" : "请输入宏脚本名"}
+            onBlur={(event) => onCommitScriptName(event.target.value)}
           />
           <ComboboxContent>
             <ComboboxList>
@@ -558,7 +547,7 @@ export function OneDragonFlowPage({
     const currentSteps = section === "pre" ? preCustomSteps : postCustomSteps
     const nextSteps = currentSteps.map((item) =>
       item.id === id
-        ? { ...item, type, script_name: type === "close_game" ? "" : item.script_name }
+        ? { ...item, type }
         : item,
     )
     persistSectionSteps(section, nextSteps)
