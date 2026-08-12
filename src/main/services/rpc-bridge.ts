@@ -49,7 +49,12 @@ export function registerRpcBridge() {
         (source === 'agent' && phase === 'started' && hasAgentToolCall)
         || (source !== 'agent' && phase === 'started')
       if (shouldAutoShow) {
-        if (mainWindowForTaskStart && !mainWindowForTaskStart.isDestroyed()) {
+        if (
+          mainWindowForTaskStart &&
+          !mainWindowForTaskStart.isDestroyed() &&
+          mainWindowForTaskStart.isVisible() &&
+          !mainWindowForTaskStart.isMinimized()
+        ) {
           mainWindowForTaskStart.minimize()
         }
         setOverlayIgnoreMouseEvents(true)
