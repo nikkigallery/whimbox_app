@@ -3,21 +3,9 @@ import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { toast } from 'sonner'
 import type { TaskProgressState } from 'renderer/components/global-progress-modal'
 import { apiClient } from 'renderer/lib/api-client'
+import { compareVersion } from 'shared/version'
 
 const IGNORED_VERSION_KEY = 'ignored_version'
-
-function compareVersion(a: string, b: string): number {
-  const parse = (s: string) => {
-    const parts = s.replace(/^v/i, '').split('.')
-    return [parseInt(parts[0], 10) || 0, parseInt(parts[1], 10) || 0, parseInt(parts[2], 10) || 0]
-  }
-  const [ma, mi, pa] = parse(a)
-  const [mb, mj, pb] = parse(b)
-  if (ma !== mb) return ma > mb ? 1 : -1
-  if (mi !== mj) return mi > mj ? 1 : -1
-  if (pa !== pb) return pa > pb ? 1 : -1
-  return 0
-}
 
 function getIgnoredVersion(): string | null {
   try {
