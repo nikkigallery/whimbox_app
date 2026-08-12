@@ -1,4 +1,3 @@
-import log from 'electron-log/renderer'
 import { useEffect, useMemo, useRef, useState } from 'react'
 
 import type {
@@ -17,8 +16,6 @@ type MapMaskCanvasProps = {
   labels: MapMaskLabel[]
   enabled: boolean
 }
-
-const PERFORMANCE_LOG_INTERVAL_MS = 2000
 
 const markerColors = [
   '#ff6b8a',
@@ -55,36 +52,6 @@ export function MapMaskCanvas({
 }: MapMaskCanvasProps) {
   const canvasRef = useRef<HTMLCanvasElement | null>(null)
   const [size, setSize] = useState({ width: 1, height: 1 })
-  const drawStatsRef = useRef({
-    draws: 0,
-    totalDrawMs: 0,
-    maxDrawMs: 0,
-    pointCount: 0,
-    enabled: false,
-  })
-
-  useEffect(() => {
-    const timer = window.setInterval(() => {
-      const stats = drawStatsRef.current
-      const averageDrawMs = stats.draws
-        ? stats.totalDrawMs / stats.draws
-        : 0
-      log.info(
-        '[map-mask-perf] canvas ' +
-          `draws=${stats.draws} avg_draw_ms=${averageDrawMs.toFixed(2)} ` +
-          `max_draw_ms=${stats.maxDrawMs.toFixed(2)} ` +
-          `points=${stats.pointCount} enabled=${stats.enabled}`
-      )
-      drawStatsRef.current = {
-        draws: 0,
-        totalDrawMs: 0,
-        maxDrawMs: 0,
-        pointCount: stats.pointCount,
-        enabled: stats.enabled,
-      }
-    }, PERFORMANCE_LOG_INTERVAL_MS)
-    return () => window.clearInterval(timer)
-  }, [])
 
   const labelById = useMemo(() => {
     return new Map(labels.map((label) => [label.id, label]))
@@ -115,8 +82,6 @@ export function MapMaskCanvas({
   useEffect(() => {
     const canvas = canvasRef.current
     if (!canvas) return
-    const started = performance.now()
-
     const ratio = Math.max(1, window.devicePixelRatio || 1)
     canvas.width = Math.round(size.width * ratio)
     canvas.height = Math.round(size.height * ratio)
@@ -127,16 +92,7 @@ export function MapMaskCanvas({
     context.setTransform(ratio, 0, 0, ratio, 0, 0)
     context.clearRect(0, 0, size.width, size.height)
 
-    if (!enabled) {
-      const elapsed = performance.now() - started
-      const stats = drawStatsRef.current
-      stats.draws += 1
-      stats.totalDrawMs += elapsed
-      stats.maxDrawMs = Math.max(stats.maxDrawMs, elapsed)
-      stats.pointCount = 0
-      stats.enabled = false
-      return
-    }
+    if (!enabled) return
 
     for (const item of canvasPoints) {
       const label = labelById.get(item.point.label_id)
@@ -161,14 +117,6 @@ export function MapMaskCanvas({
       context.fillText(markerGlyph(label), item.x, item.y + 0.5)
       context.restore()
     }
-
-    const elapsed = performance.now() - started
-    const stats = drawStatsRef.current
-    stats.draws += 1
-    stats.totalDrawMs += elapsed
-    stats.maxDrawMs = Math.max(stats.maxDrawMs, elapsed)
-    stats.pointCount = canvasPoints.length
-    stats.enabled = true
   }, [canvasPoints, enabled, labelById, size.height, size.width])
 
   return (

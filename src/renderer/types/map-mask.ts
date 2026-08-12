@@ -77,15 +77,6 @@ export type MapMaskState = {
   center_correction_offset_x: number
   center_correction_offset_y: number
   center_correction_source: string
-  nearest_loaded_point_id: string
-  nearest_loaded_point_name: string
-  nearest_loaded_point_image_x: number | null
-  nearest_loaded_point_image_y: number | null
-  nearest_loaded_point_distance: number | null
-  nearest_loaded_point_delta_image_x: number | null
-  nearest_loaded_point_delta_image_y: number | null
-  nearest_loaded_point_delta_screen_x: number | null
-  nearest_loaded_point_delta_screen_y: number | null
   pending_center_x: number | null
   pending_center_y: number | null
   center_jump_distance: number | null
@@ -153,52 +144,6 @@ export type MapMaskLabelsResponse = {
 export type MapMaskVisiblePointsResponse = {
   points: VisibleMapMaskPoint[]
   state: MapMaskState
-}
-
-export type GameWindowBounds = {
-  x: number
-  y: number
-  width: number
-  height: number
-  source: 'debug-fixed' | 'game-window'
-  appliedBoundsSource: 'debug-fixed' | 'client-area' | 'window-rect'
-  trackerMode: 'debug' | 'real-window'
-  isGameWindowFound: boolean
-  isForeground: boolean
-  isMinimized: boolean
-  clientAreaAvailable: boolean
-  clientX: number | null
-  clientY: number | null
-  clientWidth: number | null
-  clientHeight: number | null
-  windowRect: GameWindowRect | null
-  clientRect: GameWindowRect | null
-  dpiScale: number | null
-  scaleFactor: number | null
-  matchedBy: 'title' | 'process' | 'fallback'
-  processName: string | null
-  pid: number | null
-  foundWindowTitle: string | null
-  foundWindowHandle: string | null
-  titleKeywords: string[]
-  processNames: string[]
-  lastUpdateTime: string
-  trackerIntervalMs: number
-  lastUpdateDurationMs: number
-  lastBoundsChanged: boolean
-  message?: string
-  overlay?: { x: number; y: number; width: number; height: number } | null
-}
-
-export type GameWindowRect = {
-  left: number
-  top: number
-  right: number
-  bottom: number
-  x: number
-  y: number
-  width: number
-  height: number
 }
 
 export type MapMaskUserStatus = {

@@ -9,75 +9,15 @@ import { gameWindowTracker, type GameWindowBounds } from '../services/game-windo
 let mapMaskOverlayWindowRef: BrowserWindow | null = null
 let creatingMapMaskOverlayWindowPromise: Promise<BrowserWindow> | null = null
 let followGameWindowTimer: ReturnType<typeof setInterval> | null = null
-let followGameWindowPerfTimer: ReturnType<typeof setInterval> | null = null
-let mapMaskOverlayIgnoringMouseEvents = true
 let mapMaskOverlayVisibleRequested = false
 let hiddenBecauseGameMinimized = false
 let hiddenBecauseGameUnfocused = false
 let allowMapMaskOverlayClose = false
 
-const WINDOW_TRACKER_PERF_LOG_INTERVAL_MS = 2_000
 const WINDOW_BOUNDS_TOLERANCE_PX = 1
-
-type WindowTrackerPerfStats = {
-  polls: number
-  successes: number
-  failures: number
-  totalRpcMs: number
-  maxRpcMs: number
-  trackerChanges: number
-  getBoundsCalls: number
-  setBoundsCalls: number
-  hideCalls: number
-  showCalls: number
-  lastBoundsChange: string | null
-}
-
-function createWindowTrackerPerfStats(): WindowTrackerPerfStats {
-  return {
-    polls: 0,
-    successes: 0,
-    failures: 0,
-    totalRpcMs: 0,
-    maxRpcMs: 0,
-    trackerChanges: 0,
-    getBoundsCalls: 0,
-    setBoundsCalls: 0,
-    hideCalls: 0,
-    showCalls: 0,
-    lastBoundsChange: null,
-  }
-}
-
-let windowTrackerPerfStats = createWindowTrackerPerfStats()
-
-function logWindowTrackerPerf() {
-  const stats = windowTrackerPerfStats
-  const averageRpcMs = stats.successes > 0 ? stats.totalRpcMs / stats.successes : 0
-  log.info(
-    `[map-mask-window-perf] polls=${stats.polls} successes=${stats.successes} failures=${stats.failures} `
-    + `tracker_changes=${stats.trackerChanges} avg_rpc_ms=${averageRpcMs.toFixed(2)} `
-    + `max_rpc_ms=${stats.maxRpcMs.toFixed(2)} get_bounds=${stats.getBoundsCalls} `
-    + `set_bounds=${stats.setBoundsCalls} hides=${stats.hideCalls} shows=${stats.showCalls} `
-    + `last_bounds_change=${stats.lastBoundsChange ?? 'none'}`,
-  )
-  windowTrackerPerfStats = createWindowTrackerPerfStats()
-}
 
 function isHiddenBecauseGameInactive() {
   return hiddenBecauseGameMinimized || hiddenBecauseGameUnfocused
-}
-
-function isCalibrationOverlayEnabledByEnv() {
-  const value = process.env.WHIMBOX_MAP_MASK_DEBUG_OVERLAY ?? process.env.WHIMBOX_MAP_MASK_CALIBRATION_OVERLAY
-  if (!value) return false
-  return ['1', 'true', 'yes', 'on'].includes(value.trim().toLowerCase())
-}
-
-function isViewportDebugEnabledByEnv() {
-  const value = process.env.WHIMBOX_MAP_MASK_DEBUG_VIEWPORT
-  if (!value) return false
-  return ['1', 'true', 'yes', 'on'].includes(value.trim().toLowerCase())
 }
 
 function getTrackedBounds(): GameWindowBounds {
@@ -89,32 +29,14 @@ async function refreshTrackedBounds(): Promise<GameWindowBounds> {
 }
 
 async function applyTrackedBounds(win: BrowserWindow) {
-  windowTrackerPerfStats.polls += 1
-  const rpcStartedAt = performance.now()
-  let bounds: GameWindowBounds
-  try {
-    bounds = await refreshTrackedBounds()
-    const rpcDurationMs = performance.now() - rpcStartedAt
-    windowTrackerPerfStats.successes += 1
-    windowTrackerPerfStats.totalRpcMs += rpcDurationMs
-    windowTrackerPerfStats.maxRpcMs = Math.max(windowTrackerPerfStats.maxRpcMs, rpcDurationMs)
-    if (bounds.lastBoundsChanged) {
-      windowTrackerPerfStats.trackerChanges += 1
-    }
-  } catch (error) {
-    windowTrackerPerfStats.failures += 1
-    throw error
-  }
+  const bounds = await refreshTrackedBounds()
 
   const shouldHideBecauseMinimized = bounds.isGameWindowFound && bounds.isMinimized
-  const shouldHideBecauseUnfocused = bounds.trackerMode === 'real-window' && (
-    !bounds.isGameWindowFound || !bounds.isForeground
-  )
+  const shouldHideBecauseUnfocused = !bounds.isGameWindowFound || !bounds.isForeground
   if (shouldHideBecauseMinimized || shouldHideBecauseUnfocused) {
     hiddenBecauseGameMinimized = shouldHideBecauseMinimized
     hiddenBecauseGameUnfocused = shouldHideBecauseUnfocused
     if (win.isVisible()) {
-      windowTrackerPerfStats.hideCalls += 1
       win.hide()
     }
     return bounds
@@ -129,7 +51,6 @@ async function applyTrackedBounds(win: BrowserWindow) {
     width: bounds.width,
     height: bounds.height,
   }
-  windowTrackerPerfStats.getBoundsCalls += 1
   const currentBounds = win.getBounds()
   if (
     Math.abs(currentBounds.x - nextBounds.x) > WINDOW_BOUNDS_TOLERANCE_PX ||
@@ -137,14 +58,10 @@ async function applyTrackedBounds(win: BrowserWindow) {
     Math.abs(currentBounds.width - nextBounds.width) > WINDOW_BOUNDS_TOLERANCE_PX ||
     Math.abs(currentBounds.height - nextBounds.height) > WINDOW_BOUNDS_TOLERANCE_PX
   ) {
-    windowTrackerPerfStats.setBoundsCalls += 1
-    windowTrackerPerfStats.lastBoundsChange = `${currentBounds.x},${currentBounds.y},${currentBounds.width}x${currentBounds.height}`
-      + `->${nextBounds.x},${nextBounds.y},${nextBounds.width}x${nextBounds.height}`
     win.setBounds(nextBounds)
   }
 
   if (wasHiddenBecauseGameInactive && mapMaskOverlayVisibleRequested && !win.isVisible()) {
-    windowTrackerPerfStats.showCalls += 1
     win.showInactive()
   }
 
@@ -162,7 +79,6 @@ async function bringMapMaskOverlayToFront(win: BrowserWindow) {
 
 function startFollowGameWindow() {
   if (followGameWindowTimer) return
-  windowTrackerPerfStats = createWindowTrackerPerfStats()
   followGameWindowTimer = setInterval(() => {
     const win = mapMaskOverlayWindowRef
     if (!win || win.isDestroyed()) return
@@ -170,7 +86,6 @@ function startFollowGameWindow() {
       log.warn(`[map-mask-overlay] failed to follow game window: ${error instanceof Error ? error.message : String(error)}`)
     })
   }, gameWindowTracker.getIntervalMs())
-  followGameWindowPerfTimer = setInterval(logWindowTrackerPerf, WINDOW_TRACKER_PERF_LOG_INTERVAL_MS)
 }
 
 function stopFollowGameWindow() {
@@ -178,40 +93,14 @@ function stopFollowGameWindow() {
     clearInterval(followGameWindowTimer)
     followGameWindowTimer = null
   }
-  if (followGameWindowPerfTimer) {
-    clearInterval(followGameWindowPerfTimer)
-    followGameWindowPerfTimer = null
-  }
-  windowTrackerPerfStats = createWindowTrackerPerfStats()
 }
 
-export function getMapMaskOverlayWindow() {
-  return mapMaskOverlayWindowRef
-}
-
-export function setMapMaskOverlayIgnoreMouseEvents(
+function setMapMaskOverlayIgnoreMouseEvents(
   ignore: boolean,
 ) {
   const win = mapMaskOverlayWindowRef
   if (!win || win.isDestroyed()) return
-  mapMaskOverlayIgnoringMouseEvents = ignore
   win.setIgnoreMouseEvents(ignore)
-}
-
-export function getMapMaskOverlayDebugState() {
-  const win = mapMaskOverlayWindowRef
-  return {
-    exists: Boolean(win && !win.isDestroyed()),
-    visible: Boolean(win && !win.isDestroyed() && win.isVisible()),
-    alwaysOnTop: Boolean(win && !win.isDestroyed() && win.isAlwaysOnTop()),
-    ignoreMouseEvents: mapMaskOverlayIgnoringMouseEvents,
-    transparentConfigured: true,
-    bounds: win && !win.isDestroyed() ? win.getBounds() : null,
-    hiddenBecauseGameMinimized,
-    visibleRequested: mapMaskOverlayVisibleRequested,
-    hiddenBecauseGameUnfocused,
-    tracker: gameWindowTracker.getBounds(),
-  }
 }
 
 async function ensureMapMaskOverlayWindow() {
@@ -247,30 +136,6 @@ function registerMapMaskOverlayIpc() {
     stopFollowGameWindow()
     return true
   })
-
-  ipcMain.handle('map-mask-overlay:get-bounds', async () => {
-    const tracked = getTrackedBounds()
-    const win = mapMaskOverlayWindowRef
-    return {
-      ...tracked,
-      overlay: win && !win.isDestroyed() ? win.getBounds() : null,
-    }
-  })
-
-  ipcMain.handle('map-mask-overlay:sync-to-game-window', async () => {
-    const win = mapMaskOverlayWindowRef
-    if (!win || win.isDestroyed()) return refreshTrackedBounds()
-    const tracked = await applyTrackedBounds(win)
-    return {
-      ...tracked,
-      overlay: win.getBounds(),
-    }
-  })
-
-  ipcMain.handle('map-mask-overlay:get-debug-options', () => ({
-    calibrationOverlayEnabled: isCalibrationOverlayEnabledByEnv(),
-    viewportDebugEnabled: isViewportDebugEnabledByEnv(),
-  }))
 
   ipcMain.handle(
     'map-mask-overlay:set-ignore-mouse-events',
@@ -344,12 +209,7 @@ async function createMapMaskOverlayWindow() {
     window.webContents.once('did-finish-load', () => resolve())
   })
 
-  log.info(`[map-mask-overlay] created with tracker mode=${gameWindowTracker.getMode()}`)
   return window
-}
-
-export async function MapMaskOverlayWindow() {
-  return ensureMapMaskOverlayWindow()
 }
 
 export function persistMapMaskOverlayState() {

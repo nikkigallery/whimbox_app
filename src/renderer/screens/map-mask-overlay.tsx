@@ -1,4 +1,3 @@
-import log from 'electron-log/renderer'
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 
 import { MapMaskCanvas } from 'renderer/components/map-mask/map-mask-canvas'
@@ -12,7 +11,6 @@ import type {
 } from 'renderer/types/map-mask'
 
 const POINT_POSITION_TOLERANCE_PX = 2
-const PERFORMANCE_LOG_INTERVAL_MS = 2000
 
 function isFiniteNumber(value: unknown): value is number {
   return typeof value === 'number' && Number.isFinite(value)
@@ -179,46 +177,6 @@ export function MapMaskOverlayScreen() {
   }))
   const lastRenderableResultRef =
     useRef<MapMaskVisiblePointsResponse | null>(null)
-  const snapshotStatsRef = useRef({
-    requests: 0,
-    successes: 0,
-    failures: 0,
-    visualUpdates: 0,
-    skippedUpdates: 0,
-    totalRpcMs: 0,
-    maxRpcMs: 0,
-    pointCount: 0,
-  })
-
-  useEffect(() => {
-    const timer = window.setInterval(() => {
-      const stats = snapshotStatsRef.current
-      const averageRpcMs = stats.successes
-        ? stats.totalRpcMs / stats.successes
-        : 0
-      log.info(
-        '[map-mask-perf] snapshots ' +
-          `requests=${stats.requests} successes=${stats.successes} ` +
-          `failures=${stats.failures} visual_updates=${stats.visualUpdates} ` +
-          `skipped=${stats.skippedUpdates} ` +
-          `avg_rpc_ms=${averageRpcMs.toFixed(2)} ` +
-          `max_rpc_ms=${stats.maxRpcMs.toFixed(2)} ` +
-          `points=${stats.pointCount}`
-      )
-      snapshotStatsRef.current = {
-        requests: 0,
-        successes: 0,
-        failures: 0,
-        visualUpdates: 0,
-        skippedUpdates: 0,
-        totalRpcMs: 0,
-        maxRpcMs: 0,
-        pointCount: stats.pointCount,
-      }
-    }, PERFORMANCE_LOG_INTERVAL_MS)
-    return () => window.clearInterval(timer)
-  }, [])
-
   useEffect(() => {
     const updateOverlaySize = () => {
       setOverlaySize({ width: window.innerWidth, height: window.innerHeight })
@@ -236,29 +194,14 @@ export function MapMaskOverlayScreen() {
   }, [])
 
   const refreshVisiblePoints = useCallback(async () => {
-    const started = performance.now()
-    snapshotStatsRef.current.requests += 1
-    try {
-      const result = (await window.App.rpc.request(
-        'map_mask.get_visible_points'
-      )) as MapMaskVisiblePointsResponse
-      const elapsed = performance.now() - started
-      const stats = snapshotStatsRef.current
-      stats.successes += 1
-      stats.totalRpcMs += elapsed
-      stats.maxRpcMs = Math.max(stats.maxRpcMs, elapsed)
-      stats.pointCount = result.points.length
-      if (hasSameRenderableSnapshot(lastRenderableResultRef.current, result)) {
-        stats.skippedUpdates += 1
-        return
-      }
-      lastRenderableResultRef.current = result
-      stats.visualUpdates += 1
-      setVisibleResult(result)
-    } catch (error) {
-      snapshotStatsRef.current.failures += 1
-      throw error
+    const result = (await window.App.rpc.request(
+      'map_mask.get_visible_points'
+    )) as MapMaskVisiblePointsResponse
+    if (hasSameRenderableSnapshot(lastRenderableResultRef.current, result)) {
+      return
     }
+    lastRenderableResultRef.current = result
+    setVisibleResult(result)
   }, [])
 
   useEffect(() => {

@@ -70,112 +70,7 @@ declare global {
       mapMaskOverlay?: {
         show: () => Promise<boolean>
         hide: () => Promise<boolean>
-        getBounds: () => Promise<{
-          x: number
-          y: number
-          width: number
-          height: number
-          source: 'debug-fixed' | 'game-window'
-          appliedBoundsSource: 'debug-fixed' | 'client-area' | 'window-rect'
-          trackerMode: 'debug' | 'real-window'
-          isGameWindowFound: boolean
-          isForeground: boolean
-          isMinimized: boolean
-          clientAreaAvailable: boolean
-          clientX: number | null
-          clientY: number | null
-          clientWidth: number | null
-          clientHeight: number | null
-          windowRect: {
-            left: number
-            top: number
-            right: number
-            bottom: number
-            x: number
-            y: number
-            width: number
-            height: number
-          } | null
-          clientRect: {
-            left: number
-            top: number
-            right: number
-            bottom: number
-            x: number
-            y: number
-            width: number
-            height: number
-          } | null
-          dpiScale: number | null
-          scaleFactor: number | null
-          matchedBy: 'title' | 'process' | 'fallback'
-          processName: string | null
-          pid: number | null
-          foundWindowTitle: string | null
-          foundWindowHandle: string | null
-          titleKeywords: string[]
-          processNames: string[]
-          lastUpdateTime: string
-          trackerIntervalMs: number
-          lastUpdateDurationMs: number
-          lastBoundsChanged: boolean
-          message?: string
-          overlay?: { x: number; y: number; width: number; height: number } | null
-        }>
-        syncToGameWindow: () => Promise<{
-          x: number
-          y: number
-          width: number
-          height: number
-          source: 'debug-fixed' | 'game-window'
-          appliedBoundsSource: 'debug-fixed' | 'client-area' | 'window-rect'
-          trackerMode: 'debug' | 'real-window'
-          isGameWindowFound: boolean
-          isForeground: boolean
-          isMinimized: boolean
-          clientAreaAvailable: boolean
-          clientX: number | null
-          clientY: number | null
-          clientWidth: number | null
-          clientHeight: number | null
-          windowRect: {
-            left: number
-            top: number
-            right: number
-            bottom: number
-            x: number
-            y: number
-            width: number
-            height: number
-          } | null
-          clientRect: {
-            left: number
-            top: number
-            right: number
-            bottom: number
-            x: number
-            y: number
-            width: number
-            height: number
-          } | null
-          dpiScale: number | null
-          scaleFactor: number | null
-          matchedBy: 'title' | 'process' | 'fallback'
-          processName: string | null
-          pid: number | null
-          foundWindowTitle: string | null
-          foundWindowHandle: string | null
-          titleKeywords: string[]
-          processNames: string[]
-          lastUpdateTime: string
-          trackerIntervalMs: number
-          lastUpdateDurationMs: number
-          lastBoundsChanged: boolean
-          message?: string
-          overlay?: { x: number; y: number; width: number; height: number } | null
-        }>
-        setIgnoreMouseEvents: (ignore: boolean, options?: { forward?: boolean }) => Promise<void>
-        getDebugOptions: () => Promise<{ calibrationOverlayEnabled: boolean; viewportDebugEnabled: boolean }>
+        setIgnoreMouseEvents: (ignore: boolean) => Promise<void>
       }
       conversation: {
         getState: () => Promise<{
@@ -337,5 +232,3 @@ declare namespace JSX {
     }
   }
 }
-
-export {}
