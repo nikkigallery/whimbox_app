@@ -13,7 +13,7 @@
   Rss,
   Sparkles,
   Square,
-  Tv,
+  Wrench,
   X,
 } from 'lucide-react'
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
@@ -46,8 +46,7 @@ import { OneDragonPage } from '../pages/one-dragon-page'
 import { AutoMacroPage } from '../pages/auto-macro-page'
 import { AutoMusicPage } from '../pages/auto-music-page'
 import { ScriptSubscribePage } from '../pages/script-subscribe-page'
-import { VideoOverlayPage } from '../pages/video-overlay-page'
-import { MapMaskPage } from '../pages/map-mask-page'
+import { ToolboxPage } from '../pages/toolbox-page'
 import { IpcRpcClient } from 'renderer/lib/ipc-rpc'
 import { apiClient } from 'renderer/lib/api-client'
 import { type ConversationSendPayload, useHomeConversation } from 'renderer/hooks/use-home-conversation'
@@ -100,8 +99,7 @@ const navItems: NavItem[] = [
     ],
   },
   { id: 'script-subscribe', label: '订阅脚本', icon: Rss },
-  { id: 'map-mask', label: 'Map Mask', icon: Map },
-  { id: 'video-overlay', label: '视频小窗', icon: Tv },
+  { id: 'toolbox', label: '工具箱', icon: Wrench },
 ]
 
 type AgentStatusState = {
@@ -494,10 +492,8 @@ export function MainScreen() {
         )
       case 'auto-trigger':
         return <AutoTriggerPage rpcClient={rpcClient} backendReloadVersion={backendReloadVersion} />
-      case 'video-overlay':
-        return <VideoOverlayPage />
-      case 'map-mask':
-        return <MapMaskPage />
+      case 'toolbox':
+        return <ToolboxPage />
       case 'auto-navigate':
         return <AutoNavigatePage rpcClient={rpcClient} sessionId={sessionId} rpcState={rpcState} />
       case 'auto-macro':
@@ -563,22 +559,6 @@ export function MainScreen() {
           </div>
         </div>
         <div className="app-no-drag flex items-center gap-3">
-          <button
-            type="button"
-            onClick={() => void window.App?.mapMaskOverlay?.show?.()}
-            className="flex items-center gap-2 rounded-full border border-slate-200 bg-white/80 px-3 py-1 text-xs text-slate-500 shadow-sm transition hover:bg-slate-50 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-300 dark:hover:bg-slate-700"
-          >
-            <Map className="size-3" />
-            Map Mask
-          </button>
-          <button
-            type="button"
-            onClick={() => void window.App?.videoOverlay?.show?.()}
-            className="flex items-center gap-2 rounded-full border border-slate-200 bg-white/80 px-3 py-1 text-xs text-slate-500 shadow-sm transition hover:bg-slate-50 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-300 dark:hover:bg-slate-700"
-          >
-            <Tv className="size-3" />
-            视频小窗
-          </button>
           <button
             type="button"
             onClick={() => window.App?.overlay?.show?.()}
