@@ -137,6 +137,10 @@ function registerMapMaskOverlayIpc() {
     return true
   })
 
+  ipcMain.handle('map-mask-overlay:get-state', () => ({
+    active: mapMaskOverlayVisibleRequested,
+  }))
+
   ipcMain.handle(
     'map-mask-overlay:set-ignore-mouse-events',
     (_event, ignore: boolean) => {

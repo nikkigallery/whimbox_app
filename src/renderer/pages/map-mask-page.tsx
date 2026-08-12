@@ -57,6 +57,7 @@ export function MapMaskPage() {
   const [selectedLabelIds, setSelectedLabelIds] = useState<string[]>([])
   const [settingsLoading, setSettingsLoading] = useState(true)
   const [opening, setOpening] = useState(false)
+  const [overlayActive, setOverlayActive] = useState(false)
   const [refreshing, setRefreshing] = useState(false)
   const [updatingFilter, setUpdatingFilter] = useState(false)
 
@@ -86,6 +87,13 @@ export function MapMaskPage() {
   useEffect(() => {
     void loadFilters()
   }, [loadFilters])
+
+  useEffect(() => {
+    void window.App.mapMaskOverlay
+      ?.getState()
+      .then(state => setOverlayActive(state.active))
+      .catch(() => {})
+  }, [])
 
   const waitForLogin = useCallback(async () => {
     let status = (await window.App.rpc.request(
@@ -149,18 +157,25 @@ export function MapMaskPage() {
     return waitForLogin()
   }, [refreshUserState, waitForLogin])
 
-  const handleOpen = async () => {
+  const handleToggleOverlay = async () => {
     if (settingsLoading || opening || refreshing || updatingFilter) return
     setOpening(true)
     try {
+      if (overlayActive) {
+        await window.App.mapMaskOverlay?.hide()
+        setOverlayActive(false)
+        toast.success('地图遮罩已关闭')
+        return
+      }
       await ensureUserSession()
       await window.App.rpc.request('map_mask.set_hide_awarded', {
         hide_awarded: true,
       })
       await window.App.mapMaskOverlay?.show()
+      setOverlayActive(true)
       toast.success('地图遮罩已打开，请回到游戏并打开大地图')
     } catch (error) {
-      toast.error(error instanceof Error ? error.message : '打开地图遮罩失败')
+      toast.error(error instanceof Error ? error.message : '切换地图遮罩失败')
     } finally {
       setOpening(false)
     }
@@ -234,7 +249,7 @@ export function MapMaskPage() {
                 <Button
                   className="h-11 rounded-xl bg-pink-400 px-5 text-white shadow-sm hover:bg-pink-500 dark:bg-pink-500 dark:hover:bg-pink-400"
                   disabled={actionBusy}
-                  onClick={() => void handleOpen()}
+                  onClick={() => void handleToggleOverlay()}
                   type="button"
                 >
                   {opening ? (
@@ -242,7 +257,13 @@ export function MapMaskPage() {
                   ) : (
                     <MapPinned className="size-4" />
                   )}
-                  {opening ? '正在准备遮罩…' : '打开地图遮罩'}
+                  {opening
+                    ? overlayActive
+                      ? '正在关闭遮罩…'
+                      : '正在准备遮罩…'
+                    : overlayActive
+                      ? '关闭地图遮罩'
+                      : '打开地图遮罩'}
                 </Button>
                 <Button
                   className="h-11 rounded-xl"

@@ -70,6 +70,7 @@ declare global {
       mapMaskOverlay?: {
         show: () => Promise<boolean>
         hide: () => Promise<boolean>
+        getState: () => Promise<{ active: boolean }>
         setIgnoreMouseEvents: (ignore: boolean) => Promise<void>
       }
       conversation: {
