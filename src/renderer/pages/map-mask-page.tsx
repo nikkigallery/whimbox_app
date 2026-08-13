@@ -6,6 +6,7 @@ import {
   RefreshCw,
   Sparkles,
   Star,
+  Trash2,
 } from 'lucide-react'
 import { toast } from 'sonner'
 
@@ -13,6 +14,14 @@ import { ScrollCenterLayout } from 'renderer/components/scroll-center-layout'
 import { SettingsPageLayout } from 'renderer/components/settings-page-layout'
 import { Button } from 'renderer/components/ui/button'
 import { Checkbox } from 'renderer/components/ui/checkbox'
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+} from 'renderer/components/ui/dialog'
 import type {
   MapMaskLabelsResponse,
   MapMaskUserStatus,
@@ -60,6 +69,8 @@ export function MapMaskPage() {
   const [overlayActive, setOverlayActive] = useState(false)
   const [refreshing, setRefreshing] = useState(false)
   const [updatingFilter, setUpdatingFilter] = useState(false)
+  const [clearLoginDialogOpen, setClearLoginDialogOpen] = useState(false)
+  const [clearingLogin, setClearingLogin] = useState(false)
 
   const loadFilters = useCallback(async () => {
     try {
@@ -220,7 +231,24 @@ export function MapMaskPage() {
     }
   }
 
-  const actionBusy = settingsLoading || opening || refreshing || updatingFilter
+  const handleClearLogin = async () => {
+    if (clearingLogin) return
+    setClearingLogin(true)
+    try {
+      await window.App.mapMaskOverlay?.hide()
+      setOverlayActive(false)
+      await window.App.rpc.request('map_mask.clear_pearpal_login')
+      setClearLoginDialogOpen(false)
+      toast.success('登录信息已清除，下次打开地图遮罩时需要重新登录')
+    } catch (error) {
+      toast.error(error instanceof Error ? error.message : '清除登录信息失败')
+    } finally {
+      setClearingLogin(false)
+    }
+  }
+
+  const actionBusy =
+    settingsLoading || opening || refreshing || updatingFilter || clearingLogin
 
   return (
     <ScrollCenterLayout
@@ -276,6 +304,16 @@ export function MapMaskPage() {
                     className={refreshing ? 'size-4 animate-spin' : 'size-4'}
                   />
                   {refreshing ? '正在刷新…' : '刷新点位'}
+                </Button>
+                <Button
+                  className="h-11 rounded-xl text-red-500 hover:bg-red-50 hover:text-red-600 dark:text-red-400 dark:hover:bg-red-950/30 dark:hover:text-red-300"
+                  disabled={actionBusy}
+                  onClick={() => setClearLoginDialogOpen(true)}
+                  type="button"
+                  variant="outline"
+                >
+                  <Trash2 className="size-4" />
+                  清除登录信息
                 </Button>
               </div>
             </div>
@@ -342,6 +380,39 @@ export function MapMaskPage() {
           </section>
         </div>
       </SettingsPageLayout>
+      <Dialog
+        open={clearLoginDialogOpen}
+        onOpenChange={open => {
+          if (!clearingLogin) setClearLoginDialogOpen(open)
+        }}
+      >
+        <DialogContent className="sm:max-w-md" showCloseButton={!clearingLogin}>
+          <DialogHeader>
+            <DialogTitle>清除地图遮罩登录信息？</DialogTitle>
+            <DialogDescription>
+              将清除美鸭梨账号的本地登录缓存，并关闭当前地图遮罩。下次打开地图遮罩时需要重新登录。
+            </DialogDescription>
+          </DialogHeader>
+          <DialogFooter>
+            <Button
+              disabled={clearingLogin}
+              onClick={() => setClearLoginDialogOpen(false)}
+              type="button"
+              variant="outline"
+            >
+              取消
+            </Button>
+            <Button
+              disabled={clearingLogin}
+              onClick={() => void handleClearLogin()}
+              type="button"
+              variant="destructive"
+            >
+              {clearingLogin ? '正在清除…' : '确认清除'}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </ScrollCenterLayout>
   )
 }
