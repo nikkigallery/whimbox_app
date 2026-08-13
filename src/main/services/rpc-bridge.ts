@@ -1,12 +1,24 @@
-import { BrowserWindow, ipcMain } from 'electron'
+import { BrowserWindow, app, ipcMain } from 'electron'
 
 import { RpcClient } from './rpc-client'
+import { backendManager } from './backend-manager'
 import { forceShowOverlay, setOverlayIgnoreMouseEvents, showOverlayOnToolStart } from '../windows/overlay'
 
 let initialized = false
 const rpcClient = new RpcClient()
 let currentSessionId: string | null = null
 let mainWindowForTaskStart: BrowserWindow | null = null
+let appQuitRequested = false
+
+const quitWhimbox = async () => {
+  if (appQuitRequested) return
+  appQuitRequested = true
+  try {
+    await backendManager.stopBackend()
+  } finally {
+    app.quit()
+  }
+}
 
 const broadcast = (channel: string, payload: unknown) => {
   for (const window of BrowserWindow.getAllWindows()) {
@@ -31,6 +43,12 @@ export function registerRpcBridge() {
   })
   rpcClient.on('notification', (payload) => {
     broadcast('rpc:notification', payload)
+    if (payload.method === 'event.app.quit') {
+      // Give the backend a brief moment to finish publishing the task result
+      // before Electron terminates its managed Python process.
+      setTimeout(() => void quitWhimbox(), 250)
+      return
+    }
     if (payload.method === 'event.overlay.show') {
       forceShowOverlay()
       return
