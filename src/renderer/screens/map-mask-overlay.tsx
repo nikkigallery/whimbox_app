@@ -239,7 +239,7 @@ export function MapMaskOverlayScreen() {
         pollVisiblePoints(),
       ])
       if (!disposed && document.visibilityState === 'visible') {
-        visibleTimer = window.setInterval(() => void pollVisiblePoints(), 50)
+        visibleTimer = window.setInterval(() => void pollVisiblePoints(), 20)
       }
       starting = false
     }
