@@ -58,14 +58,17 @@ export function registerRpcBridge() {
         source?: string
         phase?: string
         tool_call_id?: string
+        ui_behavior?: string
       } | undefined
       const source = params?.source ?? ''
       if (source !== 'agent' && source !== 'task' && source !== 'background') return
       const phase = params?.phase ?? ''
+      const usesGameOverlay = params?.ui_behavior === 'game_overlay'
       const hasAgentToolCall = source === 'agent' && typeof params?.tool_call_id === 'string' && params.tool_call_id.length > 0
       const shouldAutoShow =
-        (source === 'agent' && phase === 'started' && hasAgentToolCall)
-        || (source !== 'agent' && phase === 'started')
+        usesGameOverlay
+        && ((source === 'agent' && phase === 'started' && hasAgentToolCall)
+          || (source !== 'agent' && phase === 'started'))
       if (shouldAutoShow) {
         if (
           mainWindowForTaskStart &&
@@ -77,9 +80,9 @@ export function registerRpcBridge() {
         }
         setOverlayIgnoreMouseEvents(true)
         showOverlayOnToolStart()
-      } else if (phase === 'stopping') {
+      } else if (usesGameOverlay && phase === 'stopping') {
         setOverlayIgnoreMouseEvents(false)
-      } else if (phase === 'completed' || phase === 'cancelled' || phase === 'error') {
+      } else if (usesGameOverlay && (phase === 'completed' || phase === 'cancelled' || phase === 'error')) {
         setOverlayIgnoreMouseEvents(false)
       }
     }
