@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from "react"
+import { useEffect, useMemo, useRef, useState } from "react"
 import { toast } from "sonner"
 
 import { ScrollCenterLayout } from "renderer/components/scroll-center-layout"
@@ -164,9 +164,10 @@ export function ScriptSelectPage({
   const runToolId = toolIdMap[mode]
   const recordToolId = recordToolIdMap[mode] ?? null
 
-  const loadScripts = async () => {
-    setLoading(true)
-    setError("")
+  const loadScripts = async (opts?: { silent?: boolean }) => {
+    const silent = opts?.silent === true
+    if (!silent) setLoading(true)
+    if (!silent) setError("")
     try {
       const params =
         mode === "path"
@@ -193,20 +194,38 @@ export function ScriptSelectPage({
       if (selectedName && !nextScripts.some((item) => item.name === selectedName)) {
         setSelectedName(null)
       }
-    } catch (err) {
+    } catch {
+      if (silent) {
+        // 静默刷新失败时保留当前列表，不打断用户操作
+        return
+      }
       setScripts([])
       setSelectedName(null)
       setError("读取脚本列表失败，请稍后重试。")
       toast.error("读取脚本列表失败")
     } finally {
-      setLoading(false)
+      if (!silent) setLoading(false)
     }
   }
+
+  const loadScriptsRef = useRef(loadScripts)
+  loadScriptsRef.current = loadScripts
 
   useEffect(() => {
     void loadScripts()
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [mode, nameFilter, targetFilter, typeFilter, countFilter, showDefault])
+
+  // 脚本目录文件变化（watchdog）或手动刷新时，后端会广播 event.scripts.changed，这里静默刷新列表
+  useEffect(() => {
+    const offNotification = rpcClient.on("notification", (notification) => {
+      if (notification.method !== "event.scripts.changed") return
+      void loadScriptsRef.current({ silent: true })
+    })
+    return () => {
+      offNotification()
+    }
+  }, [rpcClient])
 
   useEffect(() => {
     const offNotification = rpcClient.on("notification", (notification) => {

@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from "react"
+import { useEffect, useMemo, useRef, useState } from "react"
 import type { CSSProperties } from "react"
 import {
   closestCenter,
@@ -400,22 +400,33 @@ export function OneDragonFlowPage({
     }),
   )
 
+  const refreshScriptOptions = async () => {
+    try {
+      const [pathResult, macroResult] = await Promise.all([
+        rpcClient.sendRequest<unknown>("script.query_path", { show_default: true }),
+        rpcClient.sendRequest<unknown>("script.query_macro", { show_default: true }),
+      ])
+      setPathScripts(normalizeScripts(pathResult))
+      setMacroScripts(normalizeScripts(macroResult))
+    } catch {
+      // 静默失败，保留当前脚本选项
+    }
+  }
+
+  const refreshScriptOptionsRef = useRef(refreshScriptOptions)
+  refreshScriptOptionsRef.current = refreshScriptOptions
+
   const loadFlow = async () => {
     setLoading(true)
     setLoadError("")
     try {
-      const [flowResult, pathResult, macroResult] = await Promise.all([
-        rpcClient.sendRequest<OneDragonFlowResponse>("one_dragon.flow.get", {}),
-        rpcClient.sendRequest<unknown>("script.query_path", { show_default: true }),
-        rpcClient.sendRequest<unknown>("script.query_macro", { show_default: true }),
-      ])
+      const flowResult = await rpcClient.sendRequest<OneDragonFlowResponse>("one_dragon.flow.get", {})
       setDefaultSteps(Array.isArray(flowResult?.default_steps) ? flowResult.default_steps : [])
       setPreCustomSteps(normalizeCustomSteps(flowResult?.pre_custom_steps))
       setPostCustomSteps(
         normalizeCustomSteps(flowResult?.post_custom_steps ?? flowResult?.custom_steps),
       )
-      setPathScripts(normalizeScripts(pathResult))
-      setMacroScripts(normalizeScripts(macroResult))
+      await refreshScriptOptions()
     } catch {
       setLoadError("奇想盒后端异常，读取流程配置失败。")
       setDefaultSteps([])
@@ -431,6 +442,18 @@ export function OneDragonFlowPage({
   useEffect(() => {
     void loadFlow()
   }, [rpcClient, backendReloadVersion])
+
+  // 脚本目录文件变化（watchdog）或手动刷新时，后端会广播 event.scripts.changed，
+  // 只刷新前置/后置步骤的脚本选项，不重载流程配置，避免覆盖正在编辑的内容
+  useEffect(() => {
+    const offNotification = rpcClient.on("notification", (notification) => {
+      if (notification.method !== "event.scripts.changed") return
+      void refreshScriptOptionsRef.current()
+    })
+    return () => {
+      offNotification()
+    }
+  }, [rpcClient])
 
   useEffect(() => {
     const offNotification = rpcClient.on("notification", (notification) => {
