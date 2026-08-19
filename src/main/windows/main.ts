@@ -1,4 +1,5 @@
 import { BrowserWindow } from 'electron'
+import windowStateKeeper from 'electron-window-state'
 import { join } from 'node:path'
 
 import { createWindow } from 'lib/electron-app/factories/windows/create'
@@ -6,13 +7,23 @@ import { ENVIRONMENT } from 'shared/constants'
 import { displayName } from '~/package.json'
 
 export async function MainWindow() {
+  const mainWindowState = windowStateKeeper({
+    defaultWidth: 1100,
+    defaultHeight: 750,
+    file: 'main-window-state.json',
+    maximize: true,
+    fullScreen: false,
+  })
+
   const window = createWindow({
     id: 'main',
     title: displayName,
-    width: 1100,
-    height: 750,
-    minWidth:1100,
-    minHeight:750,
+    x: mainWindowState.x,
+    y: mainWindowState.y,
+    width: mainWindowState.width,
+    height: mainWindowState.height,
+    minWidth: 800,
+    minHeight: 600,
     show: false,
     center: false,
     movable: true,
@@ -25,6 +36,8 @@ export async function MainWindow() {
       preload: join(__dirname, '../preload/index.js'),
     },
   })
+
+  mainWindowState.manage(window)
 
   window.webContents.on('did-finish-load', () => {
     if (ENVIRONMENT.IS_DEV) {
