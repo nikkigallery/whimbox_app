@@ -166,7 +166,9 @@ export type MapMaskUserStatus = {
   awarded_star_count: number
   awarded_dewdrop_count: number
   awarded_box_count: number
+  awarded_read_count: number
   matched_awarded_star_count: number
   matched_awarded_dewdrop_count: number
   matched_awarded_box_count: number
+  matched_awarded_read_count: number
 }

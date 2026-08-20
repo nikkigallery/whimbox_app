@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useState, type ReactNode } from 'react'
 import {
   Box,
+  BookOpen,
   Droplets,
   MapPinned,
   RefreshCw,
@@ -54,8 +55,16 @@ const filters = [
     iconClassName:
       'bg-cyan-100 text-cyan-600 dark:bg-cyan-500/15 dark:text-cyan-300',
   },
+  {
+    id: 'pearpal_read',
+    name: '阅读物',
+    description: '显示尚未收集的阅读物',
+    icon: BookOpen,
+    iconClassName:
+      'bg-violet-100 text-violet-600 dark:bg-violet-500/15 dark:text-violet-300',
+  },
 ] as const
-const supportedLabelIds = new Set(filters.map(filter => filter.id))
+const filterLabelIds = new Set<string>(filters.map(filter => filter.id))
 const PEARPAL_API_RECOVERY_HINT =
   '请点击“清除登录信息”，重新登录后再试。'
 
@@ -84,10 +93,12 @@ export function MapMaskPage() {
         'map_mask.get_labels'
       )) as MapMaskLabelsResponse
       const selected = response.selected_label_ids.filter(labelId =>
-        supportedLabelIds.has(labelId as (typeof filters)[number]['id'])
+        filterLabelIds.has(labelId)
       )
       setSelectedLabelIds(selected)
-      if (selected.length !== response.selected_label_ids.length) {
+      if (
+        selected.length !== response.selected_label_ids.length
+      ) {
         await window.App.rpc.request('map_mask.set_selected_labels', {
           label_ids: selected,
         })
@@ -226,8 +237,11 @@ export function MapMaskPage() {
           label_ids: next,
         }
       )) as SetSelectedLabelsResponse
+      const savedLabelIds = Array.isArray(saved)
+        ? saved
+        : saved.selected_label_ids
       setSelectedLabelIds(
-        Array.isArray(saved) ? saved : saved.selected_label_ids
+        savedLabelIds.filter(labelId => filterLabelIds.has(labelId))
       )
     } catch {
       setSelectedLabelIds(previous)
@@ -330,7 +344,7 @@ export function MapMaskPage() {
               <MapPinned className="size-5 text-pink-400" />
               <h2 className="font-semibold">显示点位</h2>
             </div>
-            <div className="grid gap-3 md:grid-cols-3">
+            <div className="grid gap-3 md:grid-cols-2 xl:grid-cols-4">
               {filters.map(filter => {
                 const Icon = filter.icon
                 const checked = selectedLabelIds.includes(filter.id)
@@ -377,7 +391,7 @@ export function MapMaskPage() {
                 点击“打开地图遮罩”。如需登录，请在自动弹出的网页中完成操作。
               </Instruction>
               <Instruction index="2" title="进入大地图">
-                回到游戏并打开大地图，将大地图缩放至最大，未收集点位会自动显示并随地图拖动。
+                回到游戏并打开大地图，未收集点位会自动显示并随地图拖动。
               </Instruction>
               <Instruction index="3" title="同步进度">
                 收集后可等待自动同步，或点击“刷新点位”立即刷新。
