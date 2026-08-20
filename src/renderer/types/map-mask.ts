@@ -115,6 +115,10 @@ export type MapMaskState = {
   map_scale_source: string
   viewport_span_source: string
   assumes_max_bigmap_zoom: boolean
+  zoom_status: 'unknown' | 'supported' | 'unsupported' | 'error' | string
+  zoom_level: 'second' | 'third' | 'max' | string
+  zoom_confidence: number
+  overlay_hint: string
   detection_mode: MapMaskBigMapDetectionMode
   detection_source: string
   detection_confidence: number

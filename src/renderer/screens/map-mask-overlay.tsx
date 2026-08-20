@@ -140,6 +140,8 @@ function hasSameRenderableSnapshot(
   if (
     previous.state.enabled !== next.state.enabled ||
     previous.state.is_bigmap_open !== next.state.is_bigmap_open ||
+    previous.state.zoom_status !== next.state.zoom_status ||
+    previous.state.overlay_hint !== next.state.overlay_hint ||
     previous.state.viewport_screen_width !==
       next.state.viewport_screen_width ||
     previous.state.viewport_screen_height !==
@@ -298,6 +300,10 @@ export function MapMaskOverlayScreen() {
       activeViewport &&
       overlayViewport
   )
+  const overlayHint =
+    visibleResult?.state.enabled && visibleResult.state.is_bigmap_open
+      ? visibleResult.state.overlay_hint
+      : ''
 
   return (
     <main className="pointer-events-none relative h-screen w-screen overflow-hidden bg-transparent">
@@ -306,6 +312,11 @@ export function MapMaskOverlayScreen() {
         labels={labels}
         points={renderedPoints}
       />
+      {overlayHint ? (
+        <div className="absolute left-1/2 top-8 -translate-x-1/2 rounded-full border border-white/20 bg-slate-950/80 px-4 py-2 text-sm font-medium text-white shadow-lg backdrop-blur-md">
+          {overlayHint}
+        </div>
+      ) : null}
     </main>
   )
 }
