@@ -396,8 +396,13 @@ export function registerLauncherIpc(window: BrowserWindow) {
     })
   })
 
-  backendManager.on('launch-backend-end', (data) => {
+  const onBackendEnd = (data: { message: string }) => {
+    if (window.isDestroyed() || window.webContents.isDestroyed()) return
     window.webContents.send('launcher:launch-backend-end', data)
+  }
+  backendManager.on('launch-backend-end', onBackendEnd)
+  window.once('closed', () => {
+    backendManager.off('launch-backend-end', onBackendEnd)
   })
 
   // 主窗口不再在此做 Python 环境准备，由启动屏在显示主窗口前完成
