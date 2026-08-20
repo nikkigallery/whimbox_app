@@ -56,6 +56,12 @@ const filters = [
   },
 ] as const
 const supportedLabelIds = new Set(filters.map(filter => filter.id))
+const PEARPAL_API_RECOVERY_HINT =
+  '请点击“清除登录信息”，重新登录后再试。'
+
+function pearPalApiFailure(action: string) {
+  return `${action}，可能是登录信息已过期。${PEARPAL_API_RECOVERY_HINT}`
+}
 
 const delay = (milliseconds: number) =>
   new Promise(resolve => {
@@ -86,10 +92,8 @@ export function MapMaskPage() {
           label_ids: selected,
         })
       }
-    } catch (error) {
-      toast.error(
-        error instanceof Error ? error.message : '读取点位筛选设置失败'
-      )
+    } catch {
+      toast.error('读取点位筛选设置失败，请稍后重试')
     } finally {
       setSettingsLoading(false)
     }
@@ -125,9 +129,7 @@ export function MapMaskPage() {
     }
 
     if (status.auth_state !== 'authenticated' || !status.authenticated) {
-      throw new Error(
-        status.auth_error || '登录未完成，请重新打开地图遮罩后再试'
-      )
+      throw new Error(pearPalApiFailure('美鸭梨登录失败'))
     }
     return status
   }, [])
@@ -145,10 +147,10 @@ export function MapMaskPage() {
     }
 
     if (status.refreshing) {
-      throw new Error('刷新收集进度超时，请稍后重试')
+      throw new Error(pearPalApiFailure('刷新美鸭梨收集进度超时'))
     }
     if (status.refresh_error) {
-      throw new Error(status.refresh_error)
+      throw new Error(pearPalApiFailure('获取美鸭梨收集进度失败'))
     }
     return status
   }, [])
@@ -185,8 +187,12 @@ export function MapMaskPage() {
       await window.App.mapMaskOverlay?.show()
       setOverlayActive(true)
       toast.success('地图遮罩已打开，请回到游戏并打开大地图')
-    } catch (error) {
-      toast.error(error instanceof Error ? error.message : '切换地图遮罩失败')
+    } catch {
+      toast.error(
+        overlayActive
+          ? '关闭地图遮罩失败，请稍后重试'
+          : pearPalApiFailure('打开地图遮罩失败')
+      )
     } finally {
       setOpening(false)
     }
@@ -198,8 +204,8 @@ export function MapMaskPage() {
     try {
       await ensureUserSession()
       toast.success('收集进度已刷新')
-    } catch (error) {
-      toast.error(error instanceof Error ? error.message : '刷新收集进度失败')
+    } catch {
+      toast.error(pearPalApiFailure('刷新收集进度失败'))
     } finally {
       setRefreshing(false)
     }
@@ -223,9 +229,9 @@ export function MapMaskPage() {
       setSelectedLabelIds(
         Array.isArray(saved) ? saved : saved.selected_label_ids
       )
-    } catch (error) {
+    } catch {
       setSelectedLabelIds(previous)
-      toast.error(error instanceof Error ? error.message : '更新点位筛选失败')
+      toast.error('更新点位筛选失败，请稍后重试')
     } finally {
       setUpdatingFilter(false)
     }
@@ -240,8 +246,8 @@ export function MapMaskPage() {
       await window.App.rpc.request('map_mask.clear_pearpal_login')
       setClearLoginDialogOpen(false)
       toast.success('登录信息已清除，下次打开地图遮罩时需要重新登录')
-    } catch (error) {
-      toast.error(error instanceof Error ? error.message : '清除登录信息失败')
+    } catch {
+      toast.error('清除登录信息失败，请重启奇想盒后再次尝试清除')
     } finally {
       setClearingLogin(false)
     }
