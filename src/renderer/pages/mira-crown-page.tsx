@@ -118,7 +118,7 @@ export function MiraCrownPage({
                     {running ? '任务正在运行' : '一键完成巅峰赛'}
                   </h2>
                   <p className="mt-1 max-w-xl text-sm leading-6 text-slate-600 dark:text-slate-300">
-                    请先启动游戏并进入主界面。任务运行期间请暂时不要操作鼠标和键盘。
+                    请先进入游戏。任务运行期间请暂时不要操作鼠标和键盘。
                   </p>
                 </div>
               </div>

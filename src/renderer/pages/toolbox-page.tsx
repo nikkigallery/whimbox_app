@@ -14,14 +14,14 @@ const tools = [
     icon: MapPinned,
   },
   {
-    id: 'mira-crown',
-    name: '巅峰赛',
-    icon: Trophy,
-  },
-  {
     id: 'video-overlay',
     name: '视频小窗',
     icon: Tv,
+  },
+  {
+    id: 'mira-crown',
+    name: '巅峰赛',
+    icon: Trophy,
   },
 ] as const
 

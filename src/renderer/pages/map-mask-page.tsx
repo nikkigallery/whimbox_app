@@ -191,6 +191,7 @@ export function MapMaskPage() {
         toast.success('地图遮罩已关闭')
         return
       }
+      await window.App.rpc.request('map_mask.prepare_points')
       await ensureUserSession()
       await window.App.rpc.request('map_mask.set_hide_awarded', {
         hide_awarded: true,
