@@ -1,8 +1,10 @@
-import { MapPinned, Tv, Wrench } from 'lucide-react'
+import { MapPinned, Trophy, Tv } from 'lucide-react'
 import { useState } from 'react'
 
+import type { IpcRpcClient } from 'renderer/lib/ipc-rpc'
 import { cn } from 'renderer/lib/utils'
 import { MapMaskPage } from './map-mask-page'
+import { MiraCrownPage } from './mira-crown-page'
 import { VideoOverlayPage } from './video-overlay-page'
 
 const tools = [
@@ -10,22 +12,47 @@ const tools = [
     id: 'map-mask',
     name: '地图遮罩',
     icon: MapPinned,
-    component: MapMaskPage,
+  },
+  {
+    id: 'mira-crown',
+    name: '巅峰赛',
+    icon: Trophy,
   },
   {
     id: 'video-overlay',
     name: '视频小窗',
     icon: Tv,
-    component: VideoOverlayPage,
   },
 ] as const
 
 type ToolId = (typeof tools)[number]['id']
 
-export function ToolboxPage() {
+type ToolboxPageProps = {
+  rpcClient: IpcRpcClient
+  sessionId: string | null
+  rpcState: 'idle' | 'connecting' | 'open' | 'closed' | 'error'
+}
+
+export function ToolboxPage({
+  rpcClient,
+  sessionId,
+  rpcState,
+}: ToolboxPageProps) {
   const [activeTool, setActiveTool] = useState<ToolId>('map-mask')
-  const ActiveTool =
-    tools.find(tool => tool.id === activeTool)?.component ?? MapMaskPage
+
+  const activeContent = (() => {
+    if (activeTool === 'mira-crown') {
+      return (
+        <MiraCrownPage
+          rpcClient={rpcClient}
+          sessionId={sessionId}
+          rpcState={rpcState}
+        />
+      )
+    }
+    if (activeTool === 'video-overlay') return <VideoOverlayPage />
+    return <MapMaskPage />
+  })()
 
   return (
     <div className="flex min-h-0 flex-1 bg-slate-50/40 dark:bg-slate-950/20">
@@ -57,7 +84,7 @@ export function ToolboxPage() {
       </aside>
 
       <section className="flex min-w-0 flex-1 flex-col overflow-hidden">
-        <ActiveTool />
+        {activeContent}
       </section>
     </div>
   )

@@ -493,7 +493,13 @@ export function MainScreen() {
       case 'auto-trigger':
         return <AutoTriggerPage rpcClient={rpcClient} backendReloadVersion={backendReloadVersion} />
       case 'toolbox':
-        return <ToolboxPage />
+        return (
+          <ToolboxPage
+            rpcClient={rpcClient}
+            sessionId={sessionId}
+            rpcState={rpcState}
+          />
+        )
       case 'auto-navigate':
         return <AutoNavigatePage rpcClient={rpcClient} sessionId={sessionId} rpcState={rpcState} />
       case 'auto-macro':
