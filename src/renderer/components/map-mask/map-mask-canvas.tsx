@@ -26,12 +26,23 @@ const markerColors = [
   '#7bd88f',
 ]
 
+const markerColorByLabelId: Record<string, string> = {
+  pearpal_box: '#f5c84b',
+  pearpal_star: '#f472b6',
+  pearpal_dewdrop: '#38bdf8',
+  pearpal_read: '#4ade80',
+}
+
 function hashColor(value: string) {
   let hash = 0
   for (let index = 0; index < value.length; index += 1) {
     hash = (hash * 31 + value.charCodeAt(index)) >>> 0
   }
   return markerColors[hash % markerColors.length]
+}
+
+function markerColor(labelId: string) {
+  return markerColorByLabelId[labelId] ?? hashColor(labelId)
 }
 
 function markerGlyph(label?: MapMaskLabel) {
@@ -96,7 +107,7 @@ export function MapMaskCanvas({
 
     for (const item of canvasPoints) {
       const label = labelById.get(item.point.label_id)
-      const color = hashColor(item.point.label_id)
+      const color = markerColor(item.point.label_id)
 
       context.save()
       context.shadowColor = 'rgba(15, 23, 42, 0.45)'
