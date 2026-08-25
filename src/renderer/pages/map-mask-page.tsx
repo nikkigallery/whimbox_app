@@ -122,9 +122,7 @@ export function MapMaskPage() {
   }, [])
 
   const waitForLogin = useCallback(async () => {
-    let status = (await window.App.rpc.request(
-      'map_mask.start_pearpal_login'
-    )) as MapMaskUserStatus
+    let status = (await window.App.pearPalLogin.open()) as MapMaskUserStatus
 
     for (let attempt = 0; attempt < 240; attempt += 1) {
       if (
@@ -258,7 +256,7 @@ export function MapMaskPage() {
     try {
       await window.App.mapMaskOverlay?.hide()
       setOverlayActive(false)
-      await window.App.rpc.request('map_mask.clear_pearpal_login')
+      await window.App.pearPalLogin.clear()
       setClearLoginDialogOpen(false)
       toast.success('登录信息已清除，下次打开地图遮罩时需要重新登录')
     } catch {

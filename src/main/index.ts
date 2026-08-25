@@ -16,6 +16,7 @@ import { pythonManager } from './services/python-manager'
 import { registerRpcBridge, setRpcMainWindow, stopRpcBridge, waitForRpcConnected } from './services/rpc-bridge'
 import { createTray, destroyTray } from './services/tray'
 import { registerConversationBridge } from './services/conversation-bridge'
+import { registerPearPalLoginIpc, unregisterPearPalLoginIpc } from './services/pearpal-login'
 import { MainWindow } from './windows/main'
 import { OverlayWindow, persistOverlayState } from './windows/overlay'
 import { SplashWindow } from './windows/splash'
@@ -258,6 +259,7 @@ makeAppWithSingleInstanceLock(async () => {
   void overlayWindow
 
   registerConversationBridge(window)
+  registerPearPalLoginIpc(window)
   createTray(window)
   ipcMain.handle('window:minimize-to-tray', () => {
     if (window && !window.isDestroyed()) {
@@ -295,6 +297,7 @@ app.on('before-quit', () => {
   primaryWindow = null
   destroyTray()
   stopAuthServer()
+  unregisterPearPalLoginIpc()
   stopRpcBridge()
   unregisterAppUpdater()
 })

@@ -73,6 +73,10 @@ declare global {
         getState: () => Promise<{ active: boolean }>
         setIgnoreMouseEvents: (ignore: boolean) => Promise<void>
       }
+      pearPalLogin: {
+        open: () => Promise<unknown>
+        clear: () => Promise<unknown>
+      }
       conversation: {
         getState: () => Promise<{
           messages: Array<{

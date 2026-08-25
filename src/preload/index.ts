@@ -189,6 +189,10 @@ const API = {
     setIgnoreMouseEvents: (ignore: boolean) =>
       ipcRenderer.invoke('map-mask-overlay:set-ignore-mouse-events', ignore),
   },
+  pearPalLogin: {
+    open: () => ipcRenderer.invoke('pearpal-login:open'),
+    clear: () => ipcRenderer.invoke('pearpal-login:clear'),
+  },
   conversation: {
     getState: () =>
       ipcRenderer.invoke('conversation:get-state') as Promise<{
