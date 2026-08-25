@@ -151,6 +151,7 @@ export type MapMaskVisiblePointsResponse = {
 }
 
 export type MapMaskUserStatus = {
+  region: 'cn' | 'oversea' | string
   auth_state: 'anonymous' | 'opening-login' | 'loading-user-state' | 'authenticated' | 'cancelled' | 'error' | string
   authenticated: boolean
   auth_error: string

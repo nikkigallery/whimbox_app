@@ -11,20 +11,32 @@ import { join } from 'node:path'
 
 import { sendRpcRequest } from './rpc-bridge'
 
-const LOGIN_URL = 'https://myl.nuanpaper.com/tools/map'
-const LOGIN_HOST = 'myl.nuanpaper.com'
-const LOGIN_PARTITION = 'persist:whimbox-pearpal-login'
 const STORAGE_POLL_INTERVAL_MS = 400
 
-const READ_LOGIN_STORAGE_SCRIPT = `
-(() => {
-  if (location.hostname !== '${LOGIN_HOST}') return null
-  return {
-    momoToken: localStorage.getItem('momoToken') || '',
-    momoNid: localStorage.getItem('momoNid') || ''
-  }
-})()
-`
+type PearPalRegion = 'cn' | 'oversea'
+
+type PearPalLoginConfig = {
+  label: string
+  url: string
+  host: string
+  partition: string
+}
+
+const LOGIN_CONFIGS: Record<PearPalRegion, PearPalLoginConfig> = {
+  cn: {
+    label: '国服/B服',
+    url: 'https://myl.nuanpaper.com/tools/map',
+    host: 'myl.nuanpaper.com',
+    // Keep the existing partition so current users stay signed in.
+    partition: 'persist:whimbox-pearpal-login',
+  },
+  oversea: {
+    label: '国际服',
+    url: 'https://pearpal.infoldgames.com/tools/map',
+    host: 'pearpal.infoldgames.com',
+    partition: 'persist:whimbox-pearpal-login-oversea',
+  },
+}
 
 type PearPalLoginStorage = {
   momoToken: string
@@ -33,6 +45,24 @@ type PearPalLoginStorage = {
 
 let loginWindowRef: BrowserWindow | null = null
 let loginPromise: Promise<unknown> | null = null
+let loginRegion: PearPalRegion | null = null
+
+function parseRegion(value: unknown): PearPalRegion {
+  if (value === 'cn' || value === 'oversea') return value
+  throw new Error('不支持的美鸭梨区服')
+}
+
+function readLoginStorageScript(host: string) {
+  return `
+(() => {
+  if (location.hostname !== ${JSON.stringify(host)}) return null
+  return {
+    momoToken: localStorage.getItem('momoToken') || '',
+    momoNid: localStorage.getItem('momoNid') || ''
+  }
+})()
+`
+}
 
 function isAllowedNavigation(url: string) {
   try {
@@ -42,17 +72,17 @@ function isAllowedNavigation(url: string) {
   }
 }
 
-function isLoginPage(contents: WebContents) {
+function isLoginPage(contents: WebContents, host: string) {
   try {
-    return new URL(contents.getURL()).hostname === LOGIN_HOST
+    return new URL(contents.getURL()).hostname === host
   } catch {
     return false
   }
 }
 
-function loginWebPreferences() {
+function loginWebPreferences(partition: string) {
   return {
-    partition: LOGIN_PARTITION,
+    partition,
     nodeIntegration: false,
     contextIsolation: true,
     sandbox: true,
@@ -60,7 +90,11 @@ function loginWebPreferences() {
   }
 }
 
-function configureNavigation(contents: WebContents, owner: BrowserWindow) {
+function configureNavigation(
+  contents: WebContents,
+  owner: BrowserWindow,
+  partition: string
+) {
   contents.setWindowOpenHandler(({ url }) => {
     if (!isAllowedNavigation(url)) return { action: 'deny' }
     return {
@@ -68,7 +102,7 @@ function configureNavigation(contents: WebContents, owner: BrowserWindow) {
       overrideBrowserWindowOptions: {
         parent: owner,
         autoHideMenuBar: true,
-        webPreferences: loginWebPreferences(),
+        webPreferences: loginWebPreferences(partition),
       },
     }
   })
@@ -76,16 +110,17 @@ function configureNavigation(contents: WebContents, owner: BrowserWindow) {
     if (!isAllowedNavigation(url)) event.preventDefault()
   })
   contents.on('did-create-window', childWindow => {
-    configureNavigation(childWindow.webContents, childWindow)
+    configureNavigation(childWindow.webContents, childWindow, partition)
   })
 }
 
 function createLoginWindow(
-  parent: BrowserWindow
+  parent: BrowserWindow,
+  config: PearPalLoginConfig
 ): Promise<PearPalLoginStorage> {
   return new Promise((resolve, reject) => {
     const window = new BrowserWindow({
-      title: '奇想盒 - 美鸭梨登录',
+      title: `奇想盒 - 美鸭梨${config.label}登录`,
       width: 1100,
       height: 760,
       minWidth: 800,
@@ -93,7 +128,7 @@ function createLoginWindow(
       show: false,
       autoHideMenuBar: true,
       parent: parent.isDestroyed() ? undefined : parent,
-      webPreferences: loginWebPreferences(),
+      webPreferences: loginWebPreferences(config.partition),
     })
     loginWindowRef = window
 
@@ -124,11 +159,15 @@ function createLoginWindow(
     }
 
     const readLoginStorage = async () => {
-      if (settled || window.isDestroyed() || !isLoginPage(window.webContents))
+      if (
+        settled ||
+        window.isDestroyed() ||
+        !isLoginPage(window.webContents, config.host)
+      )
         return
       try {
         const value = (await window.webContents.executeJavaScript(
-          READ_LOGIN_STORAGE_SCRIPT,
+          readLoginStorageScript(config.host),
           true
         )) as Partial<PearPalLoginStorage> | null
         if (
@@ -146,7 +185,7 @@ function createLoginWindow(
       }
     }
 
-    configureNavigation(window.webContents, window)
+    configureNavigation(window.webContents, window, config.partition)
     window.webContents.on(
       'did-fail-load',
       (_event, errorCode, errorDescription, _validatedUrl, isMainFrame) => {
@@ -177,7 +216,7 @@ function createLoginWindow(
       () => void readLoginStorage(),
       STORAGE_POLL_INTERVAL_MS
     )
-    void window.loadURL(LOGIN_URL).catch(error => {
+    void window.loadURL(config.url).catch(error => {
       fail(
         new Error(
           `无法打开美鸭梨登录页面：${error instanceof Error ? error.message : String(error)}`
@@ -187,8 +226,15 @@ function createLoginWindow(
   })
 }
 
-async function openAndAuthenticate(parent: BrowserWindow) {
+async function openAndAuthenticate(
+  parent: BrowserWindow,
+  regionValue: unknown
+) {
+  const region = parseRegion(regionValue)
   if (loginPromise) {
+    if (loginRegion !== region) {
+      throw new Error('请先完成或关闭当前区服的美鸭梨登录窗口')
+    }
     const window = loginWindowRef
     if (window && !window.isDestroyed()) {
       if (window.isMinimized()) window.restore()
@@ -198,42 +244,52 @@ async function openAndAuthenticate(parent: BrowserWindow) {
     return loginPromise
   }
 
+  loginRegion = region
   loginPromise = (async () => {
-    const credentials = await createLoginWindow(parent)
+    const credentials = await createLoginWindow(parent, LOGIN_CONFIGS[region])
     return sendRpcRequest('map_mask.submit_pearpal_login', {
+      region,
       momo_token: credentials.momoToken,
       momo_nid: credentials.momoNid,
     })
   })().finally(() => {
     loginPromise = null
+    loginRegion = null
   })
   return loginPromise
 }
 
-async function clearLoginInformation() {
+async function clearLoginInformation(regionValue: unknown) {
+  const region = parseRegion(regionValue)
   const window = loginWindowRef
-  if (window && !window.isDestroyed()) window.destroy()
+  if (loginRegion === region && window && !window.isDestroyed()) window.destroy()
 
-  const loginSession = session.fromPartition(LOGIN_PARTITION)
+  const loginSession = session.fromPartition(LOGIN_CONFIGS[region].partition)
   await loginSession.clearStorageData()
   await loginSession.clearCache()
 
   // Remove the profile used by the retired Python WebView implementation.
-  const localAppData =
-    process.env.LOCALAPPDATA || join(app.getPath('home'), 'AppData', 'Local')
-  const legacyStoragePath = join(localAppData, 'Whimbox', 'pearpal-webview')
-  await rm(legacyStoragePath, { recursive: true, force: true }).catch(error => {
-    log.warn(
-      `[pearpal-login] failed to remove legacy storage: ${error instanceof Error ? error.message : String(error)}`
-    )
-  })
+  if (region === 'cn') {
+    const localAppData =
+      process.env.LOCALAPPDATA || join(app.getPath('home'), 'AppData', 'Local')
+    const legacyStoragePath = join(localAppData, 'Whimbox', 'pearpal-webview')
+    await rm(legacyStoragePath, { recursive: true, force: true }).catch(error => {
+      log.warn(
+        `[pearpal-login] failed to remove legacy storage: ${error instanceof Error ? error.message : String(error)}`
+      )
+    })
+  }
 
-  return sendRpcRequest('map_mask.clear_pearpal_login')
+  return sendRpcRequest('map_mask.clear_pearpal_login', { region })
 }
 
 export function registerPearPalLoginIpc(parent: BrowserWindow) {
-  ipcMain.handle('pearpal-login:open', () => openAndAuthenticate(parent))
-  ipcMain.handle('pearpal-login:clear', () => clearLoginInformation())
+  ipcMain.handle('pearpal-login:open', (_event, region) =>
+    openAndAuthenticate(parent, region)
+  )
+  ipcMain.handle('pearpal-login:clear', (_event, region) =>
+    clearLoginInformation(region)
+  )
 }
 
 export function unregisterPearPalLoginIpc() {
@@ -242,4 +298,5 @@ export function unregisterPearPalLoginIpc() {
   const window = loginWindowRef
   if (window && !window.isDestroyed()) window.destroy()
   loginWindowRef = null
+  loginRegion = null
 }

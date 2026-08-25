@@ -190,8 +190,10 @@ const API = {
       ipcRenderer.invoke('map-mask-overlay:set-ignore-mouse-events', ignore),
   },
   pearPalLogin: {
-    open: () => ipcRenderer.invoke('pearpal-login:open'),
-    clear: () => ipcRenderer.invoke('pearpal-login:clear'),
+    open: (region: 'cn' | 'oversea') =>
+      ipcRenderer.invoke('pearpal-login:open', region),
+    clear: (region: 'cn' | 'oversea') =>
+      ipcRenderer.invoke('pearpal-login:clear', region),
   },
   conversation: {
     getState: () =>

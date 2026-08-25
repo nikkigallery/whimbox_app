@@ -29,6 +29,23 @@ import type {
 } from 'renderer/types/map-mask'
 
 type SetSelectedLabelsResponse = string[] | MapMaskLabelsResponse
+type PearPalRegion = 'cn' | 'oversea'
+
+const PEARPAL_REGION_STORAGE_KEY = 'map-mask-pearpal-region'
+const regions: Array<{ id: PearPalRegion; name: string }> = [
+  { id: 'cn', name: '国服/B服' },
+  { id: 'oversea', name: '国际服' },
+]
+
+function initialPearPalRegion(): PearPalRegion {
+  try {
+    return localStorage.getItem(PEARPAL_REGION_STORAGE_KEY) === 'oversea'
+      ? 'oversea'
+      : 'cn'
+  } catch {
+    return 'cn'
+  }
+}
 
 const filters = [
   {
@@ -78,6 +95,7 @@ const delay = (milliseconds: number) =>
   })
 
 export function MapMaskPage() {
+  const [region, setRegion] = useState<PearPalRegion>(initialPearPalRegion)
   const [selectedLabelIds, setSelectedLabelIds] = useState<string[]>([])
   const [settingsLoading, setSettingsLoading] = useState(true)
   const [opening, setOpening] = useState(false)
@@ -121,8 +139,15 @@ export function MapMaskPage() {
       .catch(() => {})
   }, [])
 
+  const selectBackendRegion = useCallback(
+    () => window.App.rpc.request('map_mask.set_pearpal_region', { region }),
+    [region]
+  )
+
   const waitForLogin = useCallback(async () => {
-    let status = (await window.App.pearPalLogin.open()) as MapMaskUserStatus
+    let status = (await window.App.pearPalLogin.open(
+      region
+    )) as MapMaskUserStatus
 
     for (let attempt = 0; attempt < 240; attempt += 1) {
       if (
@@ -141,7 +166,7 @@ export function MapMaskPage() {
       throw new Error(pearPalApiFailure('美鸭梨登录失败'))
     }
     return status
-  }, [])
+  }, [region])
 
   const refreshUserState = useCallback(async () => {
     let status = (await window.App.rpc.request(
@@ -165,11 +190,12 @@ export function MapMaskPage() {
   }, [])
 
   const ensureUserSession = useCallback(async () => {
+    await selectBackendRegion()
     const status = (await window.App.rpc.request(
       'map_mask.get_user_status'
     )) as MapMaskUserStatus
 
-    if (status.authenticated) {
+    if (status.authenticated && status.region === region) {
       try {
         return await refreshUserState()
       } catch {
@@ -177,7 +203,7 @@ export function MapMaskPage() {
       }
     }
     return waitForLogin()
-  }, [refreshUserState, waitForLogin])
+  }, [refreshUserState, region, selectBackendRegion, waitForLogin])
 
   const handleToggleOverlay = async () => {
     if (settingsLoading || opening || refreshing || updatingFilter) return
@@ -189,6 +215,7 @@ export function MapMaskPage() {
         toast.success('地图遮罩已关闭')
         return
       }
+      await selectBackendRegion()
       await window.App.rpc.request('map_mask.prepare_points')
       await ensureUserSession()
       await window.App.rpc.request('map_mask.set_hide_awarded', {
@@ -205,6 +232,16 @@ export function MapMaskPage() {
       )
     } finally {
       setOpening(false)
+    }
+  }
+
+  const handleRegionChange = (nextRegion: PearPalRegion) => {
+    if (nextRegion === region || overlayActive) return
+    setRegion(nextRegion)
+    try {
+      localStorage.setItem(PEARPAL_REGION_STORAGE_KEY, nextRegion)
+    } catch {
+      // The selection still applies to the current session.
     }
   }
 
@@ -256,9 +293,11 @@ export function MapMaskPage() {
     try {
       await window.App.mapMaskOverlay?.hide()
       setOverlayActive(false)
-      await window.App.pearPalLogin.clear()
+      await window.App.pearPalLogin.clear(region)
       setClearLoginDialogOpen(false)
-      toast.success('登录信息已清除，下次打开地图遮罩时需要重新登录')
+      toast.success(
+        `${region === 'cn' ? '国服/B服' : '国际服'}登录信息已清除，下次使用时需要重新登录`
+      )
     } catch {
       toast.error('清除登录信息失败，请重启奇想盒后再次尝试清除')
     } finally {
@@ -291,6 +330,34 @@ export function MapMaskPage() {
                 <p className="text-sm leading-6 text-slate-600 dark:text-slate-300">
                   奇想盒不会记录你的账号密码，请放心使用！
                 </p>
+                <div className="mt-4 flex flex-wrap items-center gap-3">
+                  <fieldset
+                    className="inline-flex rounded-xl border border-pink-200 bg-white/80 p-1 shadow-sm dark:border-pink-900/60 dark:bg-slate-900/70"
+                  >
+                    <legend className="sr-only">美鸭梨数据区服</legend>
+                    {regions.map(item => (
+                      <button
+                        aria-pressed={region === item.id}
+                        className={`rounded-lg px-4 py-1.5 text-sm font-medium transition-colors disabled:cursor-not-allowed disabled:opacity-50 ${
+                          region === item.id
+                            ? 'bg-pink-400 text-white shadow-sm dark:bg-pink-500'
+                            : 'text-slate-600 hover:bg-pink-50 hover:text-pink-600 dark:text-slate-300 dark:hover:bg-pink-950/30 dark:hover:text-pink-300'
+                        }`}
+                        disabled={actionBusy || overlayActive}
+                        key={item.id}
+                        onClick={() => handleRegionChange(item.id)}
+                        type="button"
+                      >
+                        {item.name}
+                      </button>
+                    ))}
+                  </fieldset>
+                  {overlayActive && (
+                    <span className="text-xs text-slate-500 dark:text-slate-400">
+                      请先关闭地图遮罩后切换区服
+                    </span>
+                  )}
+                </div>
               </div>
               <div className="flex shrink-0 flex-col gap-3 sm:flex-row lg:flex-col xl:flex-row">
                 <Button
@@ -409,7 +476,7 @@ export function MapMaskPage() {
           <DialogHeader>
             <DialogTitle>清除地图遮罩登录信息？</DialogTitle>
             <DialogDescription>
-              将清除美鸭梨账号的本地登录缓存，并关闭当前地图遮罩。下次打开地图遮罩时需要重新登录。
+              将清除美鸭梨{region === 'cn' ? '国服/B服' : '国际服'}账号的本地登录缓存，并关闭当前地图遮罩。下次使用该区服时需要重新登录。
             </DialogDescription>
           </DialogHeader>
           <DialogFooter>
