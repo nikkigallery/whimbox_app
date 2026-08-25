@@ -1,3 +1,4 @@
+import { screen } from 'electron'
 import log from 'electron-log/main.js'
 
 import { sendRpcRequest } from './rpc-bridge'
@@ -10,14 +11,31 @@ export type GameWindowBounds = {
   isGameWindowFound: boolean
   isForeground: boolean
   isMinimized: boolean
+  coordinateSource?: 'physical-screen-to-dip' | 'legacy-dip'
+  physicalBounds?: WindowRectangle
+  gameDpi?: number
+  gameDpiScale?: number
+  displayId?: number
+  displayScaleFactor?: number
+  displayBounds?: WindowRectangle
+}
+
+type WindowRectangle = {
+  x: number
+  y: number
+  width: number
+  height: number
 }
 
 type NativeWindowLookupResult = {
   found?: boolean
+  coordinateSpace?: 'physical' | 'dip' | string
   x?: number
   y?: number
   width?: number
   height?: number
+  dpi?: number
+  dpiScale?: number
   isForeground?: boolean
   isMinimized?: boolean
 }
@@ -37,6 +55,7 @@ class GameWindowTracker {
   private currentBounds = INITIAL_BOUNDS
   private refreshPromise: Promise<GameWindowBounds> | null = null
   private lastLookupWarning: string | null = null
+  private lastGeometryLogSignature: string | null = null
 
   getBounds(): GameWindowBounds {
     return this.currentBounds
@@ -65,15 +84,36 @@ class GameWindowTracker {
       )
       if (found?.found && isUsableWindowBounds(found)) {
         this.lastLookupWarning = null
+        const sourceBounds = {
+          x: found.x,
+          y: found.y,
+          width: found.width,
+          height: found.height,
+        }
+        const usesPhysicalCoordinates = found.coordinateSpace === 'physical'
+        const convertedBounds = usesPhysicalCoordinates
+          ? screen.screenToDipRect(null, sourceBounds)
+          : sourceBounds
+        const dipBounds = roundRectangle(convertedBounds)
+        const display = screen.getDisplayMatching(dipBounds)
         this.currentBounds = {
-          x: Math.round(found.x),
-          y: Math.round(found.y),
-          width: Math.round(found.width),
-          height: Math.round(found.height),
+          ...dipBounds,
           isGameWindowFound: true,
           isForeground: Boolean(found.isForeground),
           isMinimized: Boolean(found.isMinimized),
+          coordinateSource: usesPhysicalCoordinates
+            ? 'physical-screen-to-dip'
+            : 'legacy-dip',
+          physicalBounds: usesPhysicalCoordinates
+            ? roundRectangle(sourceBounds)
+            : undefined,
+          gameDpi: finiteNumberOrUndefined(found.dpi),
+          gameDpiScale: finiteNumberOrUndefined(found.dpiScale),
+          displayId: display.id,
+          displayScaleFactor: display.scaleFactor,
+          displayBounds: roundRectangle(display.bounds),
         }
+        this.logGeometryIfChanged(this.currentBounds)
         return this.currentBounds
       }
 
@@ -89,6 +129,7 @@ class GameWindowTracker {
   }
 
   private markUnavailable(): GameWindowBounds {
+    this.lastGeometryLogSignature = null
     this.currentBounds = {
       ...this.currentBounds,
       isGameWindowFound: false,
@@ -97,6 +138,63 @@ class GameWindowTracker {
     }
     return this.currentBounds
   }
+
+  private logGeometryIfChanged(bounds: GameWindowBounds) {
+    const signature = JSON.stringify({
+      physicalBounds: bounds.physicalBounds,
+      dipBounds: pickRectangle(bounds),
+      gameDpi: bounds.gameDpi,
+      gameDpiScale: bounds.gameDpiScale,
+      displayId: bounds.displayId,
+      displayScaleFactor: bounds.displayScaleFactor,
+      displayBounds: bounds.displayBounds,
+      coordinateSource: bounds.coordinateSource,
+    })
+    if (signature === this.lastGeometryLogSignature) return
+    this.lastGeometryLogSignature = signature
+    log.info(
+      '[game-window-tracker] geometry ' +
+        `source=${bounds.coordinateSource ?? 'unknown'} ` +
+        `game_physical=${formatRectangle(bounds.physicalBounds)} ` +
+        `game_dpi=${formatNumber(bounds.gameDpi)} ` +
+        `game_dpi_scale=${formatNumber(bounds.gameDpiScale)} ` +
+        `display_id=${bounds.displayId ?? 'n/a'} ` +
+        `display_scale=${formatNumber(bounds.displayScaleFactor)} ` +
+        `display_dip=${formatRectangle(bounds.displayBounds)} ` +
+        `target_dip=${formatRectangle(bounds)}`,
+    )
+  }
+}
+
+function roundRectangle(rectangle: WindowRectangle): WindowRectangle {
+  return {
+    x: Math.round(rectangle.x),
+    y: Math.round(rectangle.y),
+    width: Math.round(rectangle.width),
+    height: Math.round(rectangle.height),
+  }
+}
+
+function pickRectangle(rectangle: WindowRectangle): WindowRectangle {
+  return {
+    x: rectangle.x,
+    y: rectangle.y,
+    width: rectangle.width,
+    height: rectangle.height,
+  }
+}
+
+function finiteNumberOrUndefined(value: unknown) {
+  return typeof value === 'number' && Number.isFinite(value) ? value : undefined
+}
+
+function formatNumber(value: number | undefined) {
+  return value === undefined ? 'n/a' : String(value)
+}
+
+function formatRectangle(rectangle: WindowRectangle | undefined) {
+  if (!rectangle) return 'n/a'
+  return `${rectangle.x},${rectangle.y},${rectangle.width}x${rectangle.height}`
 }
 
 function isUsableWindowBounds(

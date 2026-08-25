@@ -13,6 +13,7 @@ let mapMaskOverlayVisibleRequested = false
 let hiddenBecauseGameMinimized = false
 let hiddenBecauseGameUnfocused = false
 let allowMapMaskOverlayClose = false
+let lastOverlayGeometryLogSignature: string | null = null
 
 const WINDOW_BOUNDS_TOLERANCE_PX = 1
 
@@ -60,12 +61,56 @@ async function applyTrackedBounds(win: BrowserWindow) {
   ) {
     win.setBounds(nextBounds)
   }
+  logOverlayGeometryIfChanged(win, bounds, nextBounds)
 
   if (wasHiddenBecauseGameInactive && mapMaskOverlayVisibleRequested && !win.isVisible()) {
     win.showInactive()
   }
 
   return bounds
+}
+
+function logOverlayGeometryIfChanged(
+  win: BrowserWindow,
+  tracked: GameWindowBounds,
+  targetBounds: { x: number; y: number; width: number; height: number },
+) {
+  const overlayBounds = win.getBounds()
+  const contentBounds = win.getContentBounds()
+  const signature = JSON.stringify({
+    targetBounds,
+    overlayBounds,
+    contentBounds,
+    physicalBounds: tracked.physicalBounds,
+    gameDpi: tracked.gameDpi,
+    gameDpiScale: tracked.gameDpiScale,
+    displayId: tracked.displayId,
+    displayScaleFactor: tracked.displayScaleFactor,
+  })
+  if (signature === lastOverlayGeometryLogSignature) return
+  lastOverlayGeometryLogSignature = signature
+  log.info(
+    '[map-mask-overlay] geometry ' +
+      `game_physical=${formatBounds(tracked.physicalBounds)} ` +
+      `game_dpi=${formatNumber(tracked.gameDpi)} ` +
+      `game_dpi_scale=${formatNumber(tracked.gameDpiScale)} ` +
+      `display_id=${tracked.displayId ?? 'n/a'} ` +
+      `display_scale=${formatNumber(tracked.displayScaleFactor)} ` +
+      `target_dip=${formatBounds(targetBounds)} ` +
+      `overlay_dip=${formatBounds(overlayBounds)} ` +
+      `content_dip=${formatBounds(contentBounds)}`,
+  )
+}
+
+function formatNumber(value: number | undefined) {
+  return value === undefined ? 'n/a' : String(value)
+}
+
+function formatBounds(
+  bounds: { x: number; y: number; width: number; height: number } | undefined,
+) {
+  if (!bounds) return 'n/a'
+  return `${bounds.x},${bounds.y},${bounds.width}x${bounds.height}`
 }
 
 async function bringMapMaskOverlayToFront(win: BrowserWindow) {
@@ -178,6 +223,7 @@ async function createMapMaskOverlayWindow() {
   })
 
   mapMaskOverlayWindowRef = window
+  lastOverlayGeometryLogSignature = null
   mapMaskOverlayVisibleRequested = false
   hiddenBecauseGameMinimized = false
   allowMapMaskOverlayClose = false
@@ -206,6 +252,7 @@ async function createMapMaskOverlayWindow() {
 
   window.on('closed', () => {
     stopFollowGameWindow()
+    lastOverlayGeometryLogSignature = null
     mapMaskOverlayWindowRef = null
   })
 
@@ -225,4 +272,5 @@ export function persistMapMaskOverlayState() {
     win.destroy()
   }
   mapMaskOverlayWindowRef = null
+  lastOverlayGeometryLogSignature = null
 }
