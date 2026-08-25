@@ -11,9 +11,22 @@ import type {
 } from 'renderer/types/map-mask'
 
 const POINT_POSITION_TOLERANCE_PX = 2
+const SUPPORTED_ASPECT_RATIO_MIN = 1.55
+const SUPPORTED_ASPECT_RATIO_MAX = 1.8
+const UNSUPPORTED_RESOLUTION_HINT =
+  '不支持当前游戏窗口分辨率，请在游戏设置中调整为窗口模式，和16:9或16:10分辨率'
 
 function isFiniteNumber(value: unknown): value is number {
   return typeof value === 'number' && Number.isFinite(value)
+}
+
+function isSupportedAspectRatio(width: number, height: number) {
+  if (width <= 0 || height <= 0) return true
+  const aspectRatio = width / height
+  return (
+    aspectRatio > SUPPORTED_ASPECT_RATIO_MIN &&
+    aspectRatio < SUPPORTED_ASPECT_RATIO_MAX
+  )
 }
 
 function isValidViewport(
@@ -294,16 +307,24 @@ export function MapMaskOverlayScreen() {
       ),
     [activeViewport, overlayViewport, visibleResult?.points]
   )
+  const resolutionSupported = isSupportedAspectRatio(
+    overlaySize.width,
+    overlaySize.height
+  )
   const enabled = Boolean(
     visibleResult?.state.enabled &&
+      resolutionSupported &&
       visibleResult.state.is_bigmap_open &&
       activeViewport &&
       overlayViewport
   )
-  const overlayHint =
-    visibleResult?.state.enabled && visibleResult.state.is_bigmap_open
-      ? visibleResult.state.overlay_hint
-      : ''
+  const overlayHint = visibleResult?.state.enabled
+    ? !resolutionSupported
+      ? UNSUPPORTED_RESOLUTION_HINT
+      : visibleResult.state.is_bigmap_open
+        ? visibleResult.state.overlay_hint
+        : ''
+    : ''
 
   return (
     <main className="pointer-events-none relative h-screen w-screen overflow-hidden bg-transparent">
