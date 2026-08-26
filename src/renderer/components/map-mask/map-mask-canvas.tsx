@@ -15,6 +15,8 @@ type MapMaskCanvasProps = {
   points: VisibleMapMaskPoint[]
   labels: MapMaskLabel[]
   enabled: boolean
+  clipCircle?: { x: number; y: number; radius: number } | null
+  compact?: boolean
 }
 
 const markerColors = [
@@ -60,6 +62,8 @@ export function MapMaskCanvas({
   points,
   labels,
   enabled,
+  clipCircle = null,
+  compact = false,
 }: MapMaskCanvasProps) {
   const canvasRef = useRef<HTMLCanvasElement | null>(null)
   const [size, setSize] = useState({ width: 1, height: 1 })
@@ -105,6 +109,21 @@ export function MapMaskCanvas({
 
     if (!enabled) return
 
+    if (clipCircle) {
+      context.save()
+      context.beginPath()
+      context.arc(
+        clipCircle.x,
+        clipCircle.y,
+        clipCircle.radius,
+        0,
+        Math.PI * 2
+      )
+      context.clip()
+    }
+
+    const markerRadius = compact ? 6 : 9
+
     for (const item of canvasPoints) {
       const label = labelById.get(item.point.label_id)
       const color = markerColor(item.point.label_id)
@@ -113,24 +132,36 @@ export function MapMaskCanvas({
       context.shadowColor = 'rgba(15, 23, 42, 0.45)'
       context.shadowBlur = 10
       context.beginPath()
-      context.arc(item.x, item.y, 9, 0, Math.PI * 2)
+      context.arc(item.x, item.y, markerRadius, 0, Math.PI * 2)
       context.fillStyle = color
       context.fill()
-      context.lineWidth = 2
+      context.lineWidth = compact ? 1.5 : 2
       context.strokeStyle = 'rgba(255, 255, 255, 0.94)'
       context.stroke()
 
-      context.shadowBlur = 0
-      context.font = '700 10px system-ui, -apple-system, BlinkMacSystemFont, sans-serif'
-      context.textAlign = 'center'
-      context.textBaseline = 'middle'
-      context.fillStyle = '#ffffff'
-      context.fillText(markerGlyph(label), item.x, item.y + 0.5)
+      if (!compact) {
+        context.shadowBlur = 0
+        context.font = '700 10px system-ui, -apple-system, BlinkMacSystemFont, sans-serif'
+        context.textAlign = 'center'
+        context.textBaseline = 'middle'
+        context.fillStyle = '#ffffff'
+        context.fillText(markerGlyph(label), item.x, item.y + 0.5)
+      }
       context.restore()
     }
-  }, [canvasPoints, enabled, labelById, size.height, size.width])
+
+    if (clipCircle) context.restore()
+  }, [
+    canvasPoints,
+    clipCircle,
+    compact,
+    enabled,
+    labelById,
+    size.height,
+    size.width,
+  ])
 
   return (
-    <canvas ref={canvasRef} className="absolute inset-0 size-full" />
+    <canvas className="absolute inset-0 size-full" ref={canvasRef} />
   )
 }

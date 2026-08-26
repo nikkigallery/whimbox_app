@@ -45,6 +45,18 @@ export type MapMaskState = {
   enabled: boolean
   is_map_open?: boolean
   is_bigmap_open: boolean
+  is_main_world_open: boolean
+  display_mode: 'hidden' | 'bigmap' | 'minimap' | string
+  minimap_tracking_status: 'uninitialized' | 'tracking' | 'lost' | string
+  minimap_position_x: number | null
+  minimap_position_y: number | null
+  minimap_confidence: number
+  minimap_local_confidence: number
+  minimap_failure_count: number
+  minimap_hint: string
+  minimap_center_x: number
+  minimap_center_y: number
+  minimap_radius: number
   provider: string
   fallback_provider: string
   data_source: 'sample' | 'local' | 'fallback' | string

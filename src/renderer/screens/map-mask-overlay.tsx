@@ -153,6 +153,11 @@ function hasSameRenderableSnapshot(
   if (
     previous.state.enabled !== next.state.enabled ||
     previous.state.is_bigmap_open !== next.state.is_bigmap_open ||
+    previous.state.is_main_world_open !== next.state.is_main_world_open ||
+    previous.state.display_mode !== next.state.display_mode ||
+    previous.state.minimap_tracking_status !==
+      next.state.minimap_tracking_status ||
+    previous.state.minimap_hint !== next.state.minimap_hint ||
     previous.state.zoom_status !== next.state.zoom_status ||
     previous.state.overlay_hint !== next.state.overlay_hint ||
     previous.state.viewport_screen_width !==
@@ -311,24 +316,62 @@ export function MapMaskOverlayScreen() {
     overlaySize.width,
     overlaySize.height
   )
+  const displayMode = visibleResult?.state.display_mode ?? 'hidden'
+  const isBigmapDisplay = displayMode === 'bigmap'
+  const isMinimapDisplay = displayMode === 'minimap'
   const enabled = Boolean(
     visibleResult?.state.enabled &&
       resolutionSupported &&
-      visibleResult.state.is_bigmap_open &&
+      (isBigmapDisplay || isMinimapDisplay) &&
       activeViewport &&
       overlayViewport
   )
   const overlayHint = visibleResult?.state.enabled
     ? !resolutionSupported
       ? UNSUPPORTED_RESOLUTION_HINT
-      : visibleResult.state.is_bigmap_open
+      : isBigmapDisplay
         ? visibleResult.state.overlay_hint
         : ''
     : ''
+  const minimapHint =
+    visibleResult?.state.enabled &&
+    resolutionSupported &&
+    visibleResult.state.is_main_world_open
+      ? visibleResult.state.minimap_hint
+      : ''
+  const minimapClipCircle =
+    isMinimapDisplay && overlayViewport
+      ? {
+          x: overlayViewport.screen_left + overlayViewport.screen_width / 2,
+          y: overlayViewport.screen_top + overlayViewport.screen_height / 2,
+          radius:
+            Math.min(
+              overlayViewport.screen_width,
+              overlayViewport.screen_height
+            ) / 2,
+        }
+      : null
+  const minimapHintPosition = (() => {
+    const state = visibleResult?.state
+    const sourceWidth = state?.viewport_screen_width ?? 1920
+    const sourceHeight = state?.viewport_screen_height ?? 1080
+    const centerX = state?.minimap_center_x ?? 181
+    const centerY = state?.minimap_center_y ?? 122
+    const radius = state?.minimap_radius ?? 102
+    return {
+      left: (centerX / sourceWidth) * overlaySize.width,
+      top: Math.max(
+        8,
+        ((centerY - radius) / sourceHeight) * overlaySize.height + 4
+      ),
+    }
+  })()
 
   return (
     <main className="pointer-events-none relative h-screen w-screen overflow-hidden bg-transparent">
       <MapMaskCanvas
+        clipCircle={minimapClipCircle}
+        compact={isMinimapDisplay}
         enabled={enabled}
         labels={labels}
         points={renderedPoints}
@@ -336,6 +379,14 @@ export function MapMaskOverlayScreen() {
       {overlayHint ? (
         <div className="absolute left-1/2 top-8 -translate-x-1/2 rounded-full border border-white/20 bg-slate-950/80 px-4 py-2 text-sm font-medium text-white shadow-lg backdrop-blur-md">
           {overlayHint}
+        </div>
+      ) : null}
+      {minimapHint ? (
+        <div
+          className="absolute -translate-x-1/2 rounded-full border border-white/20 bg-slate-950/80 px-3 py-1.5 text-xs font-medium text-white shadow-lg backdrop-blur-md"
+          style={minimapHintPosition}
+        >
+          {minimapHint}
         </div>
       ) : null}
     </main>
