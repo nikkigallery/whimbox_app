@@ -71,6 +71,9 @@ declare global {
         show: () => Promise<boolean>
         hide: () => Promise<boolean>
         getState: () => Promise<{ active: boolean }>
+        onStateChanged: (
+          callback: (state: { active: boolean }) => void
+        ) => () => void
         setIgnoreMouseEvents: (ignore: boolean) => Promise<void>
       }
       pearPalLogin: {

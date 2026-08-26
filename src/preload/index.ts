@@ -186,6 +186,14 @@ const API = {
       ipcRenderer.invoke('map-mask-overlay:get-state') as Promise<{
         active: boolean
       }>,
+    onStateChanged: (callback: (state: { active: boolean }) => void) => {
+      const listener = (_event: unknown, state: { active: boolean }) =>
+        callback(state)
+      ipcRenderer.on('map-mask-overlay:state-changed', listener)
+      return () => {
+        ipcRenderer.removeListener('map-mask-overlay:state-changed', listener)
+      }
+    },
     setIgnoreMouseEvents: (ignore: boolean) =>
       ipcRenderer.invoke('map-mask-overlay:set-ignore-mouse-events', ignore),
   },

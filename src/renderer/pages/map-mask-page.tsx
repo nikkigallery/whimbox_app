@@ -133,10 +133,16 @@ export function MapMaskPage() {
   }, [loadFilters])
 
   useEffect(() => {
-    void window.App.mapMaskOverlay
-      ?.getState()
+    const overlay = window.App.mapMaskOverlay
+    if (!overlay) return
+    const unsubscribe = overlay.onStateChanged(state => {
+      setOverlayActive(state.active)
+    })
+    void overlay
+      .getState()
       .then(state => setOverlayActive(state.active))
       .catch(() => {})
+    return unsubscribe
   }, [])
 
   const selectBackendRegion = useCallback(

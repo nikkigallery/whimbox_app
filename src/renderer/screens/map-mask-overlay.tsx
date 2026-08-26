@@ -197,6 +197,7 @@ export function MapMaskOverlayScreen() {
   }))
   const lastRenderableResultRef =
     useRef<MapMaskVisiblePointsResponse | null>(null)
+  const backendDisabledHandledRef = useRef(false)
   useEffect(() => {
     const updateOverlaySize = () => {
       setOverlaySize({ width: window.innerWidth, height: window.innerHeight })
@@ -217,6 +218,14 @@ export function MapMaskOverlayScreen() {
     const result = (await window.App.rpc.request(
       'map_mask.get_visible_points'
     )) as MapMaskVisiblePointsResponse
+    if (!result.state.enabled) {
+      if (!backendDisabledHandledRef.current) {
+        backendDisabledHandledRef.current = true
+        void window.App.mapMaskOverlay?.hide()
+      }
+    } else {
+      backendDisabledHandledRef.current = false
+    }
     if (hasSameRenderableSnapshot(lastRenderableResultRef.current, result)) {
       return
     }

@@ -1,10 +1,11 @@
 import { join } from 'node:path'
 
-import { type BrowserWindow, ipcMain } from 'electron'
+import { BrowserWindow, ipcMain } from 'electron'
 import log from 'electron-log/main.js'
 
 import { createWindow } from 'lib/electron-app/factories/windows/create'
 import { gameWindowTracker, type GameWindowBounds } from '../services/game-window-tracker'
+import { sendRpcRequest } from '../services/rpc-bridge'
 
 let mapMaskOverlayWindowRef: BrowserWindow | null = null
 let creatingMapMaskOverlayWindowPromise: Promise<BrowserWindow> | null = null
@@ -16,6 +17,17 @@ let allowMapMaskOverlayClose = false
 let lastOverlayGeometryLogSignature: string | null = null
 
 const WINDOW_BOUNDS_TOLERANCE_PX = 1
+
+function setMapMaskOverlayActive(active: boolean) {
+  if (mapMaskOverlayVisibleRequested === active) return
+  mapMaskOverlayVisibleRequested = active
+  const state = { active }
+  for (const window of BrowserWindow.getAllWindows()) {
+    if (!window.isDestroyed()) {
+      window.webContents.send('map-mask-overlay:state-changed', state)
+    }
+  }
+}
 
 function isHiddenBecauseGameInactive() {
   return hiddenBecauseGameMinimized || hiddenBecauseGameUnfocused
@@ -163,18 +175,31 @@ async function ensureMapMaskOverlayWindow() {
 
 function registerMapMaskOverlayIpc() {
   ipcMain.handle('map-mask-overlay:show', async () => {
-    const win = await ensureMapMaskOverlayWindow()
-    mapMaskOverlayVisibleRequested = true
-    setMapMaskOverlayIgnoreMouseEvents(true)
-    await bringMapMaskOverlayToFront(win)
-    startFollowGameWindow()
-    return true
+    const state = await sendRpcRequest<{ enabled: boolean }>(
+      'map_mask.set_enabled',
+      { enabled: true },
+    )
+    if (!state.enabled) {
+      throw new Error('前台自动化任务运行期间无法打开地图遮罩')
+    }
+    try {
+      const win = await ensureMapMaskOverlayWindow()
+      setMapMaskOverlayActive(true)
+      setMapMaskOverlayIgnoreMouseEvents(true)
+      await bringMapMaskOverlayToFront(win)
+      startFollowGameWindow()
+      return true
+    } catch (error) {
+      await sendRpcRequest('map_mask.set_enabled', { enabled: false }).catch(() => {})
+      throw error
+    }
   })
 
-  ipcMain.handle('map-mask-overlay:hide', () => {
+  ipcMain.handle('map-mask-overlay:hide', async () => {
+    await sendRpcRequest('map_mask.set_enabled', { enabled: false })
     const win = mapMaskOverlayWindowRef
     if (!win || win.isDestroyed()) return false
-    mapMaskOverlayVisibleRequested = false
+    setMapMaskOverlayActive(false)
     hiddenBecauseGameMinimized = false
     win.hide()
     hiddenBecauseGameUnfocused = false
@@ -224,7 +249,7 @@ async function createMapMaskOverlayWindow() {
 
   mapMaskOverlayWindowRef = window
   lastOverlayGeometryLogSignature = null
-  mapMaskOverlayVisibleRequested = false
+  setMapMaskOverlayActive(false)
   hiddenBecauseGameMinimized = false
   allowMapMaskOverlayClose = false
   hiddenBecauseGameUnfocused = false
@@ -233,7 +258,7 @@ async function createMapMaskOverlayWindow() {
 
   window.on('show', () => {
     if (!isHiddenBecauseGameInactive()) {
-      mapMaskOverlayVisibleRequested = true
+      setMapMaskOverlayActive(true)
     }
     startFollowGameWindow()
   })
@@ -251,6 +276,7 @@ async function createMapMaskOverlayWindow() {
   })
 
   window.on('closed', () => {
+    setMapMaskOverlayActive(false)
     stopFollowGameWindow()
     lastOverlayGeometryLogSignature = null
     mapMaskOverlayWindowRef = null
@@ -265,7 +291,7 @@ async function createMapMaskOverlayWindow() {
 
 export function persistMapMaskOverlayState() {
   allowMapMaskOverlayClose = true
-  mapMaskOverlayVisibleRequested = false
+  setMapMaskOverlayActive(false)
   stopFollowGameWindow()
   const win = mapMaskOverlayWindowRef
   if (win && !win.isDestroyed()) {
