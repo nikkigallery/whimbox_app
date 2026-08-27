@@ -139,14 +139,12 @@ export function MapMaskCanvas({
       context.strokeStyle = 'rgba(255, 255, 255, 0.94)'
       context.stroke()
 
-      if (!compact) {
-        context.shadowBlur = 0
-        context.font = '700 10px system-ui, -apple-system, BlinkMacSystemFont, sans-serif'
-        context.textAlign = 'center'
-        context.textBaseline = 'middle'
-        context.fillStyle = '#ffffff'
-        context.fillText(markerGlyph(label), item.x, item.y + 0.5)
-      }
+      context.shadowBlur = 0
+      context.font = `700 ${compact ? 8 : 10}px system-ui, -apple-system, BlinkMacSystemFont, sans-serif`
+      context.textAlign = 'center'
+      context.textBaseline = 'middle'
+      context.fillStyle = '#ffffff'
+      context.fillText(markerGlyph(label), item.x, item.y + 0.5)
       context.restore()
     }
 
