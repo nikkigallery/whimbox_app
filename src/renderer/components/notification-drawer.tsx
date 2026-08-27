@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useMemo, useState } from "react"
 import { Bell } from "lucide-react"
+import { toast } from "sonner"
 
 import {
   Sheet,
@@ -17,8 +18,6 @@ export type NotificationItem = {
   created_at: string
 }
 
-type NotificationDrawerProps = {}
-
 const formatDate = (value: string) => {
   if (!value) return ""
   const date = new Date(value)
@@ -26,7 +25,7 @@ const formatDate = (value: string) => {
   return date.toLocaleDateString("zh-CN")
 }
 
-export function NotificationDrawer({}: NotificationDrawerProps) {
+export function NotificationDrawer() {
   const launcherApi = useMemo(() => window.App.launcher, [])
   const [items, setItems] = useState<NotificationItem[]>([])
   const [announcementsHash, setAnnouncementsHash] = useState<string>("")
@@ -73,6 +72,19 @@ export function NotificationDrawer({}: NotificationDrawerProps) {
     [markAnnouncementsSeen],
   )
 
+  const handleOpenExternal = useCallback(
+    async (url: string) => {
+      try {
+        const result = await launcherApi.openExternal(url)
+        if (result.success) return
+      } catch {
+        // The same user-facing guidance applies if the IPC call itself fails.
+      }
+      toast.error("无法打开链接，请检查 Windows 默认浏览器设置")
+    },
+    [launcherApi],
+  )
+
   return (
     <Sheet onOpenChange={handleOpenChange}>
       <SheetTrigger asChild>
@@ -95,21 +107,35 @@ export function NotificationDrawer({}: NotificationDrawerProps) {
           {items.length === 0 ? (
             <p className="text-sm text-slate-400">暂无公告</p>
           ) : (
-            items.map((item: NotificationItem) => (
-              <button
-                key={`${item.title}-${item.created_at}`}
-                type="button"
-                onClick={() => item.url && launcherApi.openExternal(item.url)}
-                className="cursor-pointer flex w-full flex-col gap-1 rounded-xl border border-slate-100 px-3 py-2 text-left hover:bg-slate-50 dark:border-slate-800 dark:hover:bg-slate-800/70"
-              >
-                <span className="text-sm text-slate-700 dark:text-slate-200">
-                  {item.title}
-                </span>
-                <span className="text-xs text-slate-400 text-right">
-                  {formatDate(item.created_at)}
-                </span>
-              </button>
-            ))
+            items.map((item: NotificationItem) => {
+              const url = item.url?.trim()
+              const content = (
+                <>
+                  <span className="text-sm text-slate-700 dark:text-slate-200">
+                    {item.title}
+                  </span>
+                  <span className="text-xs text-slate-400 text-right">
+                    {formatDate(item.created_at)}
+                  </span>
+                </>
+              )
+              const className =
+                "flex w-full flex-col gap-1 rounded-xl border border-slate-100 px-3 py-2 text-left dark:border-slate-800"
+              return url ? (
+                <button
+                  key={`${item.title}-${item.created_at}`}
+                  type="button"
+                  onClick={() => void handleOpenExternal(url)}
+                  className={`${className} cursor-pointer hover:bg-slate-50 dark:hover:bg-slate-800/70`}
+                >
+                  {content}
+                </button>
+              ) : (
+                <div key={`${item.title}-${item.created_at}`} className={className}>
+                  {content}
+                </div>
+              )
+            })
           )}
         </div>
       </SheetContent>

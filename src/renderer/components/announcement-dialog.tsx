@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useMemo, useState } from 'react'
+import { toast } from 'sonner'
 import {
   Dialog,
   DialogContent,
@@ -40,9 +41,19 @@ export function AnnouncementDialog() {
     setOpen(false)
   }, [markSeen])
 
-  const handleOpenExternal = useCallback(() => {
-    if (announcement?.url) {
-      launcherApi.openExternal(announcement.url)
+  const handleOpenExternal = useCallback(async () => {
+    const url = announcement?.url?.trim()
+    if (url) {
+      try {
+        const result = await launcherApi.openExternal(url)
+        if (!result.success) {
+          toast.error('无法打开链接，请检查 Windows 默认浏览器设置')
+          return
+        }
+      } catch {
+        toast.error('无法打开链接，请检查 Windows 默认浏览器设置')
+        return
+      }
     }
     handleClose()
   }, [announcement?.url, handleClose, launcherApi])
@@ -93,7 +104,7 @@ export function AnnouncementDialog() {
           <Button variant="outline" size="sm" onClick={handleClose}>
             我知道了
           </Button>
-          {announcement.url ? (
+          {announcement.url?.trim() ? (
             <Button size="sm" onClick={handleOpenExternal}>
               查看详情
             </Button>

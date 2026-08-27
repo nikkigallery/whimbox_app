@@ -125,7 +125,10 @@ declare global {
         onRunStop: (callback: () => void) => () => void
       }
       launcher: {
-        openExternal: (url: string) => void
+        openExternal: (url: string) => Promise<{
+          success: boolean
+          error?: string
+        }>
         getAuthPort: () => Promise<number>
         detectPythonEnvironment: () => Promise<{
           installed: boolean

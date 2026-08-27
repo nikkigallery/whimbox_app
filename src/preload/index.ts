@@ -277,7 +277,11 @@ const API = {
     },
   },
   launcher: {
-    openExternal: (url: string) => ipcRenderer.send('launcher:open-external', url),
+    openExternal: (url: string) =>
+      ipcRenderer.invoke('launcher:open-external', url) as Promise<{
+        success: boolean
+        error?: string
+      }>,
     getAuthPort: () => ipcRenderer.invoke('launcher:get-auth-port'),
     detectPythonEnvironment: () => ipcRenderer.invoke('launcher:detect-python'),
     setupPythonEnvironment: () => ipcRenderer.invoke('launcher:setup-python'),

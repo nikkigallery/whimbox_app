@@ -2,6 +2,7 @@ import { app, dialog, ipcMain, nativeImage, shell, type BrowserWindow } from 'el
 import { mkdirSync, readdirSync } from 'node:fs'
 import { dirname, join } from 'node:path'
 import { spawn } from 'node:child_process'
+import log from 'electron-log/main.js'
 
 import { waitFor } from 'shared/utils'
 import { backendManager } from './backend-manager'
@@ -156,9 +157,20 @@ export function registerLauncherIpc(window: BrowserWindow) {
   if (initialized) return
   initialized = true
 
-  ipcMain.on('launcher:open-external', (_, url: string) => {
-    if (url) {
-      shell.openExternal(url)
+  ipcMain.handle('launcher:open-external', async (_, rawUrl: unknown) => {
+    const value = typeof rawUrl === 'string' ? rawUrl.trim() : ''
+    try {
+      if (!value) throw new Error('链接为空')
+      const url = new URL(value)
+      if (url.protocol !== 'http:' && url.protocol !== 'https:') {
+        throw new Error(`不支持的链接协议：${url.protocol}`)
+      }
+      await shell.openExternal(url.toString())
+      return { success: true }
+    } catch (error) {
+      const message = error instanceof Error ? error.message : String(error)
+      log.error(`[external-link] open failed: url=${value || '<empty>'} error=${message}`)
+      return { success: false, error: message }
     }
   })
 
