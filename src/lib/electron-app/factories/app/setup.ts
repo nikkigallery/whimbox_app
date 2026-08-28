@@ -2,6 +2,7 @@ import { app, BrowserWindow } from 'electron'
 
 import { PLATFORM, ENVIRONMENT } from 'shared/constants'
 import { ignoreConsoleWarnings } from '../../utils'
+import { isExternallyManagedNavigation } from '../../security/navigation-policy'
 import { makeAppId } from 'shared/utils'
 
 ignoreConsoleWarnings(['Manifest version 2 is deprecated'])
@@ -24,7 +25,10 @@ export async function makeAppSetup(createWindow: () => Promise<BrowserWindow>) {
   app.on('web-contents-created', (_, contents) =>
     contents.on(
       'will-navigate',
-      (event, _) => !ENVIRONMENT.IS_DEV && event.preventDefault()
+      event =>
+        !ENVIRONMENT.IS_DEV &&
+        !isExternallyManagedNavigation(contents) &&
+        event.preventDefault()
     )
   )
 

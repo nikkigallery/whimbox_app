@@ -9,6 +9,8 @@ import log from 'electron-log/main.js'
 import { rm } from 'node:fs/promises'
 import { join } from 'node:path'
 
+import { registerExternallyManagedNavigationSession } from 'lib/electron-app/security/navigation-policy'
+
 import { sendRpcRequest } from './rpc-bridge'
 
 const STORAGE_POLL_INTERVAL_MS = 400
@@ -81,8 +83,10 @@ function isLoginPage(contents: WebContents, host: string) {
 }
 
 function loginWebPreferences(partition: string) {
+  const loginSession = session.fromPartition(partition)
+  registerExternallyManagedNavigationSession(loginSession)
   return {
-    partition,
+    session: loginSession,
     nodeIntegration: false,
     contextIsolation: true,
     sandbox: true,
