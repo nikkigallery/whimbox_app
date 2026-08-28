@@ -782,14 +782,17 @@ export function MainScreen() {
                   <div className="mx-auto flex size-16 items-center justify-center rounded-2xl bg-pink-100 text-pink-500 dark:bg-pink-500/15 dark:text-pink-300">
                     <Gift className="size-8" />
                   </div>
-                  <h1 className="mt-5 text-2xl font-semibold text-slate-800 dark:text-slate-100">
-                    请先更新奇想盒
+                  <h1 className="mt-5 select-text text-2xl font-semibold text-slate-800 dark:text-slate-100">
+                    第一次使用请先更新奇想盒后端
                   </h1>
-                  <p className="mt-3 text-sm text-slate-500 dark:text-slate-400">
-                    未检测到奇想盒后端，功能暂不可用。
+                  <p className="mt-3 select-text text-sm text-slate-500 dark:text-slate-400">
+                    请查看右上角通知中的使用教程，进行更新。
                   </p>
-                  <p className="mt-1 text-sm text-slate-500 dark:text-slate-400">
-                    请查看通知中的使用教程，进行更新。
+                  <p className="mt-1 select-text text-sm text-slate-500 dark:text-slate-400">
+                    若使用教程无法打开，可直接访问：
+                  </p>
+                  <p className="mt-1 select-text text-sm text-slate-500 dark:text-slate-400">
+                    https://docs.qq.com/doc/DRUJnU0ZPY0VHQ3lD
                   </p>
                 </div>
               </div>
