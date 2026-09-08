@@ -84,9 +84,21 @@ const filters = [
 const filterLabelIds = new Set<string>(filters.map(filter => filter.id))
 const PEARPAL_API_RECOVERY_HINT =
   '请点击“清除登录信息”，重新登录后再试。'
+const PEARPAL_EMPTY_PROGRESS_MESSAGE =
+  '同步游戏数据失败，请重新打开地图遮罩并点击美鸭梨地图中的“同步游戏数据”按钮'
 
 function pearPalApiFailure(action: string) {
   return `${action}，可能是登录信息已过期。${PEARPAL_API_RECOVERY_HINT}`
+}
+
+function hasEmptyCollectionProgress(status: MapMaskUserStatus) {
+  return (
+    status.authenticated &&
+    status.awarded_star_count === 0 &&
+    status.awarded_dewdrop_count === 0 &&
+    status.awarded_box_count === 0 &&
+    status.awarded_read_count === 0
+  )
 }
 
 const delay = (milliseconds: number) =>
@@ -211,6 +223,26 @@ export function MapMaskPage() {
     return waitForLogin()
   }, [refreshUserState, region, selectBackendRegion, waitForLogin])
 
+  const clearEmptyProgressSession = useCallback(
+    async (status: MapMaskUserStatus) => {
+      if (!hasEmptyCollectionProgress(status)) return false
+
+      await window.App.mapMaskOverlay?.hide().catch(() => {})
+      setOverlayActive(false)
+      try {
+        await window.App.pearPalLogin.clear(region)
+        toast.error(PEARPAL_EMPTY_PROGRESS_MESSAGE, { duration: 8000 })
+      } catch {
+        toast.error(
+          `${PEARPAL_EMPTY_PROGRESS_MESSAGE}。自动清除登录信息失败，请手动点击“清除登录信息”`,
+          { duration: 10000 }
+        )
+      }
+      return true
+    },
+    [region]
+  )
+
   const handleToggleOverlay = async () => {
     if (settingsLoading || opening || refreshing || updatingFilter) return
     setOpening(true)
@@ -223,7 +255,8 @@ export function MapMaskPage() {
       }
       await selectBackendRegion()
       await window.App.rpc.request('map_mask.prepare_points')
-      await ensureUserSession()
+      const userStatus = await ensureUserSession()
+      if (await clearEmptyProgressSession(userStatus)) return
       await window.App.rpc.request('map_mask.set_hide_awarded', {
         hide_awarded: true,
       })
@@ -255,7 +288,8 @@ export function MapMaskPage() {
     if (settingsLoading || opening || refreshing || updatingFilter) return
     setRefreshing(true)
     try {
-      await ensureUserSession()
+      const userStatus = await ensureUserSession()
+      if (await clearEmptyProgressSession(userStatus)) return
       toast.success('收集进度已刷新')
     } catch {
       toast.error(pearPalApiFailure('刷新收集进度失败'))
