@@ -35,6 +35,12 @@ export default {
     },
   ],
 
+  // 原生全局鼠标钩子必须位于 asar 外，运行时才能加载对应的 .node 文件。
+  asarUnpack: ['**/*.node'],
+
+  // uiohook-napi 自带 N-API 预编译文件，无需 node-gyp 针对 Electron 重新编译。
+  npmRebuild: false,
+
   // // 控制 asar 解包，避免整颗 node_modules 进 unpacked 导致包体过大
   // asar: {
   //   smartUnpack: false,

@@ -24,10 +24,13 @@ const store = new Store<{ state: VideoOverlayState }>({
   name: 'video-overlay',
 })
 
+const SUPPORTED_MOUSE_SHORTCUTS = new Set(['mouse_x1', 'mouse_x2'])
+
 function normalizeKey(value: unknown, fallback: string): string {
   if (typeof value !== 'string') return fallback
   const next = value.trim().toLowerCase()
-  return next || fallback
+  if (!next || (next.startsWith('mouse_') && !SUPPORTED_MOUSE_SHORTCUTS.has(next))) return fallback
+  return next
 }
 
 function normalizeOpacity(value: unknown, fallback: number): number {

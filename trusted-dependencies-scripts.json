@@ -4,5 +4,6 @@
   "electron-vite",
   "@biomejs/biome",
   "@tailwindcss/oxide",
-  "electron-winstaller"
+  "electron-winstaller",
+  "uiohook-napi"
 ]

@@ -27,6 +27,8 @@ const defaultState: VideoOverlayState = {
   seekBackwardKey: 'f7',
 }
 
+const videoOverlayMouseShortcuts = ['mouse_x1', 'mouse_x2'] as const
+
 export function VideoOverlayPage() {
   const [state, setState] = useState<VideoOverlayState>(defaultState)
   const [loading, setLoading] = useState(true)
@@ -144,9 +146,11 @@ export function VideoOverlayPage() {
           </div>
 
           <div className="space-y-3">
+            <p className="text-xs text-slate-400">支持键盘按键和鼠标侧键 X1 / X2</p>
             <KeybindInput
               label="播放 / 暂停 快捷键"
               value={state.playPauseKey}
+              allowedMouseButtons={videoOverlayMouseShortcuts}
               onChange={(value) => {
                 void handleSetState({ playPauseKey: value })
               }}
@@ -155,6 +159,7 @@ export function VideoOverlayPage() {
             <KeybindInput
               label="快进 快捷键"
               value={state.seekForwardKey}
+              allowedMouseButtons={videoOverlayMouseShortcuts}
               onChange={(value) => {
                 void handleSetState({ seekForwardKey: value })
               }}
@@ -163,6 +168,7 @@ export function VideoOverlayPage() {
             <KeybindInput
               label="快退 快捷键"
               value={state.seekBackwardKey}
+              allowedMouseButtons={videoOverlayMouseShortcuts}
               onChange={(value) => {
                 void handleSetState({ seekBackwardKey: value })
               }}

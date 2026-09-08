@@ -10,6 +10,11 @@ import {
   setVideoOverlayState,
   type VideoOverlayPlaybackCommand,
 } from '../services/video-overlay-store'
+import {
+  stopVideoOverlayMouseShortcuts,
+  updateVideoOverlayMouseShortcuts,
+  type VideoOverlayMouseShortcut,
+} from '../services/video-overlay-mouse-shortcuts'
 import { getMonitorService } from '../services/platform/monitorServiceFactory'
 
 const PANEL_DEFAULT_WIDTH = 520
@@ -72,6 +77,7 @@ function showVideoOverlayWindow() {
   setVideoOverlayState({ visible: true })
   broadcastState()
   win.showInactive()
+  syncMouseShortcuts()
 }
 
 function destroyVideoOverlayWindow(win?: BrowserWindow | null) {
@@ -80,6 +86,7 @@ function destroyVideoOverlayWindow(win?: BrowserWindow | null) {
   saveStateNow('destroy', target)
   setVideoOverlayState({ visible: false })
   broadcastState()
+  stopVideoOverlayMouseShortcuts()
   target.destroy()
 }
 
@@ -93,6 +100,36 @@ export function setVideoOverlayIgnoreMouseEvents(ignore: boolean, options?: { fo
   const win = videoOverlayWindowRef
   if (!win || win.isDestroyed()) return
   win.setIgnoreMouseEvents(ignore, options)
+}
+
+function isMouseShortcut(value: string): value is VideoOverlayMouseShortcut {
+  return value === 'mouse_x1' || value === 'mouse_x2'
+}
+
+function syncMouseShortcuts() {
+  const win = videoOverlayWindowRef
+  if (!win || win.isDestroyed() || !win.isVisible()) {
+    stopVideoOverlayMouseShortcuts()
+    return
+  }
+
+  const state = getVideoOverlayState()
+  const mappings: Array<[string, VideoOverlayPlaybackCommand]> = [
+    [state.playPauseKey, 'toggle_play'],
+    [state.seekForwardKey, 'seek_forward'],
+    [state.seekBackwardKey, 'seek_backward'],
+  ]
+  const commands = new Map<VideoOverlayMouseShortcut, VideoOverlayPlaybackCommand>()
+  for (const [shortcut, command] of mappings) {
+    if (isMouseShortcut(shortcut) && !commands.has(shortcut)) {
+      commands.set(shortcut, command)
+    }
+  }
+
+  updateVideoOverlayMouseShortcuts(commands.keys(), (shortcut) => {
+    const command = commands.get(shortcut)
+    if (command) executePlaybackCommand(command)
+  })
 }
 
 function registerPlaybackShortcuts() {
@@ -115,9 +152,16 @@ function registerPlaybackShortcuts() {
   for (const [accelerator, command] of mappings) {
     if (!accelerator || seen.has(accelerator)) continue
     seen.add(accelerator)
-    const ok = globalShortcut.register(accelerator, () => {
-      executePlaybackCommand(command)
-    })
+    if (isMouseShortcut(accelerator)) continue
+    let ok = false
+    try {
+      ok = globalShortcut.register(accelerator, () => {
+        executePlaybackCommand(command)
+      })
+    } catch (error) {
+      log.warn(`[video-overlay] invalid shortcut: ${accelerator}`, error)
+      continue
+    }
     if (!ok) {
       log.warn(`[video-overlay] failed to register shortcut: ${accelerator}`)
       continue
@@ -125,6 +169,7 @@ function registerPlaybackShortcuts() {
     registeredAccelerators.push(accelerator)
   }
   videoOverlayShortcutsRegistered = true
+  syncMouseShortcuts()
 }
 
 function registerVideoOverlayIpc() {
@@ -215,6 +260,7 @@ export function unregisterVideoOverlayShortcuts() {
   }
   registeredAccelerators = []
   videoOverlayShortcutsRegistered = false
+  stopVideoOverlayMouseShortcuts()
 }
 
 async function ensureVideoOverlayWindow() {
@@ -287,11 +333,13 @@ async function createVideoOverlayWindow() {
   window.on('show', () => {
     setVideoOverlayState({ visible: true })
     broadcastState()
+    syncMouseShortcuts()
   })
 
   window.on('hide', () => {
     setVideoOverlayState({ visible: false })
     broadcastState()
+    stopVideoOverlayMouseShortcuts()
   })
 
   window.on('close', (event) => {

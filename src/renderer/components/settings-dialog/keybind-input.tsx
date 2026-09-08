@@ -82,9 +82,16 @@ export type KeybindInputProps = {
   value: string
   onChange: (value: string) => void
   className?: string
+  allowedMouseButtons?: readonly string[]
 }
 
-export function KeybindInput({ label, value, onChange, className }: KeybindInputProps) {
+export function KeybindInput({
+  label,
+  value,
+  onChange,
+  className,
+  allowedMouseButtons,
+}: KeybindInputProps) {
   const [capturing, setCapturing] = useState(false)
   const [displayValue, setDisplayValue] = useState(value)
   const previousValueRef = useRef(value)
@@ -127,6 +134,12 @@ export function KeybindInput({ label, value, onChange, className }: KeybindInput
       e.preventDefault()
       e.stopPropagation()
       const keyStr = formatMouseButton(e.button)
+      if (allowedMouseButtons && !allowedMouseButtons.includes(keyStr)) {
+        setDisplayValue(previousValueRef.current)
+        setCapturing(false)
+        clearCurrentCapture()
+        return
+      }
       setDisplayValue(keyStr)
       onChange(keyStr)
       setCapturing(false)
@@ -137,7 +150,7 @@ export function KeybindInput({ label, value, onChange, className }: KeybindInput
     currentCaptureRef.mousedown = handleMouseDown
     window.addEventListener("keydown", handleKeyDown, true)
     window.addEventListener("mousedown", handleMouseDown, true)
-  }, [capturing, displayValue, onChange])
+  }, [allowedMouseButtons, capturing, displayValue, onChange])
 
   const displayText = capturing ? "请按下按键" : displayValue || "点击设置"
 
