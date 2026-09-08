@@ -4,9 +4,16 @@ import { useCallback, useEffect, useRef, useState } from "react"
 import { cn } from "renderer/lib/utils"
 
 /** 将 KeyboardEvent 转为与 Python 后端一致的键名字符串 */
-function formatKeyFromEvent(event: KeyboardEvent): string {
+function formatKeyFromEvent(
+  event: KeyboardEvent,
+  distinguishControlSides: boolean
+): string {
   const key = event.key
   const code = event.code
+  if (distinguishControlSides) {
+    if (code === "ControlLeft") return "left_control"
+    if (code === "ControlRight") return "right_control"
+  }
   const map: Record<string, string> = {
     " ": "space",
     Tab: "tab",
@@ -83,6 +90,7 @@ export type KeybindInputProps = {
   onChange: (value: string) => void
   className?: string
   allowedMouseButtons?: readonly string[]
+  distinguishControlSides?: boolean
 }
 
 export function KeybindInput({
@@ -91,6 +99,7 @@ export function KeybindInput({
   onChange,
   className,
   allowedMouseButtons,
+  distinguishControlSides = false,
 }: KeybindInputProps) {
   const [capturing, setCapturing] = useState(false)
   const [displayValue, setDisplayValue] = useState(value)
@@ -117,7 +126,7 @@ export function KeybindInput({
       }
       e.preventDefault()
       e.stopPropagation()
-      const keyStr = formatKeyFromEvent(e)
+      const keyStr = formatKeyFromEvent(e, distinguishControlSides)
       setDisplayValue(keyStr)
       onChange(keyStr)
       setCapturing(false)
@@ -150,7 +159,7 @@ export function KeybindInput({
     currentCaptureRef.mousedown = handleMouseDown
     window.addEventListener("keydown", handleKeyDown, true)
     window.addEventListener("mousedown", handleMouseDown, true)
-  }, [allowedMouseButtons, capturing, displayValue, onChange])
+  }, [allowedMouseButtons, capturing, displayValue, distinguishControlSides, onChange])
 
   const displayText = capturing ? "请按下按键" : displayValue || "点击设置"
 

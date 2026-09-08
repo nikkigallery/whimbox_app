@@ -115,6 +115,7 @@ function ShortcutsForm({ rpcClient }: { rpcClient: IpcRpcClient }) {
     <div className="grid grid-cols-2 gap-3">
       {Object.entries(config).map(([key, item]) => (
         <KeybindInput
+          distinguishControlSides
           key={key}
           label={item.description ?? key}
           value={typeof item.value === "string" ? item.value : String(item.value ?? "")}
