@@ -162,6 +162,8 @@ declare global {
         stopBackend: () => Promise<unknown>
         getAutoStart: () => Promise<boolean>
         setAutoStart: (enabled: boolean) => Promise<boolean>
+        getCompatibilityMode: () => Promise<boolean>
+        setCompatibilityMode: (enabled: boolean) => Promise<boolean>
         runUninstaller: () => Promise<unknown>
         getAppVersion: () => Promise<string>
         getAnnouncements: () => Promise<{

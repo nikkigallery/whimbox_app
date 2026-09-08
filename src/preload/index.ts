@@ -300,6 +300,10 @@ const API = {
     getAutoStart: () => ipcRenderer.invoke('launcher:get-auto-start') as Promise<boolean>,
     setAutoStart: (enabled: boolean) =>
       ipcRenderer.invoke('launcher:set-auto-start', enabled) as Promise<boolean>,
+    getCompatibilityMode: () =>
+      ipcRenderer.invoke('launcher:get-compatibility-mode') as Promise<boolean>,
+    setCompatibilityMode: (enabled: boolean) =>
+      ipcRenderer.invoke('launcher:set-compatibility-mode', enabled) as Promise<boolean>,
     runUninstaller: () => ipcRenderer.invoke('launcher:run-uninstaller'),
     restartBackend: (title?: string) => ipcRenderer.invoke('launcher:restart-backend', title),
     getAppVersion: () => ipcRenderer.invoke('launcher:get-app-version'),

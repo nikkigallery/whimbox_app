@@ -9,6 +9,10 @@ import { ENVIRONMENT } from 'shared/constants'
 import { waitFor } from 'shared/utils'
 import { startAuthServer, stopAuthServer } from './services/auth-server'
 import { configureLogFile, registerAppLogger } from './services/app-logger'
+import {
+  getCompatibilityModeEnabled,
+  setCompatibilityModeEnabled,
+} from './services/app-settings-store'
 import { backendManager } from './services/backend-manager'
 import { ensurePythonEnvironment, registerLauncherIpc } from './services/launcher-ipc'
 import { registerAppUpdater, unregisterAppUpdater } from './services/updater'
@@ -31,6 +35,11 @@ if (process.platform === 'win32') {
   app.commandLine.appendSwitch('no-sandbox')
   app.commandLine.appendSwitch('disable-gpu-sandbox')
   app.commandLine.appendSwitch('disable-features', 'RendererCodeIntegrity')
+}
+
+const compatibilityModeEnabled = getCompatibilityModeEnabled()
+if (process.platform === 'win32' && compatibilityModeEnabled) {
+  app.disableHardwareAcceleration()
 }
 
 let primaryWindow: BrowserWindow | null = null
@@ -151,9 +160,19 @@ makeAppWithSingleInstanceLock(async () => {
     return setAutoStartEnabled(enabled === true)
   })
 
+  ipcMain.handle('launcher:get-compatibility-mode', () => {
+    return getCompatibilityModeEnabled()
+  })
+
+  ipcMain.handle('launcher:set-compatibility-mode', (_event, enabled: boolean) => {
+    return setCompatibilityModeEnabled(enabled === true)
+  })
+
   await app.whenReady()
   configureLogFile()
-  log.info(`[startup] Whimbox App version=${app.getVersion()} mode=${ENVIRONMENT.IS_DEV ? 'dev' : 'prod'}`,)
+  log.info(
+    `[startup] Whimbox App version=${app.getVersion()} mode=${ENVIRONMENT.IS_DEV ? 'dev' : 'prod'} compatibility_mode=${compatibilityModeEnabled}`,
+  )
 
   const splashWindow = await SplashWindow()
   await new Promise<void>((resolve) => {

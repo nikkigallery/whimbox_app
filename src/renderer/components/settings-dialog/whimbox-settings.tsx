@@ -135,6 +135,73 @@ function AutoStartSetting() {
   )
 }
 
+function CompatibilityModeSetting() {
+  const [enabled, setEnabled] = useState(false)
+  const [loading, setLoading] = useState(true)
+  const [saving, setSaving] = useState(false)
+
+  useEffect(() => {
+    let disposed = false
+
+    window.App.launcher
+      .getCompatibilityMode()
+      .then((value) => {
+        if (!disposed) setEnabled(value)
+      })
+      .catch((error) => {
+        if (!disposed) {
+          toast.error(error instanceof Error ? error.message : "读取兼容模式设置失败")
+        }
+      })
+      .finally(() => {
+        if (!disposed) setLoading(false)
+      })
+
+    return () => {
+      disposed = true
+    }
+  }, [])
+
+  async function handleChange(value: boolean) {
+    const previous = enabled
+    setEnabled(value)
+    setSaving(true)
+
+    try {
+      const actual = await window.App.launcher.setCompatibilityMode(value)
+      setEnabled(actual)
+      toast.success("兼容模式设置已保存，重启奇想盒后生效")
+    } catch (error) {
+      setEnabled(previous)
+      toast.error(error instanceof Error ? error.message : "保存兼容模式设置失败")
+    } finally {
+      setSaving(false)
+    }
+  }
+
+  return (
+    <div className="rounded-xl border border-slate-100 bg-white px-4 py-3 text-sm dark:border-slate-800 dark:bg-slate-900">
+      <div className="flex flex-wrap items-center justify-between gap-3">
+        <div className="min-w-0 flex-1">
+          <p className="font-semibold text-slate-700 dark:text-slate-100">透明窗口兼容模式</p>
+          <p className="text-xs text-slate-400">
+            如果地图遮罩不是透明的，请开启此选项并重启奇想盒。
+          </p>
+        </div>
+        <label className="flex items-center gap-2 text-sm text-slate-600 dark:text-slate-200">
+          <Checkbox
+            checked={enabled}
+            disabled={loading || saving}
+            onCheckedChange={(checked) => handleChange(checked === true)}
+            className="data-[state=checked]:bg-pink-400 data-[state=checked]:border-pink-400 data-[state=checked]:text-white"
+          />
+          <span>{enabled ? "已开启" : "已关闭"}</span>
+        </label>
+      </div>
+    </div>
+  )
+}
+
 export const content: SettingContent = {
   title: "奇想盒设置",
   description: "奇想盒本身的设置",
@@ -152,6 +219,7 @@ export const content: SettingContent = {
     <div className="space-y-3">
       <ThemeToggle />
       <AutoStartSetting />
+      <CompatibilityModeSetting />
       <div className="rounded-xl border border-slate-100 bg-white px-4 py-3 text-sm dark:border-slate-800 dark:bg-slate-900">
         <div className="flex flex-wrap items-center justify-between gap-3">
           <div>
