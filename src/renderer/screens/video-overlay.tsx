@@ -143,6 +143,7 @@ export function VideoOverlayScreen() {
   const inputRef = useRef<HTMLInputElement | null>(null)
   const unlockButtonRef = useRef<HTMLButtonElement | null>(null)
   const pointerPassthroughRef = useRef(false)
+  const pointerInteractionCleanupRef = useRef<(() => void) | null>(null)
   const resizeRef = useRef<{
     edge: ResizeEdge
     startX: number
@@ -172,6 +173,7 @@ export function VideoOverlayScreen() {
     document.documentElement.classList.add('overlay-window')
     document.body.classList.add('overlay-window')
     return () => {
+      pointerInteractionCleanupRef.current?.()
       document.documentElement.classList.remove('overlay-window')
       document.body.classList.remove('overlay-window')
     }
@@ -333,52 +335,74 @@ export function VideoOverlayScreen() {
       if (event.button !== 0 || !window.App.videoOverlay) return
       event.preventDefault()
       event.stopPropagation()
-      window.App.videoOverlay.getBounds().then((bounds) => {
+
+      pointerInteractionCleanupRef.current?.()
+      const startX = event.screenX
+      const startY = event.screenY
+      let active = true
+
+      const cleanup = () => {
+        if (!active) return
+        active = false
+        resizeRef.current = null
+        window.removeEventListener('mousemove', onMove)
+        window.removeEventListener('mouseup', cleanup)
+        window.removeEventListener('blur', cleanup)
+        if (pointerInteractionCleanupRef.current === cleanup) {
+          pointerInteractionCleanupRef.current = null
+        }
+      }
+
+      const onMove = (moveEvent: MouseEvent) => {
+        if ((moveEvent.buttons & 1) === 0) {
+          cleanup()
+          return
+        }
+        const current = resizeRef.current
+        if (!current || !window.App.videoOverlay) return
+        const dx = moveEvent.screenX - current.startX
+        const dy = moveEvent.screenY - current.startY
+        let x = current.startWinX
+        const y = current.startWinY
+        let width = current.startW
+        let height = current.startH
+        if (current.edge === 'e') {
+          width = Math.max(PANEL_MIN_WIDTH, current.startW + dx)
+        } else if (current.edge === 'w') {
+          const nextWidth = Math.max(PANEL_MIN_WIDTH, current.startW - dx)
+          x = current.startWinX + current.startW - nextWidth
+          width = nextWidth
+        } else if (current.edge === 's') {
+          height = Math.max(PANEL_MIN_HEIGHT, current.startH + dy)
+        } else if (current.edge === 'se') {
+          width = Math.max(PANEL_MIN_WIDTH, current.startW + dx)
+          height = Math.max(PANEL_MIN_HEIGHT, current.startH + dy)
+        } else if (current.edge === 'sw') {
+          const nextWidth = Math.max(PANEL_MIN_WIDTH, current.startW - dx)
+          x = current.startWinX + current.startW - nextWidth
+          width = nextWidth
+          height = Math.max(PANEL_MIN_HEIGHT, current.startH + dy)
+        }
+        void window.App.videoOverlay.setBounds(x, y, width, height)
+      }
+
+      pointerInteractionCleanupRef.current = cleanup
+      window.addEventListener('mousemove', onMove)
+      window.addEventListener('mouseup', cleanup)
+      window.addEventListener('blur', cleanup)
+
+      void window.App.videoOverlay.getBounds().then((bounds) => {
+        if (!active) return
         resizeRef.current = {
           edge,
-          startX: event.screenX,
-          startY: event.screenY,
+          startX,
+          startY,
           startW: bounds.width,
           startH: bounds.height,
           startWinX: bounds.x,
           startWinY: bounds.y,
         }
-        const onMove = (moveEvent: MouseEvent) => {
-          const current = resizeRef.current
-          if (!current || !window.App.videoOverlay) return
-          const dx = moveEvent.screenX - current.startX
-          const dy = moveEvent.screenY - current.startY
-          let x = current.startWinX
-          let y = current.startWinY
-          let width = current.startW
-          let height = current.startH
-          if (current.edge === 'e') {
-            width = Math.max(PANEL_MIN_WIDTH, current.startW + dx)
-          } else if (current.edge === 'w') {
-            const nextWidth = Math.max(PANEL_MIN_WIDTH, current.startW - dx)
-            x = current.startWinX + current.startW - nextWidth
-            width = nextWidth
-          } else if (current.edge === 's') {
-            height = Math.max(PANEL_MIN_HEIGHT, current.startH + dy)
-          } else if (current.edge === 'se') {
-            width = Math.max(PANEL_MIN_WIDTH, current.startW + dx)
-            height = Math.max(PANEL_MIN_HEIGHT, current.startH + dy)
-          } else if (current.edge === 'sw') {
-            const nextWidth = Math.max(PANEL_MIN_WIDTH, current.startW - dx)
-            x = current.startWinX + current.startW - nextWidth
-            width = nextWidth
-            height = Math.max(PANEL_MIN_HEIGHT, current.startH + dy)
-          }
-          void window.App.videoOverlay.setBounds(x, y, width, height)
-        }
-        const onUp = () => {
-          resizeRef.current = null
-          window.removeEventListener('mousemove', onMove)
-          window.removeEventListener('mouseup', onUp)
-        }
-        window.addEventListener('mousemove', onMove)
-        window.addEventListener('mouseup', onUp)
-      })
+      }).catch(cleanup)
     },
     [],
   )
@@ -387,33 +411,57 @@ export function VideoOverlayScreen() {
     if (event.button !== 0 || !window.App.videoOverlay) return
     event.preventDefault()
     event.stopPropagation()
-    window.App.videoOverlay.getBounds().then((bounds) => {
+
+    pointerInteractionCleanupRef.current?.()
+    const startX = event.screenX
+    const startY = event.screenY
+    let active = true
+
+    const cleanup = () => {
+      if (!active) return
+      active = false
+      dragRef.current = null
+      window.removeEventListener('mousemove', onMove)
+      window.removeEventListener('mouseup', cleanup)
+      window.removeEventListener('blur', cleanup)
+      if (pointerInteractionCleanupRef.current === cleanup) {
+        pointerInteractionCleanupRef.current = null
+      }
+    }
+
+    const onMove = (moveEvent: MouseEvent) => {
+      if ((moveEvent.buttons & 1) === 0) {
+        cleanup()
+        return
+      }
+      const current = dragRef.current
+      if (!current || !window.App.videoOverlay) return
+      const dx = moveEvent.screenX - current.startX
+      const dy = moveEvent.screenY - current.startY
+      void window.App.videoOverlay.setBounds(
+        current.startWinX + dx,
+        current.startWinY + dy,
+        bounds.width,
+        bounds.height,
+      )
+    }
+
+    let bounds = { width: 0, height: 0 }
+    pointerInteractionCleanupRef.current = cleanup
+    window.addEventListener('mousemove', onMove)
+    window.addEventListener('mouseup', cleanup)
+    window.addEventListener('blur', cleanup)
+
+    void window.App.videoOverlay.getBounds().then((nextBounds) => {
+      if (!active) return
+      bounds = nextBounds
       dragRef.current = {
-        startX: event.screenX,
-        startY: event.screenY,
-        startWinX: bounds.x,
-        startWinY: bounds.y,
+        startX,
+        startY,
+        startWinX: nextBounds.x,
+        startWinY: nextBounds.y,
       }
-      const onMove = (moveEvent: MouseEvent) => {
-        const current = dragRef.current
-        if (!current || !window.App.videoOverlay) return
-        const dx = moveEvent.screenX - current.startX
-        const dy = moveEvent.screenY - current.startY
-        void window.App.videoOverlay.setBounds(
-          current.startWinX + dx,
-          current.startWinY + dy,
-          bounds.width,
-          bounds.height,
-        )
-      }
-      const onUp = () => {
-        dragRef.current = null
-        window.removeEventListener('mousemove', onMove)
-        window.removeEventListener('mouseup', onUp)
-      }
-      window.addEventListener('mousemove', onMove)
-      window.addEventListener('mouseup', onUp)
-    })
+    }).catch(cleanup)
   }, [])
 
   const titleText = useMemo(() => {
