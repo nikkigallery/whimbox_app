@@ -3,10 +3,11 @@
   CircleDot,
   Gift,
   Home,
+  Keyboard,
   Layers,
+  ListOrdered,
   Map,
   Minus,
-  Keyboard,
   PanelBottomClose,
   Piano,
   PlayCircle,
@@ -45,6 +46,7 @@ import { OneDragonFlowPage } from '../pages/one-dragon-flow-page'
 import { OneDragonPage } from '../pages/one-dragon-page'
 import { AutoMacroPage } from '../pages/auto-macro-page'
 import { AutoMusicPage } from '../pages/auto-music-page'
+import { CustomFlowPage } from '../pages/custom-flow-page'
 import { ScriptSubscribePage } from '../pages/script-subscribe-page'
 import { ToolboxPage } from '../pages/toolbox-page'
 import { IpcRpcClient } from 'renderer/lib/ipc-rpc'
@@ -96,6 +98,7 @@ const navItems: NavItem[] = [
       { id: 'auto-navigate', label: '跑图脚本', icon: Map },
       { id: 'auto-macro', label: '宏脚本', icon: Keyboard },
       { id: 'auto-music', label: '演奏脚本', icon: Piano },
+      { id: 'custom-flow', label: '自定义流程', icon: ListOrdered },
     ],
   },
   { id: 'script-subscribe', label: '订阅脚本', icon: Rss },
@@ -506,6 +509,15 @@ export function MainScreen() {
         return <AutoMacroPage rpcClient={rpcClient} sessionId={sessionId} rpcState={rpcState} />
       case 'auto-music':
         return <AutoMusicPage rpcClient={rpcClient} sessionId={sessionId} rpcState={rpcState} />
+      case 'custom-flow':
+        return (
+          <CustomFlowPage
+            backendReloadVersion={backendReloadVersion}
+            rpcClient={rpcClient}
+            rpcState={rpcState}
+            sessionId={sessionId}
+          />
+        )
       case 'script-subscribe':
         return (
           <ScriptSubscribePage
