@@ -263,7 +263,13 @@ export function MapMaskPage() {
       await window.App.mapMaskOverlay?.show()
       setOverlayActive(true)
       toast.success('地图遮罩已打开，请回到游戏并打开大地图')
-    } catch {
+    } catch (error) {
+      const errorMessage =
+        error instanceof Error ? error.message : String(error ?? '')
+      if (errorMessage.includes('自动化任务运行期间无法打开地图遮罩')) {
+        toast.error('自动化任务运行期间无法打开地图遮罩，请先结束任务再尝试')
+        return
+      }
       toast.error(
         overlayActive
           ? '关闭地图遮罩失败，请稍后重试'

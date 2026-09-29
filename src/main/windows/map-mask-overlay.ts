@@ -180,7 +180,7 @@ function registerMapMaskOverlayIpc() {
       { enabled: true },
     )
     if (!state.enabled) {
-      throw new Error('前台自动化任务运行期间无法打开地图遮罩')
+      throw new Error('自动化任务运行期间无法打开地图遮罩，请先结束任务再尝试')
     }
     try {
       const win = await ensureMapMaskOverlayWindow()
