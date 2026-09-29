@@ -1,4 +1,6 @@
+import { spawn } from 'node:child_process'
 import { BrowserWindow, app, ipcMain } from 'electron'
+import log from 'electron-log/main.js'
 
 import { RpcClient } from './rpc-client'
 import { backendManager } from './backend-manager'
@@ -18,6 +20,23 @@ const quitWhimbox = async () => {
   } finally {
     app.quit()
   }
+}
+
+const shutdownComputer = () => {
+  if (process.platform !== 'win32') {
+    log.warn('[one-dragon] system shutdown is only supported on Windows')
+    return
+  }
+
+  const shutdownProcess = spawn('shutdown.exe', ['/s', '/t', '0'], {
+    detached: true,
+    stdio: 'ignore',
+    windowsHide: true,
+  })
+  shutdownProcess.once('error', (error) => {
+    log.error('[one-dragon] failed to request system shutdown', error)
+  })
+  shutdownProcess.unref()
 }
 
 const broadcast = (channel: string, payload: unknown) => {
@@ -47,6 +66,21 @@ export function registerRpcBridge() {
       // Give the backend a brief moment to finish publishing the task result
       // before Electron terminates its managed Python process.
       setTimeout(() => void quitWhimbox(), 250)
+      return
+    }
+    if (payload.method === 'event.app.finish_actions') {
+      const params = payload.params as {
+        quit_app?: boolean
+        shutdown_computer?: boolean
+      } | undefined
+      if (params?.shutdown_computer) {
+        shutdownComputer()
+      }
+      if (params?.quit_app) {
+        // Give the backend a brief moment to finish publishing the task result
+        // before Electron terminates its managed Python process.
+        setTimeout(() => void quitWhimbox(), 250)
+      }
       return
     }
     if (payload.method === 'event.overlay.show') {
