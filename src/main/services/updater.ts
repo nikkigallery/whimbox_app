@@ -143,6 +143,14 @@ export function registerAppUpdater(window: BrowserWindow) {
       sendState(mainWindow, { status: 'error', message: '开发环境下无法安装更新。' })
       return
     }
+    const token = getAccessToken()
+    if (!token) {
+      sendState(mainWindow, {
+        status: 'error',
+        message: '请先登录并开通自动更新。',
+      })
+      return
+    }
     applyUpdaterAuth()
     try {
       // 下载前重新拉取 feed，拿到新的防盗链 URL（短有效期），再立即下载

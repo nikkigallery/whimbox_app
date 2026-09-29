@@ -85,7 +85,7 @@ const filterLabelIds = new Set<string>(filters.map(filter => filter.id))
 const PEARPAL_API_RECOVERY_HINT =
   '请点击“清除登录信息”，重新登录后再试。'
 const PEARPAL_EMPTY_PROGRESS_MESSAGE =
-  '同步游戏数据失败，请重新打开地图遮罩并点击美鸭梨地图中的“同步游戏数据”按钮'
+  '第一次使用美鸭梨地图？请先去官方美鸭梨地图网站登录，点击“同步游戏数据”按钮，再回来使用奇想盒的地图遮罩功能'
 
 function pearPalApiFailure(action: string) {
   return `${action}，可能是登录信息已过期。${PEARPAL_API_RECOVERY_HINT}`
