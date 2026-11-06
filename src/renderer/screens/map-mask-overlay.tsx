@@ -1,9 +1,10 @@
-import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
+import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react'
 
 import { MapMaskCanvas } from 'renderer/components/map-mask/map-mask-canvas'
 import type {
   MapMaskLabel,
   MapMaskLabelsResponse,
+  MapMaskPoint,
   MapMaskState,
   MapMaskViewport,
   MapMaskVisiblePointsResponse,
@@ -198,6 +199,16 @@ export function MapMaskOverlayScreen() {
   const lastRenderableResultRef =
     useRef<MapMaskVisiblePointsResponse | null>(null)
   const backendDisabledHandledRef = useRef(false)
+  const [selectedPoint, setSelectedPoint] = useState<VisibleMapMaskPoint | null>(null)
+  const [detailLoading, setDetailLoading] = useState(false)
+  const [detailError, setDetailError] = useState('')
+  const [imageIndex, setImageIndex] = useState(0)
+  const [detailCardHeight, setDetailCardHeight] = useState(0)
+  const detailCardRef = useRef<HTMLElement | null>(null)
+  const selectedPointRef = useRef<VisibleMapMaskPoint | null>(null)
+  const renderedPointsRef = useRef<VisibleMapMaskPoint[]>([])
+  const ignoreClicksUntilRef = useRef(0)
+  const detailRequestSequenceRef = useRef(0)
   useEffect(() => {
     const updateOverlaySize = () => {
       setOverlaySize({ width: window.innerWidth, height: window.innerHeight })
@@ -321,6 +332,7 @@ export function MapMaskOverlayScreen() {
       ),
     [activeViewport, overlayViewport, visibleResult?.points]
   )
+  renderedPointsRef.current = renderedPoints
   const resolutionSupported = isSupportedAspectRatio(
     overlaySize.width,
     overlaySize.height
@@ -376,6 +388,108 @@ export function MapMaskOverlayScreen() {
     }
   })()
 
+  const closeDetail = useCallback(() => {
+    if (!selectedPointRef.current) return
+    detailRequestSequenceRef.current += 1
+    selectedPointRef.current = null
+    ignoreClicksUntilRef.current = Date.now() + 200
+    setSelectedPoint(null)
+    setDetailError('')
+    setDetailLoading(false)
+    setImageIndex(0)
+  }, [])
+
+  useEffect(() => {
+    if (!enabled || !isBigmapDisplay) closeDetail()
+  }, [closeDetail, enabled, isBigmapDisplay])
+
+  useEffect(() => {
+    const handleVisibilityChange = () => {
+      if (document.visibilityState !== 'visible') closeDetail()
+    }
+    document.addEventListener('visibilitychange', handleVisibilityChange)
+    return () => document.removeEventListener('visibilitychange', handleVisibilityChange)
+  }, [closeDetail])
+
+  useEffect(() => {
+    void window.App.mapMaskOverlay?.setIgnoreMouseEvents(!selectedPoint)
+    return () => {
+      void window.App.mapMaskOverlay?.setIgnoreMouseEvents(true)
+    }
+  }, [selectedPoint])
+
+  useEffect(() => {
+    const unsubscribe = window.App.rpc.onNotification(notification => {
+      if (notification.method !== 'event.map_mask.bigmap_click') return
+      if (selectedPointRef.current || Date.now() < ignoreClicksUntilRef.current)
+        return
+      const params = notification.params as Record<string, unknown> | undefined
+      const relativeX = params?.relative_x
+      const relativeY = params?.relative_y
+      if (!isFiniteNumber(relativeX) || !isFiniteNumber(relativeY)) return
+      const clickX = relativeX * window.innerWidth
+      const clickY = relativeY * window.innerHeight
+      const hit = [...renderedPointsRef.current].reverse().find(point =>
+        Math.hypot(point.screen_x - clickX, point.screen_y - clickY) <= 15
+      )
+      if (!hit) return
+
+      // Visible-point snapshots only contain marker fields; full detail is lazy-loaded.
+      const initialPoint = { ...hit, detail: hit.detail ?? {} }
+      selectedPointRef.current = initialPoint
+      setSelectedPoint(initialPoint)
+      setDetailLoading(true)
+      setDetailError('')
+      setImageIndex(0)
+      const requestSequence = ++detailRequestSequenceRef.current
+      void window.App.rpc
+        .request('map_mask.get_point_detail', { point_id: hit.id })
+        .then(result => {
+          if (detailRequestSequenceRef.current !== requestSequence) return
+          const current = selectedPointRef.current
+          if (current?.id !== hit.id) return
+          const detail = result as MapMaskPoint
+          const merged = { ...current, ...detail }
+          selectedPointRef.current = merged
+          setSelectedPoint(merged)
+        })
+        .catch(() => {
+          if (detailRequestSequenceRef.current !== requestSequence) return
+          if (selectedPointRef.current?.id !== hit.id) return
+          setDetailError('点位详情加载失败，请稍后重试')
+        })
+        .finally(() => {
+          if (detailRequestSequenceRef.current !== requestSequence) return
+          if (selectedPointRef.current?.id === hit.id) setDetailLoading(false)
+        })
+    })
+    return () => { unsubscribe() }
+  }, [])
+
+  const detailImages = selectedPoint?.detail.images ?? []
+  useLayoutEffect(() => {
+    const card = detailCardRef.current
+    if (!card) return
+    const updateHeight = () => {
+      const nextHeight = card.getBoundingClientRect().height
+      setDetailCardHeight(previous =>
+        Math.abs(previous - nextHeight) >= 1 ? nextHeight : previous
+      )
+    }
+    updateHeight()
+    const observer = new ResizeObserver(updateHeight)
+    observer.observe(card)
+    return () => observer.disconnect()
+  }, [selectedPoint])
+
+  const detailWidth = Math.min(420, Math.max(260, overlaySize.width - 24))
+  const detailLeft = selectedPoint
+    ? Math.max(12, Math.min(selectedPoint.screen_x + 18, overlaySize.width - detailWidth - 12))
+    : 12
+  const detailTop = selectedPoint
+    ? Math.max(12, Math.min(selectedPoint.screen_y - 30, overlaySize.height - detailCardHeight - 12))
+    : 12
+
   return (
     <main className="pointer-events-none relative h-screen w-screen overflow-hidden bg-transparent">
       <MapMaskCanvas
@@ -396,6 +510,82 @@ export function MapMaskOverlayScreen() {
           style={minimapHintPosition}
         >
           {minimapHint}
+        </div>
+      ) : null}
+      {selectedPoint && isBigmapDisplay ? (
+        <div className="pointer-events-auto absolute inset-0">
+          <button
+            aria-label="关闭点位详情"
+            className="absolute inset-0 cursor-default"
+            onClick={closeDetail}
+            type="button"
+          />
+          <section
+            aria-label="点位详情"
+            className="absolute flex max-h-[calc(100vh-24px)] flex-col overflow-hidden rounded-2xl border border-white/25 bg-slate-950/90 text-white shadow-2xl backdrop-blur-xl"
+            ref={detailCardRef}
+            style={{ left: detailLeft, top: detailTop, width: detailWidth }}
+          >
+            <div className="flex items-start justify-between gap-3 border-b border-white/10 px-4 py-3">
+              <div className="min-w-0">
+                <h2 className="text-base font-semibold">
+                  {selectedPoint.detail.catalog_name ||
+                    labels.find(label => label.id === selectedPoint.label_id)?.name ||
+                    selectedPoint.name}
+                </h2>
+                <p className="mt-1 text-sm text-slate-200">
+                  {selectedPoint.detail.location_description || selectedPoint.name}
+                </p>
+              </div>
+              <button
+                aria-label="关闭点位详情"
+                className="shrink-0 rounded-lg px-2 py-1 text-xl leading-none text-slate-300 hover:bg-white/10 hover:text-white"
+                onClick={closeDetail}
+                type="button"
+              >
+                ×
+              </button>
+            </div>
+            <div className="min-h-0 overflow-y-auto px-4 py-3 text-sm">
+              {detailLoading ? <p className="text-slate-300">正在加载点位详情…</p> : null}
+              {detailError ? <p className="text-amber-300">{detailError}</p> : null}
+              {!detailLoading && !detailError ? (
+                <>
+                  {selectedPoint.detail.difficulty != null ? (
+                    <p className="mb-3 text-amber-200">获取难度：{selectedPoint.detail.difficulty}</p>
+                  ) : null}
+                  {detailImages.length > 0 ? (
+                    <div className="mb-3">
+                      <img
+                        alt={`${selectedPoint.name}位置示意图`}
+                        className="max-h-[40vh] w-full rounded-lg bg-black/30 object-contain"
+                        referrerPolicy="no-referrer"
+                        src={detailImages[imageIndex]}
+                      />
+                      {detailImages.length > 1 ? (
+                        <div className="mt-2 flex items-center justify-center gap-4 text-xs">
+                          <button onClick={() => setImageIndex((imageIndex - 1 + detailImages.length) % detailImages.length)} type="button">上一张</button>
+                          <span>{imageIndex + 1}/{detailImages.length}</span>
+                          <button onClick={() => setImageIndex((imageIndex + 1) % detailImages.length)} type="button">下一张</button>
+                        </div>
+                      ) : null}
+                    </div>
+                  ) : null}
+                  <p className="whitespace-pre-wrap break-words leading-relaxed text-slate-100">
+                    {selectedPoint.detail.content || '暂无详细图文说明'}
+                  </p>
+                  {selectedPoint.detail.contributor ? (
+                    <p className="mt-3 text-xs text-slate-400">贡献者：{selectedPoint.detail.contributor}</p>
+                  ) : null}
+                  {selectedPoint.detail.submitted_at || selectedPoint.detail.updated_at ? (
+                    <p className="mt-1 text-xs text-slate-400">
+                      更新时间：{String(selectedPoint.detail.submitted_at || selectedPoint.detail.updated_at).replace('T', ' ').slice(0, 19)}
+                    </p>
+                  ) : null}
+                </>
+              ) : null}
+            </div>
+          </section>
         </div>
       ) : null}
     </main>

@@ -29,7 +29,8 @@ function WhimboxConfigForm({ rpcClient }: { rpcClient: IpcRpcClient }) {
   } = useConfigForm({ section: WHIMBOX_SECTION, rpcClient })
 
   const stopKeyItem = items.find((item) => item.key === "stop_key")
-  const otherItems = items.filter((item) => item.key !== "stop_key")
+  const pauseKeyItem = items.find((item) => item.key === "pause_key")
+  const otherItems = items.filter((item) => item.key !== "stop_key" && item.key !== "pause_key")
 
   if (items.length === 0 && !loading && !loadError) return null
 
@@ -41,6 +42,17 @@ function WhimboxConfigForm({ rpcClient }: { rpcClient: IpcRpcClient }) {
             label={stopKeyItem.description || "停止任务快捷键"}
             value={String(draftConfig?.stop_key?.value ?? "")}
             onChange={(value) => handleValueChangeAndSave("stop_key", value)}
+            className="bg-transparent px-0 py-0 dark:bg-transparent"
+          />
+        </div>
+      ) : null}
+      {pauseKeyItem ? (
+        <div className="rounded-lg border border-slate-100 bg-slate-50/50 px-3 py-2 text-sm dark:border-slate-700 dark:bg-slate-800/50">
+          <KeybindInput
+            label={pauseKeyItem.description || "暂停/继续任务快捷键"}
+            value={String(draftConfig?.pause_key?.value ?? "]")}
+            onChange={(value) => handleValueChangeAndSave("pause_key", value)}
+            allowedMouseButtons={[]}
             className="bg-transparent px-0 py-0 dark:bg-transparent"
           />
         </div>

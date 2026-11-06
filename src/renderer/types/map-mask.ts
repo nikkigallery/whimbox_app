@@ -9,7 +9,14 @@ export type MapMaskLabel = {
 
 export type MapMaskPointDetail = {
   description?: string
+  catalog_name?: string
+  location_description?: string
+  content?: string
   images?: string[]
+  difficulty?: number | null
+  contributor?: string
+  updated_at?: string
+  submitted_at?: string
   [key: string]: unknown
 }
 

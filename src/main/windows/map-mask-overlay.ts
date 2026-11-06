@@ -253,6 +253,8 @@ async function createMapMaskOverlayWindow() {
   hiddenBecauseGameMinimized = false
   allowMapMaskOverlayClose = false
   hiddenBecauseGameUnfocused = false
+  // Detail cards accept mouse clicks without taking focus away from the game.
+  window.setFocusable(false)
   window.setIgnoreMouseEvents(true)
   window.setVisibleOnAllWorkspaces(true, { visibleOnFullScreen: true })
 

@@ -30,7 +30,51 @@ export function OverlayScreen() {
   const [input, setInput] = useState('')
   const [attachments, setAttachments] = useState<UiAttachment[]>([])
   const [conversationPending, setConversationPending] = useState(false)
+  const [toolRunning, setToolRunning] = useState(false)
   const [currentStatus, setCurrentStatus] = useState('')
+  const [stopKey, setStopKey] = useState('/')
+  const [pauseKey, setPauseKey] = useState(']')
+
+  const refreshHotkeys = useCallback(async () => {
+    try {
+      const result = (await window.App.rpc.request(
+        'config.get',
+        { path: 'Whimbox' },
+      )) as { value?: { stop_key?: { value?: unknown }; pause_key?: { value?: unknown } } }
+      const configuredStop = result.value?.stop_key?.value
+      const configuredPause = result.value?.pause_key?.value
+      if (typeof configuredStop === 'string' && configuredStop.trim()) {
+        setStopKey(configuredStop.trim())
+      }
+      if (typeof configuredPause === 'string' && configuredPause.trim()) {
+        setPauseKey(configuredPause.trim())
+      }
+    } catch {
+      // Keep the backend's default hotkeys while the connection is unavailable.
+    }
+  }, [])
+
+  useEffect(() => {
+    void refreshHotkeys()
+    const offRpcState = window.App.rpc.onState(({ state }) => {
+      if (state === 'open') void refreshHotkeys()
+    })
+    const onFocus = () => void refreshHotkeys()
+    const onVisibilityChange = () => {
+      if (document.visibilityState === 'visible') void refreshHotkeys()
+    }
+    window.addEventListener('focus', onFocus)
+    document.addEventListener('visibilitychange', onVisibilityChange)
+    return () => {
+      offRpcState()
+      window.removeEventListener('focus', onFocus)
+      document.removeEventListener('visibilitychange', onVisibilityChange)
+    }
+  }, [refreshHotkeys])
+
+  useEffect(() => {
+    if (toolRunning) void refreshHotkeys()
+  }, [refreshHotkeys, toolRunning])
 
   useEffect(() => {
     const applyState = (s: {
@@ -45,6 +89,7 @@ export function OverlayScreen() {
       setRpcState(s.rpcState ?? 'idle')
       setSessionId(s.sessionId ?? null)
       setConversationPending(Boolean(s.conversationPending))
+      setToolRunning(Boolean(s.toolRunning))
       setCurrentStatus(typeof s.currentStatus === 'string' ? s.currentStatus : '')
     }
     window.App.conversation.getState().then(applyState)
@@ -169,6 +214,7 @@ export function OverlayScreen() {
   const isInputDisabled = conversationPending || rpcState !== 'open' || !sessionId
   const hasConversation = messages.length > 0
   const inputPlaceholder = currentStatus || (rpcState === 'open' ? '输入内容...' : '奇想盒后端异常')
+  const pauseAvailable = pauseKey !== stopKey
 
   return (
     <div
@@ -181,7 +227,13 @@ export function OverlayScreen() {
         className="flex items-center justify-between border-b border-white/15 px-3 py-0.5 app-drag"
         style={appRegionDrag}
       >
-        <span className="text-sm font-medium text-white/90">奇想盒 - 对话小窗</span>
+        <div className="flex min-w-0 flex-wrap items-center gap-x-2 gap-y-0.5 py-1">
+          <span className="shrink-0 text-sm font-medium text-white/90">奇想盒</span>
+          {pauseAvailable && (
+            <span className="whitespace-nowrap text-[11px] text-white/65">暂停/继续 : {pauseKey}</span>
+          )}
+          <span className="whitespace-nowrap text-[11px] text-white/65">彻底停止 : {stopKey}</span>
+        </div>
         <div className="flex items-center gap-1 app-no-drag" style={appRegionNoDrag}>
           <button
             type="button"
