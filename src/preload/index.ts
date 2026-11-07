@@ -186,6 +186,8 @@ const API = {
       ipcRenderer.invoke('map-mask-overlay:get-state') as Promise<{
         active: boolean
       }>,
+    getCursorPosition: () =>
+      ipcRenderer.invoke('map-mask-overlay:get-cursor-position') as Promise<{ x: number; y: number } | null>,
     onStateChanged: (callback: (state: { active: boolean }) => void) => {
       const listener = (_event: unknown, state: { active: boolean }) =>
         callback(state)

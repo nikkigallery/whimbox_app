@@ -71,6 +71,7 @@ declare global {
         show: () => Promise<boolean>
         hide: () => Promise<boolean>
         getState: () => Promise<{ active: boolean }>
+        getCursorPosition: () => Promise<{ x: number; y: number } | null>
         onStateChanged: (
           callback: (state: { active: boolean }) => void
         ) => () => void

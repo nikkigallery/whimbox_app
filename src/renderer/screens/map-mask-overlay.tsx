@@ -207,7 +207,11 @@ export function MapMaskOverlayScreen() {
   const detailCardRef = useRef<HTMLElement | null>(null)
   const selectedPointRef = useRef<VisibleMapMaskPoint | null>(null)
   const renderedPointsRef = useRef<VisibleMapMaskPoint[]>([])
-  const ignoreClicksUntilRef = useRef(0)
+  const detailCacheRef = useRef(new Map<string, MapMaskPoint>())
+  const hoverCandidateRef = useRef<{ id: string; since: number } | null>(null)
+  const hoverLeftAtRef = useRef<number | null>(null)
+  const cardInteractiveRef = useRef(false)
+  const [cardInteractive, setCardInteractive] = useState(false)
   const detailRequestSequenceRef = useRef(0)
   useEffect(() => {
     const updateOverlaySize = () => {
@@ -392,7 +396,10 @@ export function MapMaskOverlayScreen() {
     if (!selectedPointRef.current) return
     detailRequestSequenceRef.current += 1
     selectedPointRef.current = null
-    ignoreClicksUntilRef.current = Date.now() + 200
+    hoverCandidateRef.current = null
+    hoverLeftAtRef.current = null
+    cardInteractiveRef.current = false
+    setCardInteractive(false)
     setSelectedPoint(null)
     setDetailError('')
     setDetailLoading(false)
@@ -412,59 +419,100 @@ export function MapMaskOverlayScreen() {
   }, [closeDetail])
 
   useEffect(() => {
-    void window.App.mapMaskOverlay?.setIgnoreMouseEvents(!selectedPoint)
+    void window.App.mapMaskOverlay?.setIgnoreMouseEvents(!cardInteractive)
     return () => {
       void window.App.mapMaskOverlay?.setIgnoreMouseEvents(true)
     }
-  }, [selectedPoint])
+  }, [cardInteractive])
+
+  const showDetail = useCallback((hit: VisibleMapMaskPoint) => {
+    const cached = detailCacheRef.current.get(hit.id)
+    const initialPoint = { ...hit, ...(cached ?? {}), detail: cached?.detail ?? hit.detail ?? {} }
+    selectedPointRef.current = initialPoint
+    setSelectedPoint(initialPoint)
+    setDetailLoading(!cached)
+    setDetailError('')
+    setImageIndex(0)
+    if (cached) return
+    const requestSequence = ++detailRequestSequenceRef.current
+    void window.App.rpc
+      .request('map_mask.get_point_detail', { point_id: hit.id })
+      .then(result => {
+        const detail = result as MapMaskPoint
+        detailCacheRef.current.set(hit.id, detail)
+        if (detailRequestSequenceRef.current !== requestSequence) return
+        const current = selectedPointRef.current
+        if (current?.id !== hit.id) return
+        const merged = { ...current, ...detail }
+        selectedPointRef.current = merged
+        setSelectedPoint(merged)
+      })
+      .catch(() => {
+        if (detailRequestSequenceRef.current !== requestSequence) return
+        if (selectedPointRef.current?.id !== hit.id) return
+        setDetailError('点位详情加载失败，请稍后重试')
+      })
+      .finally(() => {
+        if (detailRequestSequenceRef.current !== requestSequence) return
+        if (selectedPointRef.current?.id === hit.id) setDetailLoading(false)
+      })
+  }, [])
 
   useEffect(() => {
-    const unsubscribe = window.App.rpc.onNotification(notification => {
-      if (notification.method !== 'event.map_mask.bigmap_click') return
-      if (selectedPointRef.current || Date.now() < ignoreClicksUntilRef.current)
-        return
-      const params = notification.params as Record<string, unknown> | undefined
-      const relativeX = params?.relative_x
-      const relativeY = params?.relative_y
-      if (!isFiniteNumber(relativeX) || !isFiniteNumber(relativeY)) return
-      const clickX = relativeX * window.innerWidth
-      const clickY = relativeY * window.innerHeight
-      const hit = [...renderedPointsRef.current].reverse().find(point =>
-        Math.hypot(point.screen_x - clickX, point.screen_y - clickY) <= 15
-      )
-      if (!hit) return
-
-      // Visible-point snapshots only contain marker fields; full detail is lazy-loaded.
-      const initialPoint = { ...hit, detail: hit.detail ?? {} }
-      selectedPointRef.current = initialPoint
-      setSelectedPoint(initialPoint)
-      setDetailLoading(true)
-      setDetailError('')
-      setImageIndex(0)
-      const requestSequence = ++detailRequestSequenceRef.current
-      void window.App.rpc
-        .request('map_mask.get_point_detail', { point_id: hit.id })
-        .then(result => {
-          if (detailRequestSequenceRef.current !== requestSequence) return
-          const current = selectedPointRef.current
-          if (current?.id !== hit.id) return
-          const detail = result as MapMaskPoint
-          const merged = { ...current, ...detail }
-          selectedPointRef.current = merged
-          setSelectedPoint(merged)
-        })
-        .catch(() => {
-          if (detailRequestSequenceRef.current !== requestSequence) return
-          if (selectedPointRef.current?.id !== hit.id) return
-          setDetailError('点位详情加载失败，请稍后重试')
-        })
-        .finally(() => {
-          if (detailRequestSequenceRef.current !== requestSequence) return
-          if (selectedPointRef.current?.id === hit.id) setDetailLoading(false)
-        })
-    })
-    return () => { unsubscribe() }
-  }, [])
+    if (!enabled || !isBigmapDisplay) return
+    let disposed = false
+    let inFlight = false
+    const pollCursor = async () => {
+      if (inFlight || disposed) return
+      inFlight = true
+      try {
+        const cursor = await window.App.mapMaskOverlay?.getCursorPosition()
+        if (disposed) return
+        const now = Date.now()
+        const card = detailCardRef.current?.getBoundingClientRect()
+        const insideCard = Boolean(cursor && card &&
+          cursor.x >= card.left && cursor.x <= card.right &&
+          cursor.y >= card.top && cursor.y <= card.bottom)
+        if (cardInteractiveRef.current !== insideCard) {
+          cardInteractiveRef.current = insideCard
+          setCardInteractive(insideCard)
+        }
+        if (insideCard) {
+          hoverCandidateRef.current = null
+          hoverLeftAtRef.current = null
+          return
+        }
+        const hit = cursor && [...renderedPointsRef.current].reverse().find(point =>
+          Math.hypot(point.screen_x - cursor.x, point.screen_y - cursor.y) <= 15
+        )
+        if (hit) {
+          hoverLeftAtRef.current = null
+          if (selectedPointRef.current?.id === hit.id) return
+          if (hoverCandidateRef.current?.id !== hit.id) {
+            hoverCandidateRef.current = { id: hit.id, since: now }
+          } else if (now - hoverCandidateRef.current.since >= 120) {
+            showDetail(hit)
+          }
+          return
+        }
+        hoverCandidateRef.current = null
+        if (selectedPointRef.current) {
+          hoverLeftAtRef.current ??= now
+          if (now - hoverLeftAtRef.current >= 180) closeDetail()
+        }
+      } catch {
+        // A temporarily unavailable overlay window should not affect game input.
+      } finally {
+        inFlight = false
+      }
+    }
+    void pollCursor()
+    const timer = window.setInterval(() => void pollCursor(), 50)
+    return () => {
+      disposed = true
+      window.clearInterval(timer)
+    }
+  }, [closeDetail, enabled, isBigmapDisplay, showDetail])
 
   const detailImages = selectedPoint?.detail.images ?? []
   useLayoutEffect(() => {
@@ -513,16 +561,10 @@ export function MapMaskOverlayScreen() {
         </div>
       ) : null}
       {selectedPoint && isBigmapDisplay ? (
-        <div className="pointer-events-auto absolute inset-0">
-          <button
-            aria-label="关闭点位详情"
-            className="absolute inset-0 cursor-default"
-            onClick={closeDetail}
-            type="button"
-          />
+        <div className="absolute inset-0">
           <section
             aria-label="点位详情"
-            className="absolute flex max-h-[calc(100vh-24px)] flex-col overflow-hidden rounded-2xl border border-white/25 bg-slate-950/90 text-white shadow-2xl backdrop-blur-xl"
+            className="pointer-events-auto absolute flex max-h-[calc(100vh-24px)] flex-col overflow-hidden rounded-2xl border border-white/25 bg-slate-950/90 text-white shadow-2xl backdrop-blur-xl"
             ref={detailCardRef}
             style={{ left: detailLeft, top: detailTop, width: detailWidth }}
           >

@@ -1,6 +1,6 @@
 import { join } from 'node:path'
 
-import { BrowserWindow, ipcMain } from 'electron'
+import { BrowserWindow, ipcMain, screen } from 'electron'
 import log from 'electron-log/main.js'
 
 import { createWindow } from 'lib/electron-app/factories/windows/create'
@@ -210,6 +210,14 @@ function registerMapMaskOverlayIpc() {
   ipcMain.handle('map-mask-overlay:get-state', () => ({
     active: mapMaskOverlayVisibleRequested,
   }))
+
+  ipcMain.handle('map-mask-overlay:get-cursor-position', () => {
+    const win = mapMaskOverlayWindowRef
+    if (!win || win.isDestroyed() || !win.isVisible()) return null
+    const cursor = screen.getCursorScreenPoint()
+    const bounds = win.getBounds()
+    return { x: cursor.x - bounds.x, y: cursor.y - bounds.y }
+  })
 
   ipcMain.handle(
     'map-mask-overlay:set-ignore-mouse-events',
