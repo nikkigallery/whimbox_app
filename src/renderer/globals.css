@@ -156,6 +156,15 @@ body.overlay-window {
   padding: 0;
 }
 
+.map-mask-hud {
+  background: linear-gradient(90deg, transparent, rgb(35 58 65 / 26%) 20%, rgb(35 58 65 / 26%) 78%, transparent);
+  text-shadow: 0 1px 2px rgb(12 24 30 / 95%), 0 0 3px rgb(12 24 30 / 85%);
+}
+
+.map-mask-hud > svg {
+  filter: drop-shadow(0 1px 1px rgb(12 24 30 / 90%));
+}
+
 /* 小窗滚动条：深色半透明，避免默认白色轨道突兀 */
 .overlay-window ::-webkit-scrollbar {
   width: 8px;

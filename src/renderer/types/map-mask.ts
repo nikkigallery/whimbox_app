@@ -162,11 +162,23 @@ export type VisibleMapMaskPoint = MapMaskPoint & {
 export type MapMaskLabelsResponse = {
   labels: MapMaskLabel[]
   selected_label_ids: string[]
+  scene_guidance_supported?: boolean
+}
+
+export type SceneTarget = {
+  id: string
+  label_id: string
+  name: string
+  turn_deg: number | null
+  bearing_deg?: number
+  distance_m: number
+  progress_cached?: boolean
 }
 
 export type MapMaskVisiblePointsResponse = {
   points: VisibleMapMaskPoint[]
   state: MapMaskState
+  scene_target?: SceneTarget
 }
 
 export type MapMaskUserStatus = {

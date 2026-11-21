@@ -1,6 +1,8 @@
 import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react'
 
 import { MapMaskCanvas } from 'renderer/components/map-mask/map-mask-canvas'
+import { SceneGuidance } from 'renderer/components/map-mask/scene-guidance'
+import { useSceneGuidance } from 'renderer/hooks/use-scene-guidance'
 import type {
   MapMaskLabel,
   MapMaskLabelsResponse,
@@ -152,6 +154,11 @@ function hasSameRenderableSnapshot(
 ) {
   if (!previous) return false
   if (
+    previous.scene_target?.id !== next.scene_target?.id ||
+    previous.scene_target?.turn_deg !== next.scene_target?.turn_deg ||
+    (next.scene_target?.turn_deg == null && previous.scene_target?.bearing_deg !== next.scene_target?.bearing_deg) ||
+    previous.scene_target?.progress_cached !== next.scene_target?.progress_cached ||
+    previous.scene_target?.distance_m !== next.scene_target?.distance_m ||
     previous.state.enabled !== next.state.enabled ||
     previous.state.is_bigmap_open !== next.state.is_bigmap_open ||
     previous.state.is_main_world_open !== next.state.is_main_world_open ||
@@ -189,6 +196,7 @@ function hasSameRenderableSnapshot(
 }
 
 export function MapMaskOverlayScreen() {
+  const [sceneGuidance] = useSceneGuidance()
   const [labels, setLabels] = useState<MapMaskLabel[]>([])
   const [visibleResult, setVisibleResult] =
     useState<MapMaskVisiblePointsResponse | null>(null)
@@ -229,10 +237,7 @@ export function MapMaskOverlayScreen() {
     setLabels(result.labels)
   }, [])
 
-  const refreshVisiblePoints = useCallback(async () => {
-    const result = (await window.App.rpc.request(
-      'map_mask.get_visible_points'
-    )) as MapMaskVisiblePointsResponse
+  const applyVisiblePoints = useCallback((result: MapMaskVisiblePointsResponse) => {
     if (!result.state.enabled) {
       if (!backendDisabledHandledRef.current) {
         backendDisabledHandledRef.current = true
@@ -253,16 +258,31 @@ export function MapMaskOverlayScreen() {
     let starting = false
     let visiblePollInFlight = false
     let visibleTimer: number | null = null
+    let lastFrameAt = 0
+    const clearSceneTarget = () => {
+      const previous = lastRenderableResultRef.current
+      if (!previous?.scene_target) return
+      const next = { ...previous, scene_target: undefined }
+      lastRenderableResultRef.current = next
+      setVisibleResult(next)
+    }
 
     document.documentElement.classList.add('overlay-window')
     document.body.classList.add('overlay-window')
     void window.App.mapMaskOverlay?.setIgnoreMouseEvents(true)
 
     const pollVisiblePoints = async () => {
-      if (visiblePollInFlight || disposed) return
+      if (disposed) return
+      if (performance.now() - lastFrameAt > 900) clearSceneTarget()
+      if (visiblePollInFlight) return
       visiblePollInFlight = true
       try {
-        await refreshVisiblePoints()
+        const result = (await window.App.rpc.request(
+          'map_mask.get_visible_points', { scene_guidance: sceneGuidance, compass_fallback: sceneGuidance }
+        )) as MapMaskVisiblePointsResponse
+        if (disposed || document.visibilityState !== 'visible') return
+        applyVisiblePoints(result)
+        lastFrameAt = performance.now()
       } catch {
         // Keep the last successfully rendered frame during temporary RPC failures.
       } finally {
@@ -273,6 +293,7 @@ export function MapMaskOverlayScreen() {
     const stopPolling = () => {
       if (visibleTimer !== null) window.clearInterval(visibleTimer)
       visibleTimer = null
+      clearSceneTarget()
     }
 
     const startPolling = async () => {
@@ -306,7 +327,7 @@ export function MapMaskOverlayScreen() {
       document.documentElement.classList.remove('overlay-window')
       document.body.classList.remove('overlay-window')
     }
-  }, [refreshLabels, refreshVisiblePoints])
+  }, [applyVisiblePoints, refreshLabels, sceneGuidance])
 
   const sourceViewport = visibleResult?.state.viewport ?? null
   const activeViewport = isValidViewport(sourceViewport) ? sourceViewport : null
@@ -547,14 +568,20 @@ export function MapMaskOverlayScreen() {
         labels={labels}
         points={renderedPoints}
       />
+      {enabled && isMinimapDisplay && sceneGuidance && visibleResult?.scene_target && (
+        <SceneGuidance
+          target={visibleResult.scene_target}
+          label={labels.find(label => label.id === visibleResult.scene_target?.label_id)?.name}
+        />
+      )}
       {overlayHint ? (
-        <div className="absolute left-1/2 top-8 -translate-x-1/2 rounded-full border border-white/20 bg-slate-950/80 px-4 py-2 text-sm font-medium text-white shadow-lg backdrop-blur-md">
+        <div className="map-mask-hud absolute left-1/2 top-8 -translate-x-1/2 px-4 py-2 text-sm font-medium text-white">
           {overlayHint}
         </div>
       ) : null}
       {minimapHint ? (
         <div
-          className="absolute -translate-x-1/2 rounded-full border border-white/20 bg-slate-950/80 px-3 py-1.5 text-xs font-medium text-white shadow-lg backdrop-blur-md"
+          className="map-mask-hud absolute -translate-x-1/2 px-3 py-1.5 text-xs font-medium text-white"
           style={minimapHintPosition}
         >
           {minimapHint}

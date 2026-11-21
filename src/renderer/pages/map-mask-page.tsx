@@ -13,6 +13,7 @@ import { toast } from 'sonner'
 
 import { ScrollCenterLayout } from 'renderer/components/scroll-center-layout'
 import { SettingsPageLayout } from 'renderer/components/settings-page-layout'
+import { useSceneGuidance } from 'renderer/hooks/use-scene-guidance'
 import { Button } from 'renderer/components/ui/button'
 import { Checkbox } from 'renderer/components/ui/checkbox'
 import {
@@ -85,7 +86,7 @@ const filterLabelIds = new Set<string>(filters.map(filter => filter.id))
 const PEARPAL_API_RECOVERY_HINT =
   '请点击“清除登录信息”，重新登录后再试。'
 const PEARPAL_EMPTY_PROGRESS_MESSAGE =
-  '第一次使用美鸭梨地图？请先去官方美鸭梨地图网站登录，点击“同步游戏数据”按钮，再回来使用奇想盒的地图遮罩功能'
+  '美鸭梨暂未返回收集记录。如果你已收集过物品，请在官方地图点击“同步游戏数据”，再回到这里刷新点位。'
 
 function pearPalApiFailure(action: string) {
   return `${action}，可能是登录信息已过期。${PEARPAL_API_RECOVERY_HINT}`
@@ -107,6 +108,8 @@ const delay = (milliseconds: number) =>
   })
 
 export function MapMaskPage() {
+  const [sceneGuidance, saveSceneGuidance] = useSceneGuidance()
+  const [supportsSceneGuidance, setSupportsSceneGuidance] = useState(false)
   const [region, setRegion] = useState<PearPalRegion>(initialPearPalRegion)
   const [selectedLabelIds, setSelectedLabelIds] = useState<string[]>([])
   const [settingsLoading, setSettingsLoading] = useState(true)
@@ -122,6 +125,7 @@ export function MapMaskPage() {
       const response = (await window.App.rpc.request(
         'map_mask.get_labels'
       )) as MapMaskLabelsResponse
+      setSupportsSceneGuidance(response.scene_guidance_supported === true)
       const selected = response.selected_label_ids.filter(labelId =>
         filterLabelIds.has(labelId)
       )
@@ -207,13 +211,14 @@ export function MapMaskPage() {
     return status
   }, [])
 
-  const ensureUserSession = useCallback(async () => {
+  const ensureUserSession = useCallback(async (refreshExisting = false) => {
     await selectBackendRegion()
     const status = (await window.App.rpc.request(
       'map_mask.get_user_status'
     )) as MapMaskUserStatus
 
     if (status.authenticated && status.region === region) {
+      if (!refreshExisting) return status
       try {
         return await refreshUserState()
       } catch {
@@ -222,26 +227,6 @@ export function MapMaskPage() {
     }
     return waitForLogin()
   }, [refreshUserState, region, selectBackendRegion, waitForLogin])
-
-  const clearEmptyProgressSession = useCallback(
-    async (status: MapMaskUserStatus) => {
-      if (!hasEmptyCollectionProgress(status)) return false
-
-      await window.App.mapMaskOverlay?.hide().catch(() => {})
-      setOverlayActive(false)
-      try {
-        await window.App.pearPalLogin.clear(region)
-        toast.error(PEARPAL_EMPTY_PROGRESS_MESSAGE, { duration: 8000 })
-      } catch {
-        toast.error(
-          `${PEARPAL_EMPTY_PROGRESS_MESSAGE}。自动清除登录信息失败，请手动点击“清除登录信息”`,
-          { duration: 10000 }
-        )
-      }
-      return true
-    },
-    [region]
-  )
 
   const handleToggleOverlay = async () => {
     if (settingsLoading || opening || refreshing || updatingFilter) return
@@ -255,14 +240,20 @@ export function MapMaskPage() {
       }
       await selectBackendRegion()
       await window.App.rpc.request('map_mask.prepare_points')
-      const userStatus = await ensureUserSession()
-      if (await clearEmptyProgressSession(userStatus)) return
+      const userStatus = await ensureUserSession(!supportsSceneGuidance)
+      if (hasEmptyCollectionProgress(userStatus)) {
+        toast.info(PEARPAL_EMPTY_PROGRESS_MESSAGE, { duration: 8000 })
+      }
       await window.App.rpc.request('map_mask.set_hide_awarded', {
         hide_awarded: true,
       })
       await window.App.mapMaskOverlay?.show()
       setOverlayActive(true)
-      toast.success('地图遮罩已打开，请回到游戏并打开大地图')
+      toast.success(
+        supportsSceneGuidance
+          ? '地图遮罩已打开，回到游戏按 M 打开大地图即可刷新点位'
+          : '地图遮罩已打开，请回到游戏并打开大地图'
+      )
     } catch (error) {
       const errorMessage =
         error instanceof Error ? error.message : String(error ?? '')
@@ -294,9 +285,12 @@ export function MapMaskPage() {
     if (settingsLoading || opening || refreshing || updatingFilter) return
     setRefreshing(true)
     try {
-      const userStatus = await ensureUserSession()
-      if (await clearEmptyProgressSession(userStatus)) return
-      toast.success('收集进度已刷新')
+      const userStatus = await ensureUserSession(true)
+      if (hasEmptyCollectionProgress(userStatus)) {
+        toast.info(PEARPAL_EMPTY_PROGRESS_MESSAGE, { duration: 8000 })
+      } else {
+        toast.success('收集进度已刷新')
+      }
     } catch {
       toast.error(pearPalApiFailure('刷新收集进度失败'))
     } finally {
@@ -491,6 +485,22 @@ export function MapMaskPage() {
                 )
               })}
             </div>
+            <label className="mt-4 flex items-center gap-3 border-t border-slate-200 pt-4 text-sm dark:border-slate-800" htmlFor="map-mask-scene-guidance">
+              <Checkbox
+                checked={supportsSceneGuidance && sceneGuidance}
+                disabled={settingsLoading || !supportsSceneGuidance}
+                id="map-mask-scene-guidance"
+                onCheckedChange={value => saveSceneGuidance(value === true)}
+              />
+              <span>
+                <span className="block font-medium">场景导航箭头</span>
+                <span className="text-xs text-slate-500">
+                  {supportsSceneGuidance
+                    ? '跑图时指向已选类别中最近的未收集点，并显示水平距离。'
+                    : '使用支持场景导航的配套后端即可开启。'}
+                </span>
+              </span>
+            </label>
           </section>
 
           <section className="rounded-3xl border border-slate-200 bg-white p-4 shadow-sm dark:border-slate-800 dark:bg-slate-950">
@@ -506,7 +516,9 @@ export function MapMaskPage() {
                 回到游戏并打开大地图，未收集点位会自动显示并随地图拖动。
               </Instruction>
               <Instruction index="3" title="同步进度">
-                收集后可等待自动同步，或点击“刷新点位”立即刷新。
+                {supportsSceneGuidance
+                  ? '在游戏中按 M 打开大地图即可同步收集进度，也可点击“刷新点位”手动同步。'
+                  : '收集后可等待自动同步，或点击“刷新点位”立即刷新。'}
               </Instruction>
             </ol>
           </section>
