@@ -130,21 +130,29 @@ export function MapMaskCanvas({
 
       context.save()
       context.shadowColor = 'rgba(15, 23, 42, 0.45)'
-      context.shadowBlur = 10
+      context.shadowBlur = compact ? 0 : 10
       context.beginPath()
       context.arc(item.x, item.y, markerRadius, 0, Math.PI * 2)
+      context.globalAlpha = compact ? 0.5 : 1
       context.fillStyle = color
       context.fill()
+      context.globalAlpha = 1
       context.lineWidth = compact ? 1.5 : 2
-      context.strokeStyle = 'rgba(255, 255, 255, 0.94)'
+      context.strokeStyle = compact ? 'rgba(255, 255, 255, 0.8)' : 'rgba(255, 255, 255, 0.94)'
       context.stroke()
 
       context.shadowBlur = 0
       context.font = `700 ${compact ? 8 : 10}px system-ui, -apple-system, BlinkMacSystemFont, sans-serif`
       context.textAlign = 'center'
       context.textBaseline = 'middle'
+      const glyph = markerGlyph(label)
+      if (compact) {
+        context.lineWidth = 1.5
+        context.strokeStyle = 'rgba(17, 34, 42, 0.85)'
+        context.strokeText(glyph, item.x, item.y + 0.5)
+      }
       context.fillStyle = '#ffffff'
-      context.fillText(markerGlyph(label), item.x, item.y + 0.5)
+      context.fillText(glyph, item.x, item.y + 0.5)
       context.restore()
     }
 
